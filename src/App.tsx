@@ -5,6 +5,7 @@ import { Scene } from "./components/Scene";
 import { DevicePanel } from "./components/DevicePanel";
 import { DashboardWidgets } from "./components/DashboardWidgets";
 import { ThemeToggle } from "./components/ThemeToggle";
+import { CyberSpaceToggle } from "./components/CyberSpaceToggle";
 import { FocusCarousel } from "./components/FocusCarousel";
 import { UnsavedChangesDialog } from "./components/UnsavedChangesDialog";
 import { DeviceModal } from "./components/DeviceModal";
@@ -478,6 +479,7 @@ function App() {
             </span>
           </div>
 
+          <CyberSpaceToggle />
           <ThemeToggle />
         </div>
       </div>

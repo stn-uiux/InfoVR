@@ -74,6 +74,11 @@ export interface AppState {
   // Gizmo interaction state
   isGizmoHovered: boolean;
 
+  // Cyber Space Environment
+  cyberSpaceEnabled: boolean;
+  setCyberSpaceEnabled: (enabled: boolean) => void;
+  toggleCyberSpace: () => void;
+
   // Custom Equipment Models & Cards
   customModels: CustomEquipmentModel[];
   deletedDefaultTemplates: string[];
@@ -428,6 +433,10 @@ export const useStore = create<AppState>()(
   setPendingImportFile: (file) => set({ pendingImportFile: file }),
 
   isGizmoHovered: false,
+
+  cyberSpaceEnabled: false,
+  setCyberSpaceEnabled: (enabled) => set({ cyberSpaceEnabled: enabled }),
+  toggleCyberSpace: () => set((state) => ({ cyberSpaceEnabled: !state.cyberSpaceEnabled })),
 
   _cameraRef: null,
   _controlsRef: null,

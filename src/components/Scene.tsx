@@ -13,6 +13,7 @@ import { useStore } from "../store/useStore";
 import { Rack } from "./Rack";
 import { ImportedModelMesh } from "./ImportedModelMesh";
 import { CameraController } from "./CameraController";
+import { CyberSpaceEnvironment } from "./CyberSpaceEnvironment";
 import { GRID_SPACING } from "./constants";
 import { useTheme } from "../contexts/ThemeContext";
 import { Plane, Vector3 } from "three";
@@ -120,6 +121,7 @@ export const Scene = () => {
   const draggingModelId = useStore((state) => state.draggingModelId);
   const selectedRackId = useStore((state) => state.selectedRackId);
   const isEditMode = useStore((state) => state.isEditMode);
+  const cyberSpaceEnabled = useStore((state) => state.cyberSpaceEnabled);
   const deviceRegistrationModalOpen = useStore(
     (state) => state.deviceRegistrationModalOpen,
   );
@@ -269,8 +271,8 @@ export const Scene = () => {
           />
         )}
 
-        {/* Floor Reflection - Hidden in Edit Mode */}
-        {!isEditMode && (
+        {/* Floor Reflection - Hidden in Edit Mode and Cyber Space Mode */}
+        {!isEditMode && !cyberSpaceEnabled && (
           <mesh position={[0, -0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <planeGeometry args={[100, 100]} />
             <MeshReflectorMaterial
@@ -289,6 +291,9 @@ export const Scene = () => {
             />
           </mesh>
         )}
+
+        {/* Cyber Space Server Room Environment */}
+        {cyberSpaceEnabled && !isEditMode && <CyberSpaceEnvironment />}
 
         {/* Racks (filtered by active group) */}
         {groupRacks.map((rack) => (

@@ -4079,7 +4079,6 @@ input:checked+.slider:before {
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   padding: 16px;
-  margin-bottom: 16px;
   display: flex;
   flex-direction: column;
 }
@@ -4202,7 +4201,7 @@ input:checked+.slider:before {
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   padding: 16px;
-  margin-bottom: 16px;
+  margin-top: 12px;
   display: flex;
   flex-direction: column;
   position: absolute;
