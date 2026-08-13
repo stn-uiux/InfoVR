@@ -141,7 +141,7 @@ export const CameraController = () => {
 
     const distHeight = rackHeight / 2 / Math.tan(vFovRad / 2);
     const distWidth = rackWidth / 2 / Math.tan(hFovRad / 2);
-    const baseDistance = Math.max(distHeight, distWidth) * 1.4;
+    const baseDistance = Math.max(distHeight, distWidth) * 1.55;
     const distance = Math.max(baseDistance, 2.0);
 
     const targetCenterY = rackHeight * 0.5;
@@ -156,8 +156,9 @@ export const CameraController = () => {
     // 카메라 유효 거리 설정
     const effectiveDistance = Math.max(distance, 1.8);
 
-    // 정면에 가까운 뷰를 위해 카메라 기준 높이를 랙 중앙에 맞춥니다.
-    const cameraHeight = rackHeight * 0.5; 
+    // 정면에 가까운 뷰를 위해 카메라 기준 높이를 랙 중앙보다 살짝 위로 맞춥니다.
+    // (OrbitControls의 maxPolarAngle 제한에 걸려 화면이 떨리는 현상 방지)
+    const cameraHeight = rackHeight * 0.5 + 0.3; 
 
     // 시선 중심점(LookAt) 역시 랙 중앙으로 둡니다.
     vTargetLookAt.current.set(rackX, rackHeight * 0.5, rackZ);

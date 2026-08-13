@@ -212,7 +212,7 @@ export const getNodeDevices = (
   const placementMap = new Map<string, { rackId: string; instanceId: string; portStates: PortState[] | undefined }>();
   for (const r of racks) {
     for (const d of r.devices) {
-      placementMap.set(d.deviceId, { rackId: r.rackId, instanceId: d.itemId, portStates: d.portStates });
+      if (d.deviceId) placementMap.set(d.deviceId, { rackId: r.rackId, instanceId: d.itemId, portStates: d.portStates });
     }
   }
 
@@ -244,7 +244,7 @@ export const getSubtreeDevices = (
   const placementMap = new Map<string, { rackId: string; instanceId: string; portStates: PortState[] | undefined }>();
   for (const r of racks) {
     for (const d of r.devices) {
-      placementMap.set(d.deviceId, { rackId: r.rackId, instanceId: d.itemId, portStates: d.portStates });
+      if (d.deviceId) placementMap.set(d.deviceId, { rackId: r.rackId, instanceId: d.itemId, portStates: d.portStates });
     }
   }
 

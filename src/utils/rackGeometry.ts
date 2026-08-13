@@ -1,5 +1,5 @@
-import type { Orientation } from "../types";
-import { RACK_DEPTH } from "../components/constants";
+import type { Orientation, Rack, ImportedModel } from "../types";
+import { RACK_DEPTH, GRID_SPACING } from "../components/constants";
 
 /**
  * Get the front-facing direction vector for a given rack orientation.
@@ -40,5 +40,57 @@ export const getEffectiveDimensions = (
   return {
     effectiveWidth: isRotated ? RACK_DEPTH : width,
     effectiveDepth: isRotated ? width : RACK_DEPTH,
+  };
+};
+
+/**
+ * Calculates the dynamic dimensions (in meters) of the room based on placed racks and models,
+ * padding them by a minimum distance, and comparing against a minimum fallback width/length.
+ */
+export const calculateDynamicRoomSize = (
+  racks: Rack[],
+  importedModels: ImportedModel[],
+  activeNodeId: string | null,
+  minWidthCm: number,
+  minLengthCm: number,
+  csCustomSpaceSize?: boolean
+): { width: number; length: number } => {
+  if (csCustomSpaceSize) {
+    return {
+      width: minWidthCm / 100,
+      length: minLengthCm / 100
+    };
+  }
+
+  let maxAbsX = 0;
+  let maxAbsZ = 0;
+
+  racks.forEach(rack => {
+    if (rack.mapId !== activeNodeId) return;
+
+    const w = rack.orientation === 90 || rack.orientation === 270 ? 1.0 : rack.width;
+    const d = rack.orientation === 90 || rack.orientation === 270 ? rack.width : 1.0; 
+    const x = rack.position[0] * GRID_SPACING;
+    const z = rack.position[1] * GRID_SPACING;
+    maxAbsX = Math.max(maxAbsX, Math.abs(x) + w / 2);
+    maxAbsZ = Math.max(maxAbsZ, Math.abs(z) + d / 2);
+  });
+
+  importedModels?.forEach(model => {
+    const x = model.position[0];
+    const z = model.position[2];
+    const sX = model.scale[0] * 1.5; // rough bounding assumption
+    const sZ = model.scale[2] * 1.5;
+    maxAbsX = Math.max(maxAbsX, Math.abs(x) + sX / 2);
+    maxAbsZ = Math.max(maxAbsZ, Math.abs(z) + sZ / 2);
+  });
+
+  const MIN_PADDING = 2.0;
+  const dynamicWidth = maxAbsX > 0 ? (maxAbsX + MIN_PADDING) * 2 : 0;
+  const dynamicLength = maxAbsZ > 0 ? (maxAbsZ + MIN_PADDING) * 2 : 0;
+
+  return {
+    width: Math.max(minWidthCm / 100, dynamicWidth),
+    length: Math.max(minLengthCm / 100, dynamicLength)
   };
 };

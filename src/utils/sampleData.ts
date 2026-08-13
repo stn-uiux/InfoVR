@@ -78,7 +78,6 @@ export const sampleNodes: HierarchyNode[] = getDefaultNodes();
 
 // Varying equipment counts per node based on depth and index
 export const sampleRegisteredDevices: RegisteredDevice[] = sampleNodes.flatMap((node, idx) => {
-  const depth = getNodeDepth(sampleNodes, node.nodeId);
   // Root node gets no equipment, but sites, centers and rooms get them
   if (node.type !== "room") return []; // Only room nodes get equipment
   
@@ -113,6 +112,20 @@ const generateGroupRacks = (
     const hasError = errorIndexes.includes(localIdx);
     const devices: Device[] = [];
     let currentUPos = 1;
+
+    const totalRows = Math.ceil(count / colsPerRow);
+    const totalRowWidth = colsPerRow * (RACK_WIDTH_STANDARD + 0.01) - 0.01;
+    const startX = -totalRowWidth / 2;
+    
+    let totalZ = 0;
+    if (faceToFace) {
+      const lastRow = totalRows - 1;
+      const lastPair = Math.floor(lastRow / 2);
+      totalZ = lastPair * 4.75 + (lastRow % 2 !== 0 ? 1.75 : 0);
+    } else {
+      totalZ = (totalRows - 1) * 4.0;
+    }
+    const startZ = -totalZ / 2;
 
     // Fill rack until we run out of height or available devices for this node
     while (currentUPos <= rackSize && deviceIdx < regDevices.length) {
@@ -154,11 +167,8 @@ const generateGroupRacks = (
       }];
     }
 
-    let worldX = 0;
-    for (let j = 0; j < col; j++) {
-      worldX += RACK_WIDTH_STANDARD + 0.01; // Add 1cm gap
-    }
-    const stateX = (worldX + width / 2) / GRID_SPACING;
+    const worldX = startX + col * (RACK_WIDTH_STANDARD + 0.01) + (width / 2);
+    const stateX = worldX / GRID_SPACING;
     
     // Aisle arrangement: face-to-face pairs with 1.75 unit front gap
     let posZ = row * 4.0;
@@ -178,6 +188,9 @@ const generateGroupRacks = (
       posZ = baseY + (isSecondInPair ? 1.75 : 0);
       orient = isSecondInPair ? 0 : 180;
     }
+
+    // Offset Z to center the group
+    posZ += startZ;
 
     racks.push({
       rackId: generateUUID(),
@@ -222,8 +235,6 @@ const IX1_PORT_ERROR_DEVICE: Device = {
 export const sampleRacks: Rack[] = (() => {
   const racks = sampleNodes.flatMap((node, idx) => {
     const nodeDevices = sampleRegisteredDevices.filter((d) => d.deviceGroupId === node.nodeId);
-    const depth = getNodeDepth(sampleNodes, node.nodeId);
-
     if (node.type !== "room") return []; // Only rooms get racks
 
     if (node.nodeId === GANGNAM_ROOM_1_NODE_ID) {

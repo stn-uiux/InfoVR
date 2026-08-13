@@ -13,14 +13,14 @@ import { isUsableDashboardThumbnail, resolveDeviceImage } from "../utils/deviceA
 
 // ─── Phase 1-A: 모듈 레벨 공유 Geometry (모든 Rack이 재사용) ───
 const SHARED_GEO = {
-  topBottom:   new BoxGeometry(1, 0.03, 1),
-  cornerPost:  new BoxGeometry(0.02, 1, 0.02),
-  hBrace:      new BoxGeometry(1, 0.02, 0.02),
-  frontRail:   new BoxGeometry(0.03, 1, 0.03),
-  backRail:    new BoxGeometry(0.02, 1, 0.02),
-  rearBezel:   new BoxGeometry(1, 1, 0.01),
-  doorHBar:    new BoxGeometry(1, 0.04, 0.02),
-  doorVBar:    new BoxGeometry(0.04, 1, 0.02),
+  topBottom: new BoxGeometry(1, 0.03, 1),
+  cornerPost: new BoxGeometry(0.02, 1, 0.02),
+  hBrace: new BoxGeometry(1, 0.02, 0.02),
+  frontRail: new BoxGeometry(0.03, 1, 0.03),
+  backRail: new BoxGeometry(0.02, 1, 0.02),
+  rearBezel: new BoxGeometry(1, 1, 0.01),
+  doorHBar: new BoxGeometry(1, 0.04, 0.02),
+  doorVBar: new BoxGeometry(0.04, 1, 0.02),
   interactBox: new BoxGeometry(1, 1, 1),
 };
 
@@ -81,11 +81,11 @@ export const Rack = memo(({
   const { theme } = useTheme();
 
   const isInternalFocused = isSelected || isFocused;
-  
+
   // Local subscription for drag state to prevent global re-renders
   const isInternalDragging = useStore((state: AppState) => state.draggingRackId === rackId);
   const dragPosition = useStore((state: AppState) => state.draggingRackId === rackId ? state.dragPosition : null);
-  
+
   const isDarkMode = theme === "dark";
   // Use orientation from props directly instead of searching store.racks
   const orientation = orientationProp ?? 180;
@@ -106,9 +106,7 @@ export const Rack = memo(({
 
   // Theme-based colors
   const frameColor = isSelected
-    ? isDarkMode
-      ? "#FFFFFF" // White highlight for dark mode
-      : "#1a73e8"
+    ? "#FFFFFF" // White highlight for both modes
     : isDarkMode
       ? "#2e313b" // Darker than background
       : "#333333";
@@ -130,9 +128,9 @@ export const Rack = memo(({
   // Declarative animation - Purely reactive to props/state
   const currentTargetPos = useMemo(() =>
     isInternalDragging && dragPosition
-      ? [dragPosition[0], height / 2 + 0.1, dragPosition[1]]
+      ? [dragPosition[0], height / 2 + 0.4, dragPosition[1]]
       : [position[0] * GRID_SPACING, height / 2, position[1] * GRID_SPACING]
-  , [isInternalDragging, dragPosition, position, height]);
+    , [isInternalDragging, dragPosition, position, height]);
 
   useFrame((_, delta) => {
     // 1. First-frame direct sync to prevent visible jump/slide on mount
@@ -176,7 +174,7 @@ export const Rack = memo(({
   const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
     if (e.button !== 0) return; // Only process left click
     if (isObstructing) return;
-    
+
     // Ignore pointer events if the user is interacting with the dashboard Gizmo
     if (useStore.getState().isGizmoHovered) return;
 
@@ -256,17 +254,76 @@ export const Rack = memo(({
 
   const setHoveredRack = useStore((state: AppState) => state.setHoveredRack);
   const isGlobalDragging = useStore((state: AppState) => state.isDragging);
-  
+
   const initialPos = useMemo(() => [position[0] * GRID_SPACING, height / 2, position[1] * GRID_SPACING], [position, height]);
   const initialRot = useMemo(() => [0, rotationRad, 0], [rotationRad]);
 
+  const racks = useStore((state: AppState) => state.racks);
+  const nodeRacks = useMemo(() => racks.filter(r => r.mapId === mapId), [racks, mapId]);
+
+  const snappedGhostPosition = useMemo(() => {
+    if (!isInternalDragging || !dragPosition) return null;
+
+    let gridX = dragPosition[0] / GRID_SPACING;
+    let gridZ = dragPosition[1] / GRID_SPACING;
+
+    const SNAP_THRESHOLD = 0.5;
+    const worldX = dragPosition[0];
+    const worldZ = dragPosition[1];
+    let finalGridX = gridX;
+    let finalGridZ = gridZ;
+
+    let xSnapped = false;
+    for (const other of nodeRacks) {
+      if (other.rackId === rackId) continue;
+      // X-axis snap
+      if (Math.abs(other.position[1] - gridZ) <= 0.1) {
+        const otherWorldX = other.position[0] * GRID_SPACING;
+        const gap = Math.abs(worldX - otherWorldX) - (width + other.width) / 2;
+        if (gap >= -0.1 && gap < SNAP_THRESHOLD) {
+          const direction = worldX > otherWorldX ? 1 : -1;
+          const RACK_GAP = 0.01;
+          const snappedWorldX = otherWorldX + (direction * (other.width + width)) / 2 + (direction * RACK_GAP);
+          finalGridX = snappedWorldX / GRID_SPACING;
+          finalGridZ = other.position[1];
+          xSnapped = true;
+          break;
+        }
+      }
+    }
+
+    if (!xSnapped) {
+      const RACK_D = 1.0;
+      for (const other of nodeRacks) {
+        if (other.rackId === rackId) continue;
+        const otherWorldX = other.position[0] * GRID_SPACING;
+        if (Math.abs(worldX - otherWorldX) > (width + other.width) / 2 + 0.1) continue;
+
+        const otherWorldZ = other.position[1] * GRID_SPACING;
+        const zGap = Math.abs(worldZ - otherWorldZ) - (RACK_D + RACK_D) / 2;
+        if (zGap >= -0.1 && zGap < SNAP_THRESHOLD) {
+          const direction = worldZ > otherWorldZ ? 1 : -1;
+          const snappedWorldZ = otherWorldZ + (direction * (RACK_D + RACK_D)) / 2;
+          finalGridZ = snappedWorldZ / GRID_SPACING;
+          finalGridX = other.position[0];
+          break;
+        }
+      }
+    }
+
+    return [finalGridX * GRID_SPACING, finalGridZ * GRID_SPACING];
+  }, [isInternalDragging, dragPosition, nodeRacks, rackId, width]);
+
   return (
     <>
-      {isInternalDragging && dragPosition && (
-        <mesh position={[dragPosition[0], 0.01, dragPosition[1]]} rotation={[-Math.PI / 2, 0, rotationRad]}>
-          <planeGeometry args={[width, depth]} />
-          <meshBasicMaterial color="#2563eb" transparent opacity={0.3} depthWrite={false} />
-        </mesh>
+      {snappedGhostPosition && (
+        <group position={[snappedGhostPosition[0], 0.005, snappedGhostPosition[1]]} rotation={[-Math.PI / 2, 0, rotationRad]}>
+          <mesh>
+            <planeGeometry args={[width, depth]} />
+            <meshBasicMaterial color={isDarkMode ? "#ef4444" : "#dc2626"} transparent opacity={0.15} depthWrite={false} />
+            <Edges scale={1.0} threshold={15} color={isDarkMode ? "#f87171" : "#ef4444"} />
+          </mesh>
+        </group>
       )}
       <group
         ref={groupRef}
@@ -275,332 +332,360 @@ export const Rack = memo(({
         rotation={initialRot as unknown as Euler}
         scale={[1, 1, 1]}
       >
-      {/* 1. STRUCTURAL FRAME (Main Skeleton) */}
-      <group>
-        {/* Main Enclosure (Solid frame with better corner joins) */}
-        {/* Top */}
-        <mesh position={[0, height / 2 - 0.015, 0]} geometry={SHARED_GEO.topBottom} scale={[width, 1, depth]}>
-          <meshStandardMaterial
-            color={frameColor}
-            roughness={0.6}
-            metalness={0.9}
-          />
-        </mesh>
-        {/* Bottom */}
-        <mesh position={[0, -height / 2 + 0.015, 0]} geometry={SHARED_GEO.topBottom} scale={[width, 1, depth]}>
-          <meshStandardMaterial
-            color={frameColor}
-            roughness={0.6}
-            metalness={0.9}
-          />
-        </mesh>
-        {/* Left Side – corner posts only (no full-depth wall, so perforated holes reveal interior) */}
-        <mesh position={[-width / 2 + 0.01, 0, depth / 2 - 0.01]} geometry={SHARED_GEO.cornerPost} scale={[1, height, 1]}>
-          <meshStandardMaterial
-            color={frameColor}
-            roughness={0.6}
-            metalness={0.9}
-          />
-        </mesh>
-        <mesh position={[-width / 2 + 0.01, 0, -depth / 2 + 0.01]} geometry={SHARED_GEO.cornerPost} scale={[1, height, 1]}>
-          <meshStandardMaterial
-            color={frameColor}
-            roughness={0.6}
-            metalness={0.9}
-          />
-        </mesh>
-        {/* Right Side – corner posts only */}
-        <mesh position={[width / 2 - 0.01, 0, depth / 2 - 0.01]} geometry={SHARED_GEO.cornerPost} scale={[1, height, 1]}>
-          <meshStandardMaterial
-            color={frameColor}
-            roughness={0.6}
-            metalness={0.9}
-          />
-        </mesh>
-        <mesh position={[width / 2 - 0.01, 0, -depth / 2 + 0.01]} geometry={SHARED_GEO.cornerPost} scale={[1, height, 1]}>
-          <meshStandardMaterial
-            color={frameColor}
-            roughness={0.6}
-            metalness={0.9}
-          />
-        </mesh>
-
-        {/* ── LEFT SIDE PANEL ── */}
-        <PerforatedPanel xOff={-width / 2} rotY={-Math.PI / 2} panelW={depth - 0.04} panelH={height - 0.06} color={frameColor} texture={perforatedTexture} />
-
-        {/* ── RIGHT SIDE PANEL ── */}
-        <PerforatedPanel xOff={width / 2} rotY={Math.PI / 2} panelW={depth - 0.04} panelH={height - 0.06} color={frameColor} texture={perforatedTexture} />
-
-        <group position={[0, 0, 0]}>
-          {/* Internal Structural Bracing - Horizontal rails at the back */}
-          <mesh position={[0, height / 2 - 0.15, -depth / 2 + 0.1]} geometry={SHARED_GEO.hBrace} scale={[width - 0.04, 1, 1]}>
-            <meshStandardMaterial color={frameColor} roughness={0.8} />
-          </mesh>
-          <mesh position={[0, -height / 2 + 0.15, -depth / 2 + 0.1]} geometry={SHARED_GEO.hBrace} scale={[width - 0.04, 1, 1]}>
-            <meshStandardMaterial color={frameColor} roughness={0.8} />
-          </mesh>
-
-          {/* Vertical Mounting Rails (Front) */}
-          <mesh position={[-width / 2 + 0.06, 0, depth / 2 - 0.12]} geometry={SHARED_GEO.frontRail} scale={[1, height - 0.08, 1]}>
+        {/* 1. STRUCTURAL FRAME (Main Skeleton) */}
+        <group>
+          {/* Main Enclosure (Solid frame with better corner joins) */}
+          {/* Top */}
+          <mesh position={[0, height / 2 - 0.015, 0]} geometry={SHARED_GEO.topBottom} scale={[width, 1, depth]}>
             <meshStandardMaterial
-              color={railColor}
-              metalness={1}
-              roughness={0.2}
+              color={frameColor}
+              roughness={0.6}
+              metalness={0.9}
             />
           </mesh>
-          <mesh position={[width / 2 - 0.06, 0, depth / 2 - 0.12]} geometry={SHARED_GEO.frontRail} scale={[1, height - 0.08, 1]}>
+          {/* Bottom */}
+          <mesh position={[0, -height / 2 + 0.015, 0]} geometry={SHARED_GEO.topBottom} scale={[width, 1, depth]}>
             <meshStandardMaterial
-              color={railColor}
-              metalness={1}
-              roughness={0.2}
+              color={frameColor}
+              roughness={0.6}
+              metalness={0.9}
+            />
+          </mesh>
+          {/* Left Side – corner posts only (no full-depth wall, so perforated holes reveal interior) */}
+          <mesh position={[-width / 2 + 0.01, 0, depth / 2 - 0.01]} geometry={SHARED_GEO.cornerPost} scale={[1, height, 1]}>
+            <meshStandardMaterial
+              color={frameColor}
+              roughness={0.6}
+              metalness={0.9}
+            />
+          </mesh>
+          <mesh position={[-width / 2 + 0.01, 0, -depth / 2 + 0.01]} geometry={SHARED_GEO.cornerPost} scale={[1, height, 1]}>
+            <meshStandardMaterial
+              color={frameColor}
+              roughness={0.6}
+              metalness={0.9}
+            />
+          </mesh>
+          {/* Right Side – corner posts only */}
+          <mesh position={[width / 2 - 0.01, 0, depth / 2 - 0.01]} geometry={SHARED_GEO.cornerPost} scale={[1, height, 1]}>
+            <meshStandardMaterial
+              color={frameColor}
+              roughness={0.6}
+              metalness={0.9}
+            />
+          </mesh>
+          <mesh position={[width / 2 - 0.01, 0, -depth / 2 + 0.01]} geometry={SHARED_GEO.cornerPost} scale={[1, height, 1]}>
+            <meshStandardMaterial
+              color={frameColor}
+              roughness={0.6}
+              metalness={0.9}
             />
           </mesh>
 
-          {/* Vertical Support Rails (Back) */}
-          <mesh position={[-width / 2 + 0.06, 0, -depth / 2 + 0.12]} geometry={SHARED_GEO.backRail} scale={[1, height - 0.08, 1]}>
-            <meshStandardMaterial color={railColor} roughness={0.5} />
+          {/* ── LEFT SIDE PANEL ── */}
+          <PerforatedPanel xOff={-width / 2} rotY={-Math.PI / 2} panelW={depth - 0.04} panelH={height - 0.06} color={frameColor} texture={perforatedTexture} />
+
+          {/* ── RIGHT SIDE PANEL ── */}
+          <PerforatedPanel xOff={width / 2} rotY={Math.PI / 2} panelW={depth - 0.04} panelH={height - 0.06} color={frameColor} texture={perforatedTexture} />
+
+          <group position={[0, 0, 0]}>
+            {/* Internal Structural Bracing - Horizontal rails at the back */}
+            <mesh position={[0, height / 2 - 0.15, -depth / 2 + 0.1]} geometry={SHARED_GEO.hBrace} scale={[width - 0.04, 1, 1]}>
+              <meshStandardMaterial color={frameColor} roughness={0.8} />
+            </mesh>
+            <mesh position={[0, -height / 2 + 0.15, -depth / 2 + 0.1]} geometry={SHARED_GEO.hBrace} scale={[width - 0.04, 1, 1]}>
+              <meshStandardMaterial color={frameColor} roughness={0.8} />
+            </mesh>
+
+            {/* Vertical Mounting Rails (Front) */}
+            <mesh position={[-width / 2 + 0.06, 0, depth / 2 - 0.12]} geometry={SHARED_GEO.frontRail} scale={[1, height - 0.08, 1]}>
+              <meshStandardMaterial
+                color={railColor}
+                metalness={1}
+                roughness={0.2}
+              />
+            </mesh>
+            <mesh position={[width / 2 - 0.06, 0, depth / 2 - 0.12]} geometry={SHARED_GEO.frontRail} scale={[1, height - 0.08, 1]}>
+              <meshStandardMaterial
+                color={railColor}
+                metalness={1}
+                roughness={0.2}
+              />
+            </mesh>
+
+            {/* Vertical Support Rails (Back) */}
+            <mesh position={[-width / 2 + 0.06, 0, -depth / 2 + 0.12]} geometry={SHARED_GEO.backRail} scale={[1, height - 0.08, 1]}>
+              <meshStandardMaterial color={railColor} roughness={0.5} />
+            </mesh>
+            <mesh position={[width / 2 - 0.06, 0, -depth / 2 + 0.12]} geometry={SHARED_GEO.backRail} scale={[1, height - 0.08, 1]}>
+              <meshStandardMaterial color={railColor} roughness={0.5} />
+            </mesh>
+          </group>
+        </group>
+
+        {/* 2. REAR PANEL (Solid opaque plate – no perforation) */}
+        <group position={[0, 0, -depth / 2 + 0.02]}>
+          {/* Panel Bezel / Frame */}
+          <mesh position={[0, 0, -0.005]} geometry={SHARED_GEO.rearBezel} scale={[width - 0.02, height - 0.04, 1]}>
+            <meshStandardMaterial color={frameColor} roughness={0.7} />
           </mesh>
-          <mesh position={[width / 2 - 0.06, 0, -depth / 2 + 0.12]} geometry={SHARED_GEO.backRail} scale={[1, height - 0.08, 1]}>
-            <meshStandardMaterial color={railColor} roughness={0.5} />
+          {/* Solid Rear Plate */}
+          <mesh position={[0, 0, 0.001]}>
+            <planeGeometry args={[width - 0.08, height - 0.1]} />
+            <meshStandardMaterial
+              color={rearPanelColor}
+              roughness={0.9}
+              metalness={0.6}
+              side={DoubleSide}
+            />
           </mesh>
         </group>
-      </group>
 
-      {/* 2. REAR PANEL (Solid opaque plate – no perforation) */}
-      <group position={[0, 0, -depth / 2 + 0.02]}>
-        {/* Panel Bezel / Frame */}
-        <mesh position={[0, 0, -0.005]} geometry={SHARED_GEO.rearBezel} scale={[width - 0.02, height - 0.04, 1]}>
-          <meshStandardMaterial color={frameColor} roughness={0.7} />
-        </mesh>
-        {/* Solid Rear Plate */}
-        <mesh position={[0, 0, 0.001]}>
-          <planeGeometry args={[width - 0.08, height - 0.1]} />
-          <meshStandardMaterial
-            color={rearPanelColor}
-            roughness={0.9}
-            metalness={0.6}
-            side={DoubleSide}
-          />
-        </mesh>
-      </group>
+        {/* 3. FRONT HINGED DOOR (Hollow Frame + Glass) */}
+        <group
+          ref={doorRef}
+          position={[-width / 2, 0, depth / 2]} // Pivot at exact left edge
+        >
+          {/* Door Frame Border - Top */}
+          <mesh position={[width / 2, height / 2 - 0.02, 0.01]} geometry={SHARED_GEO.doorHBar} scale={[width, 1, 1]}>
+            <meshStandardMaterial
+              color={frameColor}
+              roughness={0.7}
+              metalness={0.8}
+            />
+          </mesh>
+          {/* Door Frame Border - Bottom */}
+          <mesh position={[width / 2, -height / 2 + 0.02, 0.01]} geometry={SHARED_GEO.doorHBar} scale={[width, 1, 1]}>
+            <meshStandardMaterial
+              color={frameColor}
+              roughness={0.7}
+              metalness={0.8}
+            />
+          </mesh>
+          {/* Door Frame Border - Left */}
+          <mesh position={[0.02, 0, 0.01]} geometry={SHARED_GEO.doorVBar} scale={[1, height - 0.08, 1]}>
+            <meshStandardMaterial
+              color={frameColor}
+              roughness={0.7}
+              metalness={0.8}
+            />
+          </mesh>
+          {/* Door Frame Border - Right */}
+          <mesh position={[width - 0.02, 0, 0.01]} geometry={SHARED_GEO.doorVBar} scale={[1, height - 0.08, 1]}>
+            <meshStandardMaterial
+              color={frameColor}
+              roughness={0.7}
+              metalness={0.8}
+            />
+          </mesh>
 
-      {/* 3. FRONT HINGED DOOR (Hollow Frame + Glass) */}
-      <group
-        ref={doorRef}
-        position={[-width / 2, 0, depth / 2]} // Pivot at exact left edge
-      >
-        {/* Door Frame Border - Top */}
-        <mesh position={[width / 2, height / 2 - 0.02, 0.01]} geometry={SHARED_GEO.doorHBar} scale={[width, 1, 1]}>
-          <meshStandardMaterial
-            color={frameColor}
-            roughness={0.7}
-            metalness={0.8}
-          />
-        </mesh>
-        {/* Door Frame Border - Bottom */}
-        <mesh position={[width / 2, -height / 2 + 0.02, 0.01]} geometry={SHARED_GEO.doorHBar} scale={[width, 1, 1]}>
-          <meshStandardMaterial
-            color={frameColor}
-            roughness={0.7}
-            metalness={0.8}
-          />
-        </mesh>
-        {/* Door Frame Border - Left */}
-        <mesh position={[0.02, 0, 0.01]} geometry={SHARED_GEO.doorVBar} scale={[1, height - 0.08, 1]}>
-          <meshStandardMaterial
-            color={frameColor}
-            roughness={0.7}
-            metalness={0.8}
-          />
-        </mesh>
-        {/* Door Frame Border - Right */}
-        <mesh position={[width - 0.02, 0, 0.01]} geometry={SHARED_GEO.doorVBar} scale={[1, height - 0.08, 1]}>
-          <meshStandardMaterial
-            color={frameColor}
-            roughness={0.7}
-            metalness={0.8}
-          />
-        </mesh>
+          {/* Glass Center Panel - Optimized to MeshStandardMaterial */}
+          <mesh position={[width / 2, 0, 0.01]}>
+            <planeGeometry args={[width - 0.08, height - 0.08]} />
+            <meshStandardMaterial
+              transparent
+              opacity={0.1}
+              color="#000000"
+              roughness={0}
+              metalness={0.5}
+            />
+          </mesh>
+        </group>
 
-        {/* Glass Center Panel - Optimized to MeshStandardMaterial */}
-        <mesh position={[width / 2, 0, 0.01]}>
-          <planeGeometry args={[width - 0.08, height - 0.08]} />
-          <meshStandardMaterial
-            transparent
-            opacity={0.2}
-            color="#ffffff"
-            roughness={0}
-            metalness={0.5}
-          />
-        </mesh>
-      </group>
+        <mesh
+          geometry={SHARED_GEO.interactBox}
+          scale={[width, height, depth]}
+          onPointerDown={isObstructing ? undefined : handlePointerDown}
+          onClick={isObstructing ? undefined : (e) => {
+            if (e.delta > 5) return; // Ignore drag
+            const hitGizmoHelper = e.intersections.some((hit) => {
+              let obj: Object3D | null = hit.object;
+              while (obj) {
+                if (obj.userData?.isGizmoHelper || obj.userData?.isGizmo) return true;
+                obj = obj.parent;
+              }
+              return false;
+            });
+            if (hitGizmoHelper) return;
 
-      <mesh
-        geometry={SHARED_GEO.interactBox}
-        scale={[width, height, depth]}
-        onPointerDown={isObstructing ? undefined : handlePointerDown}
-        onClick={isObstructing ? undefined : (e) => {
-          if (e.delta > 5) return; // Ignore drag
-          const hitGizmoHelper = e.intersections.some((hit) => {
-            let obj: Object3D | null = hit.object;
-            while (obj) {
-              if (obj.userData?.isGizmoHelper || obj.userData?.isGizmo) return true;
-              obj = obj.parent;
-            }
-            return false;
-          });
-          if (hitGizmoHelper) return;
-
-          let hitModel = false;
-          for (const hit of e.intersections) {
-            let isModel = false;
-            let obj: Object3D | null = hit.object;
-            while (obj) {
-              if (obj.userData && obj.userData.isModelContainer) {
-                isModel = true;
+            let hitModel = false;
+            for (const hit of e.intersections) {
+              let isModel = false;
+              let obj: Object3D | null = hit.object;
+              while (obj) {
+                if (obj.userData && obj.userData.isModelContainer) {
+                  isModel = true;
+                  break;
+                }
+                obj = obj.parent;
+              }
+              if (isModel) {
+                hitModel = true;
                 break;
               }
-              obj = obj.parent;
+              if ((hit.object as Mesh).geometry !== SHARED_GEO.interactBox) {
+                break;
+              }
             }
-            if (isModel) {
-              hitModel = true;
-              break;
-            }
-            if ((hit.object as Mesh).geometry !== SHARED_GEO.interactBox) {
-              break;
-            }
-          }
-          if (hitModel) return;
+            if (hitModel) return;
 
-          // Note: NOT stopping propagation so that devices inside the rack can still receive onClick!
-          // We only want to prevent racks behind from being selected. But since this is onClick,
-          // if we don't stop propagation, both rack and device might process it, which is fine, 
-          // device ignores first click.
-          useStore.getState().selectRack(rackId);
-        }}
-        onPointerOver={isObstructing ? undefined : (e) => {
-          if (useStore.getState().isGizmoHovered) return;
-          const hitGizmoHelper = e.intersections.some((hit) => {
-            let obj: Object3D | null = hit.object;
-            while (obj) {
-              if (obj.userData?.isGizmoHelper || obj.userData?.isGizmo) return true;
-              obj = obj.parent;
-            }
-            return false;
-          });
-          if (hitGizmoHelper) return;
-
-          const state = useStore.getState();
-          const isSelected = state.selectedRackId === rackId;
-          
-          // Only capture hover for the rack if it is NOT selected
-          if (!isSelected) {
-            e.stopPropagation();
-            setHoveredRack(rackId);
-            if (!state.isDragging) {
-              document.body.style.cursor = state.isEditMode ? "grab" : "pointer";
-            }
-          }
-        }}
-        onPointerOut={isObstructing ? undefined : (e) => {
-          const state = useStore.getState();
-          if (state.hoveredRackId === rackId) {
-            setHoveredRack(null);
-            if (
-              document.body.style.cursor === "grab" ||
-              document.body.style.cursor === "pointer"
-            ) {
-              document.body.style.cursor = "auto";
-            }
-          }
-        }}
-      >
-        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-      </mesh>
-
-      {/* Phase 1: 호버 태그 항상 마운트 — DOM 마운트/언마운트 비용 제거 */}
-      <Billboard position={[0, height / 2 + 0.4, 0]} visible={isHovered}>
-        <Html center zIndexRange={[0, 10]} style={{ pointerEvents: "none" }}>
-          <div
-            style={{
-              background: isDarkMode
-                ? "rgba(23, 24, 28, 0.85)"
-                : "rgba(255, 255, 255, 0.9)",
-              color: isDarkMode ? "#ebedef" : "#202226",
-              padding: "4px 12px",
-              borderRadius: "16px",
-              fontSize: "12px",
-              fontWeight: 600,
-              border: isDarkMode
-                ? isSelected
-                  ? "1px solid #FFFFFF"
-                  : "1px solid rgba(255, 255, 255, 0.1)"
-                : isSelected
-                  ? "1px solid #1a73e8"
-                  : "1px solid rgba(0, 0, 0, 0.08)",
-              boxShadow: isDarkMode
-                ? "0 4px 15px rgba(0, 0, 0, 0.4)"
-                : "0 4px 12px rgba(0, 0, 0, 0.1)",
-              whiteSpace: "nowrap",
-              backdropFilter: "blur(8px)",
-              pointerEvents: "none",
-              userSelect: "none",
-              display: isHovered ? "flex" : "none",
-              alignItems: "center",
-              gap: "6px",
-              fontFamily: "Inter, system-ui, sans-serif",
-            }}
-          >
-            <span
-              style={{
-                width: "6px",
-                height: "6px",
-                borderRadius: "50%",
-                background: isDarkMode
-                  ? isSelected
-                    ? "#FFFFFF"
-                    : "#4d5261"
-                  : "#1a73e8",
-                display: "inline-block",
-              }}
-            />
-            <span>{`${rackSize}U`}</span>
-            <span style={{ opacity: 0.4 }}>|</span>
-            <span>
-              {rackTitle || `Rack ${rackId.slice(0, 4).toUpperCase()}`}
-            </span>
-          </div>
-        </Html>
-      </Billboard>
-
-      <group position={[0, 0, depth / 2 - 0.07]}>
-        {/* Removed per-rack pointLight for performance */}
-        {devices.map((device) => (
-          <MemoDeviceMesh
-            key={device.itemId}
-            device={device}
-            rackHeight={height}
-            rackWidth={width}
-            rackId={rackId}
-            isObstructing={isObstructing}
-            rackTitle={rackTitle}
-          />
-        ))}
-      </group>
-      {/* Only mount ErrorMarker when rack has error devices and NOT in edit mode */}
-      {!isEditMode && devices.some((d) => d.portStates?.some((p) => p.status === "error")) && (
-        <ErrorMarker
-          rack={{
-            rackId,
-            rackSize,
-            position,
-            devices,
-            width,
-            mapId,
+            // Note: NOT stopping propagation so that devices inside the rack can still receive onClick!
+            // We only want to prevent racks behind from being selected. But since this is onClick,
+            // if we don't stop propagation, both rack and device might process it, which is fine, 
+            // device ignores first click.
+            useStore.getState().selectRack(rackId);
           }}
-        />
-      )}
-    </group>
+          onPointerOver={isObstructing ? undefined : (e) => {
+            if (useStore.getState().isGizmoHovered) return;
+            const hitGizmoHelper = e.intersections.some((hit) => {
+              let obj: Object3D | null = hit.object;
+              while (obj) {
+                if (obj.userData?.isGizmoHelper || obj.userData?.isGizmo) return true;
+                obj = obj.parent;
+              }
+              return false;
+            });
+            if (hitGizmoHelper) return;
+
+            const state = useStore.getState();
+            const isSelected = state.selectedRackId === rackId;
+
+            // Only capture hover for the rack if it is NOT selected
+            if (!isSelected) {
+              e.stopPropagation();
+              setHoveredRack(rackId);
+              if (!state.isDragging) {
+                document.body.style.cursor = state.isEditMode ? "grab" : "pointer";
+              }
+            }
+          }}
+          onPointerOut={isObstructing ? undefined : (e) => {
+            const state = useStore.getState();
+            if (state.hoveredRackId === rackId) {
+              setHoveredRack(null);
+              if (
+                document.body.style.cursor === "grab" ||
+                document.body.style.cursor === "pointer"
+              ) {
+                document.body.style.cursor = "auto";
+              }
+            }
+          }}
+        >
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        </mesh>
+
+        {/* Phase 1: 호버 태그 항상 마운트 — DOM 마운트/언마운트 비용 제거 */}
+        <Billboard position={[0, height / 2 + 0.4, 0]} visible={isHovered}>
+          <Html center zIndexRange={[0, 10]} style={{ pointerEvents: "none" }}>
+            <div
+              style={{
+                background: isDarkMode
+                  ? "rgba(23, 24, 28, 0.85)"
+                  : "rgba(255, 255, 255, 0.9)",
+                color: isDarkMode ? "#ebedef" : "#202226",
+                padding: "4px 12px",
+                borderRadius: "16px",
+                fontSize: "12px",
+                fontWeight: 600,
+                border: isDarkMode
+                  ? isSelected
+                    ? "1px solid #FFFFFF"
+                    : "1px solid rgba(255, 255, 255, 0.1)"
+                  : isSelected
+                    ? "1px solid #1a73e8"
+                    : "1px solid rgba(0, 0, 0, 0.08)",
+                boxShadow: isDarkMode
+                  ? "0 4px 15px rgba(0, 0, 0, 0.4)"
+                  : "0 4px 12px rgba(0, 0, 0, 0.1)",
+                whiteSpace: "nowrap",
+                backdropFilter: "blur(8px)",
+                pointerEvents: "none",
+                userSelect: "none",
+                display: isHovered ? "flex" : "none",
+                alignItems: "center",
+                gap: "6px",
+                fontFamily: "Inter, system-ui, sans-serif",
+              }}
+            >
+              <span
+                style={{
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  background: isDarkMode
+                    ? isSelected
+                      ? "#FFFFFF"
+                      : "#4d5261"
+                    : "#1a73e8",
+                  display: "inline-block",
+                }}
+              />
+              <span>{`${rackSize}U`}</span>
+              <span style={{ opacity: 0.4 }}>|</span>
+              <span>
+                {rackTitle || `Rack ${rackId.slice(0, 4).toUpperCase()}`}
+              </span>
+            </div>
+          </Html>
+        </Billboard>
+
+        {isInternalFocused && !isEditMode && (
+          <group position={[0, 0, depth / 2 - 0.02]}>
+            {/* Top Blue LED Line (Core) - Made very thin */}
+            <mesh position={[0, height / 2 - 0.03, 0]}>
+              <boxGeometry args={[width - 0.08, 0.005, 0.005]} />
+              <meshBasicMaterial color="#ffffff" />
+            </mesh>
+            {/* Top Blue Glow Lights - 3 lights for a wide, soft spread */}
+            <pointLight position={[-width / 3, height / 2 - 0.05, 0]} intensity={0.4} distance={2} decay={2} color="#00bfff" />
+            <pointLight position={[0, height / 2 - 0.05, 0]} intensity={0.4} distance={2} decay={2} color="#00bfff" />
+            <pointLight position={[width / 3, height / 2 - 0.05, 0]} intensity={0.4} distance={2} decay={2} color="#00bfff" />
+
+            {/* Bottom Blue LED Line (Core) */}
+            <mesh position={[0, -height / 2 + 0.03, 0]}>
+              <boxGeometry args={[width - 0.08, 0.005, 0.005]} />
+              <meshBasicMaterial color="#ffffff" />
+            </mesh>
+            {/* Bottom Blue Glow Lights - 3 lights for a wide, soft spread */}
+            <pointLight position={[-width / 3, -height / 2 + 0.05, 0]} intensity={0.4} distance={2} decay={2} color="#00bfff" />
+            <pointLight position={[0, -height / 2 + 0.05, 0]} intensity={0.4} distance={2} decay={2} color="#00bfff" />
+            <pointLight position={[width / 3, -height / 2 + 0.05, 0]} intensity={0.4} distance={2} decay={2} color="#00bfff" />
+          </group>
+        )}
+
+        <group position={[0, 0, depth / 2 - 0.07]}>
+          {/* Only add light to the focused rack to preserve performance while improving visibility */}
+          {isInternalFocused && !isEditMode && (
+            <pointLight position={[0, 0, 1.5]} intensity={4.0} distance={10} decay={1.5} color="#ffffff" />
+          )}
+          {devices.map((device) => (
+            <MemoDeviceMesh
+              key={device.itemId}
+              device={device}
+              rackHeight={height}
+              rackWidth={width}
+              rackId={rackId}
+              isObstructing={isObstructing}
+              rackTitle={rackTitle}
+              isRackFocused={isInternalFocused}
+            />
+          ))}
+        </group>
+        {/* Only mount ErrorMarker when rack has error devices and NOT in edit mode */}
+        {!isEditMode && devices.some((d) => d.portStates?.some((p) => p.status === "error")) && (
+          <ErrorMarker
+            rack={{
+              rackId,
+              rackSize,
+              position,
+              devices,
+              width,
+              mapId,
+            }}
+          />
+        )}
+      </group>
     </>
   );
 });
@@ -627,8 +712,8 @@ const PerforatedPanel = memo(({ xOff, rotY, panelW, panelH, color, texture }: {
 ));
 
 // Phase 1: MemoDeviceMesh — onSelect를 내부에서 안정화
-const MemoDeviceMesh = memo(({ device, rackHeight, rackWidth, rackId, isObstructing, rackTitle }: {
-  device: Device; rackHeight: number; rackWidth: number; rackId: string; isObstructing: boolean; rackTitle?: string;
+const MemoDeviceMesh = memo(({ device, rackHeight, rackWidth, rackId, isObstructing, rackTitle, isRackFocused }: {
+  device: Device; rackHeight: number; rackWidth: number; rackId: string; isObstructing: boolean; rackTitle?: string; isRackFocused: boolean;
 }) => {
   const onSelect = useCallback(() => {
     const { focusRack, selectDevice, isEditMode } = useStore.getState();
@@ -648,6 +733,8 @@ const MemoDeviceMesh = memo(({ device, rackHeight, rackWidth, rackId, isObstruct
       onSelect={onSelect}
       isObstructing={isObstructing}
       rackTitle={rackTitle}
+      rackId={rackId}
+      isRackFocused={isRackFocused}
     />
   );
 });
@@ -659,6 +746,8 @@ const DeviceMesh = ({
   onSelect,
   isObstructing,
   rackTitle,
+  rackId,
+  isRackFocused,
 }: {
   device: Device;
   rackHeight: number;
@@ -666,6 +755,8 @@ const DeviceMesh = ({
   onSelect: () => void;
   isObstructing?: boolean;
   rackTitle?: string;
+  rackId: string;
+  isRackFocused: boolean;
 }) => {
   const meshRef = useRef<Mesh>(null);
   const faceplateRef = useRef<Mesh>(null);
@@ -679,13 +770,16 @@ const DeviceMesh = ({
   const centerY = bottomY + yOffset + deviceH / 2 + 0.05;
   const deviceWidth = rackWidth - 0.06;
 
+  const isEditMode = useStore((s) => s.isEditMode);
+
   const { hasError, errorColor } = useMemo(() => {
+    if (isEditMode) return { hasError: false, errorColor: null };
     const err = getHighestError(device.portStates);
     return {
       hasError: err !== null,
       errorColor: err?.color ?? null,
     };
-  }, [device.portStates]);
+  }, [device.portStates, isEditMode]);
 
   // 에러 + 선택 + 호버 모두 애니메이션(또는 발광) 필요
   const needsAnimation = isHighlighted || isDeviceHovered || (hasError && !!errorColor);
@@ -726,11 +820,11 @@ const DeviceMesh = ({
 
       if (bodyMat instanceof MeshStandardMaterial) {
         bodyMat.emissive.set(errorColor);
-        bodyMat.emissiveIntensity = intensity;
+        bodyMat.emissiveIntensity = intensity * 0.375;
       }
       if (faceMat instanceof MeshStandardMaterial) {
         faceMat.emissive.set(errorColor);
-        faceMat.emissiveIntensity = intensity;
+        faceMat.emissiveIntensity = intensity * 0.875;
       }
     } else if (isHighlighted) {
       const pulse =
@@ -757,13 +851,27 @@ const DeviceMesh = ({
     }
   });
 
-  const resolvedUrl = useMemo(
-    () =>
-      (device.defaultViewSide !== "rear" && isUsableDashboardThumbnail(device.dashboardThumbnailUrl)
+  const thumbUrl = useMemo(
+    () => {
+      return (device.defaultViewSide !== "rear" && isUsableDashboardThumbnail(device.dashboardThumbnailUrl)
         ? device.dashboardThumbnailUrl
         : "") ||
-      resolveDeviceImage(device.modelName, device.defaultViewSide || "front"),
+        resolveDeviceImage(device.modelName, device.defaultViewSide || "front", true)
+    },
     [device.dashboardThumbnailUrl, device.defaultViewSide, device.modelName],
+  );
+
+  const resolvedUrl = useMemo(
+    () => {
+      // LOD Optimization: Use thumbnail if not focused, otherwise use full image.
+      if (!isRackFocused) return thumbUrl;
+      
+      return (device.defaultViewSide !== "rear" && isUsableDashboardThumbnail(device.dashboardThumbnailUrl)
+        ? device.dashboardThumbnailUrl
+        : "") ||
+        resolveDeviceImage(device.modelName, device.defaultViewSide || "front", false)
+    },
+    [device.dashboardThumbnailUrl, device.defaultViewSide, device.modelName, isRackFocused, thumbUrl],
   );
 
   return (
@@ -771,7 +879,7 @@ const DeviceMesh = ({
       position={[0, centerY, -0.41]}
       onClick={isObstructing ? undefined : (e) => {
         if (e.delta > 5) return; // Ignore if it was a drag
-        
+
         if (useStore.getState().isGizmoHovered) return;
         const hitGizmoHelper = e.intersections.some((hit) => {
           let obj: Object3D | null = hit.object;
@@ -793,14 +901,15 @@ const DeviceMesh = ({
 
         const hitGizmoHelper = e.intersections.some((hit) => hit.object.userData?.isGizmoHelper || hit.object.userData?.isGizmo);
         if (hitGizmoHelper) return;
-        
+
         e.stopPropagation();
         setIsDeviceHovered(true);
         state.setHoveredDevice({
           device,
           x: e.clientX,
           y: e.clientY,
-          rackTitle,
+          rackTitle: rackTitle || `Rack ${rackId.substring(0, 4).toUpperCase()}`,
+          rackId,
         });
         document.body.style.cursor = "pointer";
       }}
@@ -814,7 +923,8 @@ const DeviceMesh = ({
           device,
           x: e.clientX,
           y: e.clientY,
-          rackTitle,
+          rackTitle: rackTitle || `Rack ${rackId.substring(0, 4).toUpperCase()}`,
+          rackId,
         });
       }}
       onPointerOut={isObstructing ? undefined : (e) => {
@@ -822,7 +932,7 @@ const DeviceMesh = ({
         setIsDeviceHovered(false);
         const { hoveredDevice, setHoveredDevice } = useStore.getState();
         if (hoveredDevice?.device.itemId === device.itemId) {
-           setHoveredDevice(null);
+          setHoveredDevice(null);
         }
         if (document.body.style.cursor === "pointer") {
           document.body.style.cursor = "auto";
@@ -852,13 +962,22 @@ const DeviceMesh = ({
 
             <group position={[0, 0, DEVICE_DEPTH / 2 + 0.001]}>
               {resolvedUrl ? (
-                <ImageFaceplate
-                  url={resolvedUrl}
-                  width={deviceWidth}
-                  height={deviceH - 0.005}
-                  ref={faceplateRef}
-                  hasError={hasError}
-                />
+                <Suspense fallback={
+                  <ImageFaceplate
+                    url={thumbUrl}
+                    width={deviceWidth}
+                    height={deviceH - 0.005}
+                    hasError={hasError}
+                  />
+                }>
+                  <ImageFaceplate
+                    url={resolvedUrl}
+                    width={deviceWidth}
+                    height={deviceH - 0.005}
+                    ref={faceplateRef}
+                    hasError={hasError}
+                  />
+                </Suspense>
               ) : (
                 <DeviceFaceplate
                   type={device.type}
@@ -873,9 +992,6 @@ const DeviceMesh = ({
           </>
         );
 
-        if (resolvedUrl) {
-          return <Suspense fallback={null}>{content}</Suspense>;
-        }
         return content;
       })()}
     </group>
@@ -896,7 +1012,13 @@ const ImageFaceplate = memo(forwardRef<
   return (
     <mesh position={[0, 0, 0]} ref={ref}>
       <planeGeometry args={[width, height]} />
-      <meshStandardMaterial map={texture} bumpMap={texture} bumpScale={10} />
+      <meshStandardMaterial
+        map={texture}
+        color={hasError ? [0.8, 0.8, 0.8] : [2.5, 2.5, 2.5]}
+        bumpMap={texture}
+        bumpScale={10}
+        toneMapped={false}
+      />
     </mesh>
   );
 }));

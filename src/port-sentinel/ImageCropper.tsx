@@ -128,18 +128,8 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
     }
   };
 
-  // Convert proportions to pixels for rendering SVG
-  const renderPoints = points.map(p => {
-    if (imageRef.current) {
-      return {
-        x: p.x * imageRef.current.clientWidth,
-        y: p.y * imageRef.current.clientHeight
-      };
-    }
-    return { x: 0, y: 0 };
-  });
-
-  const polygonPoints = renderPoints.map(p => `${p.x},${p.y}`).join(" ");
+  // No need to convert to pixels, use percentages directly in CSS and SVG viewBox.
+  const polygonPoints = points.map(p => `${p.x * 100},${p.y * 100}`).join(" ");
 
   // Background position for magnifier
   let bgPosX = 0;
@@ -169,21 +159,22 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
           />
           
           {/* SVG Overlay for Lines */}
-          <svg className="sentinel-cropper__svg">
+          <svg className="sentinel-cropper__svg" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 2 }}>
             <polygon 
               points={polygonPoints} 
               fill="rgba(45, 159, 223, 0.1)" 
               stroke="#2d9fdf" 
-              strokeWidth="2" 
+              strokeWidth="0.5" 
+              vectorEffect="non-scaling-stroke"
             />
           </svg>
 
           {/* Draggable Handles */}
-          {renderPoints.map((p, i) => (
+          {points.map((p, i) => (
             <div
               key={i}
               className="sentinel-cropper__handle"
-              style={{ left: p.x, top: p.y }}
+              style={{ left: `${p.x * 100}%`, top: `${p.y * 100}%`, position: 'absolute', zIndex: 3 }}
               onPointerDown={(e) => handlePointerDown(e, i)}
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}

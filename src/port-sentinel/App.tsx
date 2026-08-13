@@ -1542,6 +1542,20 @@ ${paths}
                     setSelectedIndices([]);
                   }
                 }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    const event = {
+                      target: { files: e.dataTransfer.files }
+                    } as any;
+                    handleImageUpload(event);
+                  }
+                }}
               >
                 <input
                   type="file"

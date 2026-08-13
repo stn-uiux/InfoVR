@@ -1,6 +1,6 @@
-﻿import React from "react";
+import React from "react";
 import { useStore } from "../store/useStore";
-import { findNode } from "../utils/nodeUtils";
+import { Icon } from "@iconify/react";
 /**
  * FocusCarousel Component
  * Provides a navigation UI to cycle through focused racks in normal mode.
@@ -73,13 +73,16 @@ export const FocusCarousel: React.FC = () => {
           height: "36px",
           padding: 0,
           minWidth: "36px",
-          fontSize: "18px",
+          fontSize: "24px",
           border: "1px solid var(--border-weak)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
         onClick={handlePrev}
         title="Previous Rack"
       >
-        ‹
+        <Icon icon="mdi:chevron-left" />
       </button>
 
       {/* Status Info */}
@@ -94,7 +97,7 @@ export const FocusCarousel: React.FC = () => {
       >
         <span
           style={{
-            fontSize: "10px",
+            fontSize: "11px",
             color: "var(--text-tertiary)",
             textTransform: "uppercase",
             letterSpacing: "0.1em",
@@ -102,7 +105,7 @@ export const FocusCarousel: React.FC = () => {
             marginBottom: "2px",
           }}
         >
-          {findNode(nodes, activeNodeId)?.name || "N/A"} Rack Navigator
+          {groupRacks[currentIndex]?.rackTitle || `Rack ${groupRacks[currentIndex]?.rackId.slice(0, 4).toUpperCase()}`}
         </span>
         <div style={{ display: "flex", alignItems: "baseline", gap: "4px" }}>
           <span
@@ -134,13 +137,16 @@ export const FocusCarousel: React.FC = () => {
           height: "36px",
           padding: 0,
           minWidth: "36px",
-          fontSize: "18px",
+          fontSize: "24px",
           border: "1px solid var(--border-weak)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
         onClick={handleNext}
         title="Next Rack"
       >
-        ›
+        <Icon icon="mdi:chevron-right" />
       </button>
     </div>
   );

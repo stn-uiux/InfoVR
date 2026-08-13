@@ -40,18 +40,22 @@ function getAssetKey(modelName: string, side: EquipmentViewSide): string {
   return `${modelName.toLowerCase()}::${side}`;
 }
 
-function parseAssetName(filename: string): { modelName: string; side: EquipmentViewSide } {
-  const baseName = filename
-    .replace(/\.(png|svg)$/i, "")
-    .replace(/^\[\d+U\]\s*/, "")
-    .trim();
+function parseAssetName(filename: string): { modelName: string; side: EquipmentViewSide; isThumb: boolean } {
+  let baseName = filename.replace(/\.(png|svg)$/i, "");
+  const isThumb = baseName.endsWith("_thumb");
+  if (isThumb) {
+    baseName = baseName.slice(0, -6);
+  }
+  baseName = baseName.replace(/^\[\d+U\]\s*/, "").trim();
+  
   const sideMatch = baseName.match(/\s+(front|back|rear)$/i);
-  if (!sideMatch) return { modelName: baseName, side: "front" };
+  if (!sideMatch) return { modelName: baseName, side: "front", isThumb };
 
   const side = sideMatch[1].toLowerCase() === "front" ? "front" : "rear";
   return {
     modelName: baseName.slice(0, sideMatch.index).trim(),
     side,
+    isThumb,
   };
 }
 
@@ -73,15 +77,26 @@ const svgRawModules = import.meta.glob<{ default: string }>(
 // ── PNG: modelName → resolved URL ──────────────────────────────────────────
 const deviceImageMap = new Map<string, string>();
 const deviceImageSideMap = new Map<string, string>();
+const deviceThumbMap = new Map<string, string>();
+const deviceThumbSideMap = new Map<string, string>();
+
 for (const [path, mod] of Object.entries(assetModules)) {
   const filename = path.split("/").pop() ?? "";
-  const { modelName, side } = parseAssetName(filename);
+  const { modelName, side, isThumb } = parseAssetName(filename);
   if (modelName && mod.default) {
     const key = getAssetKey(modelName, side);
-    deviceImageSideMap.set(key, mod.default);
-    if (side === "front") {
-      deviceImageMap.set(modelName, mod.default);
-      deviceImageMap.set(modelName.toLowerCase(), mod.default);
+    if (isThumb) {
+      deviceThumbSideMap.set(key, mod.default);
+      if (side === "front") {
+        deviceThumbMap.set(modelName, mod.default);
+        deviceThumbMap.set(modelName.toLowerCase(), mod.default);
+      }
+    } else {
+      deviceImageSideMap.set(key, mod.default);
+      if (side === "front") {
+        deviceImageMap.set(modelName, mod.default);
+        deviceImageMap.set(modelName.toLowerCase(), mod.default);
+      }
     }
   }
 }
@@ -111,20 +126,29 @@ for (const [path, importFn] of Object.entries(svgRawModules)) {
 export const resolveDeviceImage = (
   modelName?: string,
   side: EquipmentViewSide = "front",
+  useThumb: boolean = false,
 ): string | undefined => {
   if (!modelName) return undefined;
   
   // 1. Try to find PNG URL from static assets
+  const sideMap = useThumb ? deviceThumbSideMap : deviceImageSideMap;
+  const generalMap = useThumb ? deviceThumbMap : deviceImageMap;
+
   for (const lookupName of getLookupNames(modelName)) {
-    const sideUrl = deviceImageSideMap.get(getAssetKey(lookupName, side));
+    const sideUrl = sideMap.get(getAssetKey(lookupName, side));
     if (sideUrl) return sideUrl;
     if (side === "front") {
-      const staticUrl = deviceImageMap.get(lookupName) ?? deviceImageMap.get(lookupName.toLowerCase());
+      const staticUrl = generalMap.get(lookupName) ?? generalMap.get(lookupName.toLowerCase());
       if (staticUrl) return staticUrl;
     }
   }
 
-  // 2. Fallback: 사용자 등록 모델 SVG → data URL
+  // 2. Fallback: If thumbnail was requested but not found, try getting full image
+  if (useThumb) {
+    return resolveDeviceImage(modelName, side, false);
+  }
+
+  // 3. Fallback: 사용자 등록 모델 SVG → data URL
   const custom = findCustomModelByName(modelName);
   const svgRaw = side === "rear" ? custom?.rearSvgRaw : custom?.modelSvgRaw;
   if (svgRaw) {

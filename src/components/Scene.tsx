@@ -8,12 +8,14 @@ import {
   GizmoViewcube,
   useGizmoContext,
   MeshReflectorMaterial,
+  Edges,
 } from "@react-three/drei";
 import { useStore } from "../store/useStore";
 import { Rack } from "./Rack";
 import { ImportedModelMesh } from "./ImportedModelMesh";
 import { CameraController } from "./CameraController";
 import { CyberSpaceEnvironment } from "./CyberSpaceEnvironment";
+import { calculateDynamicRoomSize } from "../utils/rackGeometry";
 import { GRID_SPACING } from "./constants";
 import { useTheme } from "../contexts/ThemeContext";
 import { Plane, Vector3 } from "three";
@@ -51,13 +53,29 @@ const CameraRefSync = () => {
   return null;
 };
 
+/** Waits for Suspense to resolve and shaders to compile before hiding loader */
+const SceneReadyMonitor = ({ isReadyToMonitor }: { isReadyToMonitor: boolean }) => {
+  const setCanvasReady = useStore((s) => s.setCanvasReady);
+  const frameCount = useRef(0);
+
+  useFrame(() => {
+    if (!isReadyToMonitor) return;
+    frameCount.current++;
+    // Wait for 2 frames to ensure WebGL shaders are compiled and the first frame is painted
+    if (frameCount.current === 2) {
+      setCanvasReady(true);
+    }
+  });
+
+  return null;
+};
+
 /** 
  * Wraps GizmoViewcube to ensure clicking Top/Bottom orients the camera 
  * with the Front (+Z) facing downwards.
  */
 const CustomGizmoViewcube = (props: any) => {
   const { tweenCamera } = useGizmoContext();
-  const { camera, controls } = useThree();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleClick = (e: any) => {
@@ -116,11 +134,15 @@ const DragHandler = () => {
 export const Scene = () => {
   const racks = useStore((state) => state.racks);
   const activeNodeId = useStore((state) => state.activeNodeId);
+  const nodes = useStore((state) => state.nodes);
   const isDragging = useStore((state) => state.isDragging);
   const importedModels = useStore((state) => state.importedModels);
   const draggingModelId = useStore((state) => state.draggingModelId);
   const selectedRackId = useStore((state) => state.selectedRackId);
   const isEditMode = useStore((state) => state.isEditMode);
+  const csCustomSpaceSize = useStore((state) => state.csCustomSpaceSize);
+  const csRoomWidthCm = useStore((state) => state.csRoomWidthCm);
+  const csRoomLengthCm = useStore((state) => state.csRoomLengthCm);
   const cyberSpaceEnabled = useStore((state) => state.cyberSpaceEnabled);
   const deviceRegistrationModalOpen = useStore(
     (state) => state.deviceRegistrationModalOpen,
@@ -130,6 +152,15 @@ export const Scene = () => {
   );
   const selectedDeviceId = useStore((state) => state.selectedDeviceId);
   const { theme } = useTheme();
+
+  const { width: dynamicWidth, length: dynamicLength } = calculateDynamicRoomSize(
+    racks,
+    importedModels,
+    activeNodeId,
+    csRoomWidthCm,
+    csRoomLengthCm,
+    csCustomSpaceSize
+  );
 
   const isModalOpen =
     deviceRegistrationModalOpen ||
@@ -151,9 +182,15 @@ export const Scene = () => {
     [racks, activeNodeId],
   );
 
+  const isReadyToMonitor = nodes.length === 0 || activeNodeId !== null;
+
   // Theme-based colors
   const isDarkMode = theme === "dark";
-  const backgroundColor = isDarkMode ? "#585d6e" : "#eef2f6"; // Dark mode background set to #585d6e
+  const backgroundColor = isEditMode
+    ? isDarkMode ? "#73798e" : "#eef2f6"
+    : isDarkMode
+      ? "radial-gradient(circle at 50% 50%, #1e3a8a 0%, #0a1324 60%, #050b14 100%)"
+      : "radial-gradient(circle at 50% 50%, #e0e7ff 0%, #cbd5e1 60%, #94a3b8 100%)";
   const gridCellColor = isDarkMode ? "#6b7080" : "#ccc"; // Neutral/cool gray for dark mode grid cells
   const gridSectionColor = isDarkMode ? "#7d8292" : "#999"; // Neutral/cool gray for dark mode grid sections
   const pointerDownPos = useRef<{ x: number; y: number } | null>(null);
@@ -217,24 +254,29 @@ export const Scene = () => {
         pointerDownPos.current = null;
       }}
     >
-      <ambientLight intensity={isDarkMode ? 0.6 : 0.8} />
-      {/* Only render default directional light if no user-placed Light model exists */}
-      {!hasUserLight && (
-        <directionalLight
-          position={[10, 20, 5]}
-          intensity={isDarkMode ? 1.2 : 1.5}
-          castShadow
-          shadow-mapSize={[1024, 1024]}
-        />
+      {/* Only use default basic lights in Edit Mode */}
+      {isEditMode && (
+        <>
+          <ambientLight intensity={isDarkMode ? 2.0 : 2.0} />
+          {/* Only render default directional light if no user-placed Light model exists */}
+          {!hasUserLight && (
+            <directionalLight
+              position={[10, 20, 5]}
+              intensity={isDarkMode ? 2.5 : 1.8}
+              castShadow
+              shadow-mapSize={[1024, 1024]}
+            />
+          )}
+          <hemisphereLight
+            intensity={isDarkMode ? 1.0 : 0.8}
+            color="#ffffff"
+            groundColor="#444444"
+          />
+        </>
       )}
-      <hemisphereLight
-        intensity={isDarkMode ? 0.4 : 0.6}
-        color="#ffffff"
-        groundColor="#444444"
-      />
 
       {!selectedRackId && (
-        <GizmoHelper alignment="top-right" margin={[gizmoMarginX, 140]}>
+        <GizmoHelper alignment="top-right" margin={[gizmoMarginX, 140]} renderPriority={isEditMode ? undefined : 2}>
           <group
             scale={1.4}
             onPointerOver={() => useStore.setState({ isGizmoHovered: true })}
@@ -253,47 +295,55 @@ export const Scene = () => {
       )}
 
       <Suspense fallback={null}>
-        <EnvironmentSafe preset={isDarkMode ? "night" : "city"} />
+        {isEditMode && <EnvironmentSafe preset={isDarkMode ? "night" : "city"} />}
+      </Suspense>
 
-        {/* Visual Grid – offset slightly below y=0 to prevent z-fighting with model floors */}
+      <Suspense fallback={null}>
+
+        {/* Visual Grid & Room Bounds – offset slightly below y=0 to prevent z-fighting with model floors */}
         {isEditMode && (
-          <Grid
-            position={[0, -0.01, 0]}
-            args={[40, 40]}
-            cellSize={GRID_SPACING}
-            cellColor={gridCellColor}
-            sectionSize={GRID_SPACING * 5}
-            sectionColor={gridSectionColor}
-            fadeDistance={50}
-            infiniteGrid
-            followCamera={false}
-            depthWrite={false}
-          />
-        )}
-
-        {/* Floor Reflection - Hidden in Edit Mode and Cyber Space Mode */}
-        {!isEditMode && !cyberSpaceEnabled && (
-          <mesh position={[0, -0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <planeGeometry args={[100, 100]} />
-            <MeshReflectorMaterial
-              transparent={true}
-              opacity={0.1}
-              blur={[50, 50]}
-              resolution={1024}
-              mixBlur={10}
-              mixStrength={12}
-              roughness={0.8}
-              depthScale={0.8}
-              minDepthThreshold={0.4}
-              maxDepthThreshold={1}
-              color="#757575"
-              metalness={0.5}
+          <group>
+            {/* Server Room Bounds Wireframe */}
+            {cyberSpaceEnabled && (
+              <group position={[0, 2.0, 0]}>
+                <mesh>
+                  <boxGeometry args={[dynamicWidth, 4.0, dynamicLength]} />
+                  <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+                  <Edges scale={1.0} color={isDarkMode ? "#4b5563" : "#9ca3af"} />
+                </mesh>
+              </group>
+            )}
+            <Grid
+              position={[0, -0.01, 0]}
+              args={[40, 40]}
+              cellSize={GRID_SPACING}
+              cellColor={gridCellColor}
+              sectionSize={GRID_SPACING * 5}
+              sectionColor={gridSectionColor}
+              fadeDistance={50}
+              infiniteGrid
+              followCamera={false}
             />
-          </mesh>
+            {/* Center Origin Marker */}
+            <group position={[0, -0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <mesh renderOrder={1}>
+                <ringGeometry args={[0.3, 0.35, 32]} />
+                <meshBasicMaterial color={isDarkMode ? "#3b82f6" : "#2563eb"} transparent opacity={0.8} depthTest={false} />
+              </mesh>
+              <mesh renderOrder={1}>
+                <planeGeometry args={[1.0, 0.03]} />
+                <meshBasicMaterial color={isDarkMode ? "#3b82f6" : "#2563eb"} transparent opacity={0.8} depthTest={false} />
+              </mesh>
+              <mesh renderOrder={1}>
+                <planeGeometry args={[0.03, 1.0]} />
+                <meshBasicMaterial color={isDarkMode ? "#3b82f6" : "#2563eb"} transparent opacity={0.8} depthTest={false} />
+              </mesh>
+            </group>
+          </group>
         )}
 
-        {/* Cyber Space Server Room Environment */}
-        {cyberSpaceEnabled && !isEditMode && <CyberSpaceEnvironment />}
+        {/* Universal High-Quality Environment (Lights, Floor, Post-Processing) */}
+        {!isEditMode && <CyberSpaceEnvironment />}
 
         {/* Racks (filtered by active group) */}
         {groupRacks.map((rack) => (
@@ -307,6 +357,8 @@ export const Scene = () => {
         {importedModels.map((model) => (
           <ImportedModelMesh key={model.id} model={model} />
         ))}
+
+        <SceneReadyMonitor isReadyToMonitor={isReadyToMonitor} />
       </Suspense>
 
       <OrbitControls

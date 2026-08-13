@@ -1,4 +1,4 @@
-﻿import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useStore, checkFrontClearanceViolation } from "../store/useStore";
 import type { Device, PortState, RegisteredDevice } from "../types";
@@ -396,18 +396,20 @@ export const DevicePanel = () => {
                 </span>
               </div>
 
-              <button
-                className="device-tile-delete"
-                aria-label={`Delete device ${displayName}`}
-                title="Delete device"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  setDeleteConfirmId(device.itemId);
-                }}
-              >
-                ✕
-              </button>
+              {isEditMode && (
+                <button
+                  className="device-tile-delete"
+                  aria-label={`Delete device ${displayName}`}
+                  title="Delete device"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    setDeleteConfirmId(device.itemId);
+                  }}
+                >
+                  ✕
+                </button>
+              )}
 
               {/* Inline delete confirmation */}
               {deleteConfirmId === device.itemId && (
@@ -480,13 +482,13 @@ export const DevicePanel = () => {
         rendered.push(
           <div
             key={`empty-${u}`}
-            onClick={() => openAddModal(u)}
+            onClick={() => isEditMode && openAddModal(u)}
             style={{
               height: `${SLOT_HEIGHT}px`,
               borderBottom: "1px solid var(--border-weak)",
               display: "flex",
               alignItems: "center",
-              cursor: "pointer",
+              cursor: isEditMode ? "pointer" : "default",
               backgroundColor: "var(--severity-success-bg)",
               transition: "background 0.1s",
               marginBottom: "2px",
@@ -1114,6 +1116,7 @@ export const DevicePanel = () => {
           ) : (
             <h2
               onClick={() => {
+                if (!isEditMode) return;
                 setEditNameValue(
                   rack.rackTitle || `Rack ${rack.rackId.substring(0, 4)}`,
                 );
@@ -1124,28 +1127,30 @@ export const DevicePanel = () => {
                 fontSize: "var(--font-size-lg)",
                 fontWeight: "var(--font-weight-semibold)",
                 color: "var(--text-primary)",
-                cursor: "pointer",
+                cursor: isEditMode ? "pointer" : "default",
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
               }}
-              title="클릭하여 랙 이름 변경"
+              title={isEditMode ? "클릭하여 랙 이름 변경" : ""}
             >
               {rack.rackTitle || `Rack ${rack.rackId.substring(0, 4)}`}
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="var(--text-tertiary)"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ flexShrink: 0 }}
-              >
-                <path d="M12 20h9"></path>
-                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-              </svg>
+              {isEditMode && (
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="var(--text-tertiary)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ flexShrink: 0 }}
+                >
+                  <path d="M12 20h9"></path>
+                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                </svg>
+              )}
             </h2>
           )}
           <span
@@ -1246,34 +1251,38 @@ export const DevicePanel = () => {
           style={{ background: "transparent", border: "none", padding: 0 }}
         >
           <h3 className="stn-section-title">Rack Layout</h3>
-          <div
-            style={{
-              fontSize: "var(--font-size-sm)",
-              color: "var(--text-tertiary)",
-              marginBottom: "8px",
-            }}
-          >
-            빈 슬롯을 클릭하면 등록 장비를 배치할 수 있습니다.
-          </div>
+          {isEditMode && (
+            <div
+              style={{
+                fontSize: "var(--font-size-sm)",
+                color: "var(--text-tertiary)",
+                marginBottom: "8px",
+              }}
+            >
+              빈 슬롯을 클릭하면 등록 장비를 배치할 수 있습니다.
+            </div>
+          )}
           {renderSlots()}
         </div>
 
         {/* Delete Rack Section */}
-        <div
-          style={{
-            marginTop: "20px",
-            paddingTop: "20px",
-            borderTop: "1px solid var(--severity-critical-bg)",
-          }}
-        >
-          <button
-            className="comm-btn comm-btn-md comm-btn-destructive"
-            style={{ width: "100%" }}
-            onClick={() => setIsDeleteRackModalOpen(true)}
+        {isEditMode && (
+          <div
+            style={{
+              marginTop: "20px",
+              paddingTop: "20px",
+              borderTop: "1px solid var(--severity-critical-bg)",
+            }}
           >
-            Rack 삭제
-          </button>
-        </div>
+            <button
+              className="comm-btn comm-btn-md comm-btn-destructive"
+              style={{ width: "100%" }}
+              onClick={() => setIsDeleteRackModalOpen(true)}
+            >
+              Rack 삭제
+            </button>
+          </div>
+        )}
       </div>
 
       {renderAddDeviceModal()}

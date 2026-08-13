@@ -2591,7 +2591,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #2b2b2b;
+  background-color: #5a5f70;
   transition: 0.3s;
   border-radius: 14px;
 }
@@ -4682,6 +4682,8 @@ input:checked+.slider:before {
   display: flex;
   flex-direction: row;
   pointer-events: none;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
 }
 
 .mi-collapse-btn-wrapper {
@@ -4689,6 +4691,7 @@ input:checked+.slider:before {
   justify-content: flex-end;
   padding: 2px 8px;
   flex-shrink: 0;
+  background: var(--panel-in-bg);
 }
 
 .mi-collapse-btn {
@@ -5301,7 +5304,6 @@ input:checked+.slider:before {
   flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 16px;
   gap: 16px;
 }
 

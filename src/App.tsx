@@ -1,15 +1,18 @@
 import React, { useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Icon } from "@iconify/react";
+import { Loader } from "@react-three/drei";
 import { Scene } from "./components/Scene";
 import { DevicePanel } from "./components/DevicePanel";
 import { DashboardWidgets } from "./components/DashboardWidgets";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { CyberSpaceToggle } from "./components/CyberSpaceToggle";
+import { CyberSpaceControlPanel } from "./components/CyberSpaceControlPanel";
 import { FocusCarousel } from "./components/FocusCarousel";
 import { UnsavedChangesDialog } from "./components/UnsavedChangesDialog";
 import { DeviceModal } from "./components/DeviceModal";
 import { DeviceTooltip } from "./components/DeviceTooltip";
+import { InitialLoader } from "./components/InitialLoader";
 const ImportExportModal = React.lazy(() =>
   import("./components/ImportExportModal").then((m) => ({
     default: m.ImportExportModal,
@@ -154,7 +157,7 @@ function App() {
   const loadState = useStore((s) => s.loadState);
   const selectedRackId = useStore((s) => s.selectedRackId);
   const isEditMode = useStore((s) => s.isEditMode);
-  const setEditMode = useStore((s) => s.setEditMode);
+  const setIsEditMode = useStore((s) => s.setIsEditMode);
   const setImportExportModalRackId = useStore((s) => s.setImportExportModalRackId);
   const setDeviceRegistrationModalOpen = useStore((s) => s.setDeviceRegistrationModalOpen);
   const deviceRegistrationModalOpen = useStore((s) => s.deviceRegistrationModalOpen);
@@ -167,6 +170,7 @@ function App() {
   const undo = useStore((s) => s.undo);
   const redo = useStore((s) => s.redo);
   const saveChanges = useStore((s) => s.saveChanges);
+  const cyberSpaceEnabled = useStore((s) => s.cyberSpaceEnabled);
 
   // Phase 2: isDirty — isEditMode가 아닐 때는 항상 false (비교 스킵)
   const racks = useStore((s) => s.racks);
@@ -176,6 +180,7 @@ function App() {
   const baselineRacks = useStore((s) => s.baselineRacks);
   const baselineModels = useStore((s) => s.baselineModels);
   const baselineNodes = useStore((s) => s.baselineNodes);
+  const nodeEnvironments = useStore((s) => s.nodeEnvironments);
   const isDirty = useMemo(() => {
     // Keep these store slices as render triggers for getIsDirty().
     void racks;
@@ -184,9 +189,10 @@ function App() {
     void baselineRacks;
     void baselineModels;
     void baselineNodes;
+    void nodeEnvironments;
     if (!isEditMode && !_importDirty) return false;
     return useStore.getState().getIsDirty();
-  }, [isEditMode, _importDirty, racks, importedModels, nodes, baselineRacks, baselineModels, baselineNodes]);
+  }, [isEditMode, _importDirty, racks, importedModels, nodes, baselineRacks, baselineModels, baselineNodes, nodeEnvironments]);
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -457,8 +463,7 @@ function App() {
           {/* Edit Mode Toggle */}
           <div
             className={`stn-mode-indicator ${isEditMode ? "active" : ""}`}
-            onClick={() => setEditMode(!isEditMode)}
-
+            onClick={() => setIsEditMode(!isEditMode)}
           >
             <div
               className={`comm-status-dot ${isEditMode ? "comm-status-dot-active" : "comm-status-dot-inactive"}`}
@@ -483,6 +488,8 @@ function App() {
           <ThemeToggle />
         </div>
       </div>
+
+      {cyberSpaceEnabled && <CyberSpaceControlPanel />}
 
       {/* Dashboard Widgets (shown when no rack is selected and no modal is open) */}
       {!selectedRackId && !isModalOpen && !isEditMode && <DashboardWidgets />}
@@ -536,6 +543,10 @@ function App() {
       <DeviceTooltip />
       <Toast />
       <PortErrorSynchronizer />
+      <Loader />
+
+      {/* Initial Loading Screen */}
+      <InitialLoader />
     </div>
   );
 }

@@ -224,18 +224,20 @@ const TreeNodeItem = ({
 
         {/* Rack count badge */}
         {count > 0 && <span className="tree-node-count">{count}</span>}
-        {/* Pin button */}
-        <button
-          className={`tree-node-pin ${pinnedNodeId === node.nodeId ? "pinned" : ""}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (pinnedNodeId === node.nodeId) setPinnedNode(null);
-            else setPinnedNode(node.nodeId);
-          }}
-          title={pinnedNodeId === node.nodeId ? "고정 해제" : "이 그룹 고정"}
-        >
-          <Icon icon="mynaui:pin-solid" className="icon icon comm-icon-sm" style={{ color: pinnedNodeId === node.nodeId ? "var(--theme-primary)" : "var(--text-tertiary)" }} />
-        </button>
+        {/* Pin button (only for rooms) */}
+        {node.type === "room" && (
+          <button
+            className={`tree-node-pin ${pinnedNodeId === node.nodeId ? "pinned" : ""}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (pinnedNodeId === node.nodeId) setPinnedNode(null);
+              else setPinnedNode(node.nodeId);
+            }}
+            title={pinnedNodeId === node.nodeId ? "고정 해제" : "메인 전산실로 고정"}
+          >
+            <Icon icon="mynaui:pin-solid" className="icon icon comm-icon-sm" style={{ color: pinnedNodeId === node.nodeId ? "var(--theme-primary)" : "var(--text-tertiary)" }} />
+          </button>
+        )}
       </div>
 
       {/* Children */}
@@ -552,9 +554,26 @@ export const HierarchyTree = React.memo(() => {
 
   useEffect(() => {
     if (hasAppliedPinnedDefault.current) return;
-    if (!pinnedNodeId || !rootNodes.length) return;
+    if (!rootNodes.length) return;
+
+    let firstRoomId: string | null = null;
+    const findFirstRoom = (nodesList: HierarchyNode[]) => {
+      for (const n of nodesList) {
+        if (n.type === "room") {
+          firstRoomId = n.nodeId;
+          return true;
+        }
+        const children = getChildren(nodes, n.nodeId);
+        if (findFirstRoom(children)) return true;
+      }
+      return false;
+    };
+    findFirstRoom(rootNodes);
+
+    const defaultNodeId = pinnedNodeId || firstRoomId || rootNodes[0].nodeId;
+
     if (!activeNodeId) {
-      setActiveNode(pinnedNodeId);
+      setActiveNode(defaultNodeId);
       hasAppliedPinnedDefault.current = true;
       return;
     }
@@ -563,16 +582,17 @@ export const HierarchyTree = React.memo(() => {
       (root) => root.nodeId === activeNodeId,
     );
 
-    if (isDefaultRootSelection && activeNodeId !== pinnedNodeId) {
-      setActiveNode(pinnedNodeId);
+    if (isDefaultRootSelection && activeNodeId !== defaultNodeId) {
+      setActiveNode(defaultNodeId);
     }
     hasAppliedPinnedDefault.current = true;
-  }, [pinnedNodeId, activeNodeId, rootNodes, setActiveNode]);
+  }, [pinnedNodeId, activeNodeId, rootNodes, nodes, setActiveNode]);
 
   return (
     <div className="tree-sidebar-container">
       <div
         className={`hierarchy-tree ${isCollapsed ? "collapsed" : "expanded"}`}
+        style={{ flex: 1, height: "auto", minHeight: 0 }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="hierarchy-tree-header">
@@ -855,6 +875,7 @@ export const HierarchyTree = React.memo(() => {
           </div>,
           document.body
         )}
+
     </div>
   );
 });

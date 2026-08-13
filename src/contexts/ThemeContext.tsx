@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
+import { useStore } from "../store/useStore";
 
 type Theme = "light" | "dark";
 
@@ -21,6 +22,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     localStorage.setItem("comm-theme", theme);
     document.documentElement.setAttribute("data-theme", theme);
+    useStore.getState().setCyberSpaceTheme(theme === "light");
   }, [theme]);
 
   const toggleTheme = () => {
