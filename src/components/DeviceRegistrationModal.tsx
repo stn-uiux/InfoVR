@@ -646,7 +646,7 @@ export const DeviceRegistrationModal = () => {
               <div className="drm-body">
                 {/* Left Sidebar: Node Hierarchy */}
                 <div className="drm-sidebar">
-                  <div className="hierarchy-tree-header" style={{ padding: "16px 16px 8px" }}>
+                  <div className="collapse-panel-header" style={{ padding: "16px 16px 8px" }}>
                     <div className="comm-flex-center-10-flex1">
                       <span className="comm-flex-center-8-noshrink">
                         <span className="comm-icon-primary-lg">

@@ -576,7 +576,7 @@ export const Rack = memo(({
         </mesh>
 
         {/* Phase 1: 호버 태그 항상 마운트 — DOM 마운트/언마운트 비용 제거 */}
-        <Billboard position={[0, height / 2 + 0.4, 0]} visible={isHovered}>
+        <Billboard position={[0, height / 2 + 0.15, 0]} visible={isHovered}>
           <Html center zIndexRange={[0, 10]} style={{ pointerEvents: "none" }}>
             <div
               style={{

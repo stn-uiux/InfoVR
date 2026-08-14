@@ -9,7 +9,9 @@ import {
   useGizmoContext,
   MeshReflectorMaterial,
   Edges,
+  PivotControls,
 } from "@react-three/drei";
+import { Matrix4, Vector3, Plane, BufferGeometry, Float32BufferAttribute } from "three";
 import { useStore } from "../store/useStore";
 import { Rack } from "./Rack";
 import { ImportedModelMesh } from "./ImportedModelMesh";
@@ -18,7 +20,6 @@ import { CyberSpaceEnvironment } from "./CyberSpaceEnvironment";
 import { calculateDynamicRoomSize } from "../utils/rackGeometry";
 import { GRID_SPACING } from "./constants";
 import { useTheme } from "../contexts/ThemeContext";
-import { Plane, Vector3 } from "three";
 
 /** Error boundary that silently catches Environment HDR load failures (e.g. offline) */
 class EnvironmentErrorBoundary extends React.Component<
@@ -53,27 +54,54 @@ const CameraRefSync = () => {
   return null;
 };
 
-import { useProgress } from "@react-three/drei";
+import { DefaultLoadingManager } from "three";
 
 /** Waits for Suspense to resolve and shaders to compile before hiding loader */
 const SceneReadyMonitor = ({ isReadyToMonitor }: { isReadyToMonitor: boolean }) => {
   const setCanvasReady = useStore((s) => s.setCanvasReady);
-  const { active } = useProgress();
   const frameCount = useRef(0);
+  const activeRef = useRef(false);
+
+  useEffect(() => {
+    const origStart = DefaultLoadingManager.onStart;
+    const origLoad = DefaultLoadingManager.onLoad;
+    const origError = DefaultLoadingManager.onError;
+
+    DefaultLoadingManager.onStart = (url, loaded, total) => {
+      activeRef.current = true;
+      if (origStart) origStart(url, loaded, total);
+    };
+    DefaultLoadingManager.onLoad = () => {
+      activeRef.current = false;
+      if (origLoad) origLoad();
+    };
+    DefaultLoadingManager.onError = (url) => {
+      activeRef.current = false;
+      if (origError) origError(url);
+    };
+
+    return () => {
+      DefaultLoadingManager.onStart = origStart;
+      DefaultLoadingManager.onLoad = origLoad;
+      DefaultLoadingManager.onError = origError;
+    };
+  }, []);
 
   useFrame(() => {
     // If not ready to monitor, or if ThreeJS is still actively loading textures/models, reset.
-    if (!isReadyToMonitor || active) {
+    if (!isReadyToMonitor || activeRef.current) {
       frameCount.current = 0;
-      setCanvasReady(false);
+      if (useStore.getState().isCanvasReady) {
+        setCanvasReady(false);
+      }
       return;
     }
     
-    frameCount.current++;
-    // Wait for 5 continuous frames AFTER all loading finishes to ensure WebGL shaders 
-    // are compiled and the mapped textures are fully painted on the screen.
-    if (frameCount.current === 5) {
-      setCanvasReady(true);
+    if (frameCount.current < 5) {
+      frameCount.current++;
+      if (frameCount.current === 5 && !useStore.getState().isCanvasReady) {
+        setCanvasReady(true);
+      }
     }
   });
 
@@ -153,6 +181,8 @@ export const Scene = () => {
   const csCustomSpaceSize = useStore((state) => state.csCustomSpaceSize);
   const csRoomWidthCm = useStore((state) => state.csRoomWidthCm);
   const csRoomLengthCm = useStore((state) => state.csRoomLengthCm);
+  const csOffsetXCm = useStore((state) => state.csOffsetXCm);
+  const csOffsetZCm = useStore((state) => state.csOffsetZCm);
   const cyberSpaceEnabled = useStore((state) => state.cyberSpaceEnabled);
   const deviceRegistrationModalOpen = useStore(
     (state) => state.deviceRegistrationModalOpen,
@@ -161,7 +191,16 @@ export const Scene = () => {
     (state) => state.importExportModalRackId,
   );
   const selectedDeviceId = useStore((state) => state.selectedDeviceId);
+  const selectedModelId = useStore((state) => state.selectedModelId);
   const { theme } = useTheme();
+
+  const [isRoomSelected, setIsRoomSelected] = React.useState(false);
+
+  React.useEffect(() => {
+    if (selectedRackId || selectedModelId) {
+      setIsRoomSelected(false);
+    }
+  }, [selectedRackId, selectedModelId]);
 
   const { width: dynamicWidth, length: dynamicLength } = calculateDynamicRoomSize(
     racks,
@@ -172,6 +211,40 @@ export const Scene = () => {
     csCustomSpaceSize
   );
 
+  const wallLinesGeometry = useMemo(() => {
+    const points: number[] = [];
+    const halfW = dynamicWidth / 2;
+    const halfL = dynamicLength / 2;
+    const h = 4.0;
+
+    // CyberSpaceEnvironment uses 1.8m target panel width
+    const panelCountX = Math.max(1, Math.floor(dynamicWidth / 1.8));
+    const panelWidthX = dynamicWidth / panelCountX;
+
+    const panelCountZ = Math.max(1, Math.floor(dynamicLength / 1.8));
+    const panelWidthZ = dynamicLength / panelCountZ;
+
+    // Front & Back walls (along X axis)
+    for (let i = 1; i < panelCountX; i++) {
+      const x = i * panelWidthX - halfW;
+      points.push(x, -h/2, halfL, x, h/2, halfL);
+      points.push(x, -h/2, -halfL, x, h/2, -halfL);
+    }
+    
+    // Left & Right walls (along Z axis)
+    for (let i = 1; i < panelCountZ; i++) {
+      const z = i * panelWidthZ - halfL;
+      points.push(halfW, -h/2, z, halfW, h/2, z);
+      points.push(-halfW, -h/2, z, -halfW, h/2, z);
+    }
+
+    const geom = new BufferGeometry();
+    if (points.length > 0) {
+      geom.setAttribute('position', new Float32BufferAttribute(points, 3));
+    }
+    return geom;
+  }, [dynamicWidth, dynamicLength]);
+
   const isModalOpen =
     deviceRegistrationModalOpen ||
     importExportModalRackId !== null ||
@@ -179,6 +252,16 @@ export const Scene = () => {
 
   const showDashboardWidgets = !selectedRackId && !isModalOpen && !isEditMode;
   const gizmoMarginX = showDashboardWidgets ? 440 : 100;
+
+  const csOffsetMatrix = useMemo(() => {
+    return new Matrix4().makeTranslation(
+      csCustomSpaceSize ? csOffsetXCm / 100 : 0,
+      0,
+      csCustomSpaceSize ? csOffsetZCm / 100 : 0
+    );
+  }, [csCustomSpaceSize, csOffsetXCm, csOffsetZCm]);
+
+  const liveOffset = useRef({ x: csOffsetXCm, z: csOffsetZCm });
 
   // Phase 2-C: useMemo로 감싸서 importedModels 변경 시에만 재계산
   const hasUserLight = useMemo(
@@ -259,6 +342,7 @@ export const Scene = () => {
           if (dist < 5) {
             useStore.getState().selectRack(null);
             useStore.getState().selectModel(null);
+            setIsRoomSelected(false);
           }
         }
         pointerDownPos.current = null;
@@ -314,14 +398,95 @@ export const Scene = () => {
         {isEditMode && (
           <group>
             {/* Server Room Bounds Wireframe */}
-            {cyberSpaceEnabled && (
-              <group position={[0, 2.0, 0]}>
-                <mesh>
-                  <boxGeometry args={[dynamicWidth, 4.0, dynamicLength]} />
-                  <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-                  <Edges scale={1.0} color={isDarkMode ? "#38bdf8" : "#0ea5e9"} />
-                </mesh>
-              </group>
+            {(cyberSpaceEnabled || csCustomSpaceSize) && (
+              <PivotControls
+                visible={csCustomSpaceSize && isRoomSelected}
+                activeAxes={csCustomSpaceSize && isRoomSelected ? [true, false, true] : [false, false, false]}
+                scale={100}
+                anchor={[0, -1, 0]}
+                depthTest={false}
+                fixed
+                matrix={csOffsetMatrix}
+                disableRotations={true}
+                disableScaling={true}
+                onDragStart={() => {
+                  useStore.getState()._controlsRef?.current?.enabled && (useStore.getState()._controlsRef!.current!.enabled = false);
+                }}
+                onDrag={(local) => {
+                  const position = new Vector3();
+                  position.setFromMatrixPosition(local);
+                  // Update ref instead of store to avoid double-transform feedback loop
+                  liveOffset.current = {
+                    x: Math.round(position.x * 100),
+                    z: Math.round(position.z * 100)
+                  };
+                }}
+                onDragEnd={() => {
+                  useStore.getState()._controlsRef?.current && (useStore.getState()._controlsRef!.current!.enabled = true);
+                  // Commit to store once on drag end
+                  useStore.getState().setCyberSpaceConfig({
+                    csOffsetXCm: liveOffset.current.x,
+                    csOffsetZCm: liveOffset.current.z
+                  });
+                }}
+              >
+                <group position={[0, 2.0, 0]}>
+                  <mesh>
+                    <boxGeometry args={[dynamicWidth, 4.0, dynamicLength]} />
+                    <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+                    <Edges 
+                      scale={1.0} 
+                      color={isDarkMode ? (isRoomSelected ? "#10b981" : "#38bdf8") : (isRoomSelected ? "#059669" : "#0ea5e9")} 
+                    />
+                    {wallLinesGeometry.attributes.position && (
+                      <lineSegments geometry={wallLinesGeometry}>
+                        <lineBasicMaterial 
+                          color={isDarkMode ? (isRoomSelected ? "#10b981" : "#38bdf8") : (isRoomSelected ? "#059669" : "#0ea5e9")} 
+                          transparent 
+                          opacity={isRoomSelected ? 0.5 : 0.25} 
+                        />
+                      </lineSegments>
+                    )}
+                  </mesh>
+                  {/* Invisible floor mesh for easier click selection */}
+                  {csCustomSpaceSize && (
+                    <mesh 
+                      rotation={[-Math.PI / 2, 0, 0]} 
+                      position={[0, -2.005, 0]}
+                      onClick={(e) => {
+                        if (e.button !== 0) return; // Only left-click
+                        if (e.delta > 5) return; // Ignore drags
+
+                        // Only select the floor if it was the front-most object clicked
+                        // (prevents selecting floor when clicking a Rack that doesn't stop propagation)
+                        if (e.intersections.length > 0 && e.intersections[0].object !== e.object) {
+                          return;
+                        }
+
+                        e.stopPropagation();
+                        useStore.getState().selectRack(null);
+                        useStore.getState().selectModel(null);
+                        setIsRoomSelected(true);
+                      }}
+                      onPointerOver={(e) => {
+                        e.stopPropagation();
+                        document.body.style.cursor = "pointer";
+                      }}
+                      onPointerOut={(e) => {
+                        document.body.style.cursor = "auto";
+                      }}
+                    >
+                      <planeGeometry args={[dynamicWidth, dynamicLength]} />
+                      <meshBasicMaterial 
+                        color={isDarkMode ? (isRoomSelected ? "#10b981" : "#38bdf8") : (isRoomSelected ? "#059669" : "#0ea5e9")} 
+                        transparent 
+                        opacity={0.3} 
+                        depthWrite={false} 
+                      />
+                    </mesh>
+                  )}
+                </group>
+              </PivotControls>
             )}
             <Grid
               position={[0, -0.01, 0]}

@@ -288,12 +288,12 @@ export const DashboardWidgets = () => {
   const allNodeSensors = useMemo(() => {
     // Priority 1: Nodes that actually exist in hierarchy
     const sensorList = nodes
+      .filter((node) => node.type === "room") // Only include server rooms
       .map((node) => ({
         id: node.nodeId,
         name: node.name,
         data: getNodeSensorData(node.nodeId),
-      }))
-      .filter((n) => n.id !== "root"); // Skip root if needed
+      }));
 
     // Return only nodes that exist in hierarchy
     return sensorList;

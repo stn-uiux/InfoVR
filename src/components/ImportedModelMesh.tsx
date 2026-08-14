@@ -328,7 +328,10 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
     };
   }, [model.position, model.rotation, model.scale]);
 
-  const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
+  const handleClick = (e: ThreeEvent<MouseEvent>) => {
+    if (e.button !== 0) return; // Only allow left-click
+    if (e.delta > 5) return; // Ignore if user dragged
+
     if (useStore.getState().isGizmoHovered) return;
 
     // Check if the user is clicking the PivotControls gizmo.
@@ -406,7 +409,7 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
   const innerContent = (
     <group
       userData={{ isInnerContent: true }}
-      onPointerDown={handlePointerDown}
+      onClick={handleClick}
       onPointerOver={() => {
         if (useStore.getState().isGizmoHovered) return;
         if (isEditMode) {
@@ -442,20 +445,7 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
         </GltfErrorBoundary>
       )}
 
-      {/* Selection highlight box */}
-      {isSelected && (
-        <group position={hlCenter}>
-          <mesh>
-            <boxGeometry args={hlArgs} />
-            <meshBasicMaterial
-              color={highlightColor}
-              wireframe
-              transparent
-              opacity={highlightOpacity}
-            />
-          </mesh>
-        </group>
-      )}
+      {/* Selection highlight box (Removed per user request) */}
       {/* Lock/Unlock status label */}
       {isSelected && isEditMode && (
         <Billboard
@@ -508,7 +498,7 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
         <PivotControls
           matrix={matrix}
           userData={{ isGizmo: true }}
-          anchor={[0, 0, 0]}
+          anchor={[0, -1, 0]}
           depthTest={false}
           fixed
           scale={75}

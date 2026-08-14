@@ -437,7 +437,8 @@ export const CameraController = () => {
             if (projFront > 0.3 && perpDistFront < 1.2) {
               // 2. 현재 카메라 위치가 맞은편 랙 뒤로 넘어가서 시야를 가리는 상태인지 검사
               // 랙 높이가 서로 다를 때 중심점 3D 거리를 사용하면 오차가 크므로 XZ 평면(바닥)과 Y 높이를 분리해서 계산
-              const camXZ = new Vector2(camera.position.x, camera.position.z);
+              const camPosToUse = isAnimating.current ? vTargetPos.current : camera.position;
+              const camXZ = new Vector2(camPosToUse.x, camPosToUse.z);
               const targetXZ = new Vector2(rackX, rackZ);
               const dirXZ = new Vector2().subVectors(targetXZ, camXZ);
               const distToTargetXZ = dirXZ.length();
@@ -459,12 +460,12 @@ export const CameraController = () => {
                 if (perpDistSightXZ < 1.2) {
                   // 카메라가 목표 랙을 내려다보는 시선이 맞은편 랙 위쪽 허공을 지나가는지 검사
                   const ratio = projSightXZ / distToTargetXZ;
-                  const sightYAtRack = camera.position.y + ratio * (targetCenterY - camera.position.y);
+                  const sightYAtRack = camPosToUse.y + ratio * (targetCenterY - camPosToUse.y);
                   
                   const otherHeight = other.rackSize * U_HEIGHT + 0.1;
                   
                   // 시선 높이가 맞은편 랙의 실제 높이보다 낮거나, 카메라 자체가 랙 높이보다 낮다면 (화면 하단을 가림) 숨김 처리
-                  if (sightYAtRack < otherHeight + 0.5 || camera.position.y < otherHeight + 0.5) {
+                  if (sightYAtRack < otherHeight + 0.5 || camPosToUse.y < otherHeight + 0.5) {
                     obstructingIds.push(other.rackId);
                   }
                 }
@@ -484,7 +485,7 @@ export const CameraController = () => {
     if (!isAnimating.current || !controls || isInteracting.current) return;
 
     const orbitControls = controls as unknown as OrbitControls;
-    const alpha = 1 - Math.exp(-15 * delta);
+    const alpha = 1 - Math.exp(-3 * delta); // 2.5에서 3으로 미세조정
 
     camera.position.lerp(vTargetPos.current, alpha);
     orbitControls.target.lerp(vTargetLookAt.current, alpha);

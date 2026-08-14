@@ -2233,8 +2233,8 @@
   }
 }
 
-/* ---------- Hierarchy Tree ---------- */
-.hierarchy-tree {
+/* ---------- Collapse Panel ---------- */
+.collapse-panel {
   width: 100%;
   height: 100%;
   background: transparent;
@@ -2247,26 +2247,31 @@
   flex-shrink: 0;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   backdrop-filter: none;
+  border-top: 1px solid var(--border-weak);
 }
 
-.hierarchy-tree.expanded {
+.collapse-panel:first-child {
+  border-top: 0 none;
+}
+
+.collapse-panel.expanded {
   max-height: none;
 }
 
-.hierarchy-tree.collapsed {
+.collapse-panel.collapsed {
   max-height: 48px;
 }
 
-.hierarchy-tree.collapsed .hierarchy-tree-body {
+.collapse-panel.collapsed .collapse-panel-body {
   opacity: 0;
   pointer-events: none;
 }
 
-.hierarchy-tree-header {
+.collapse-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 16px;
+  padding: 12px 16px;
   font-size: 14px;
   font-weight: 700;
   color: var(--text-primary);
@@ -2274,7 +2279,7 @@
   user-select: none;
 }
 
-.hierarchy-tree-body {
+.collapse-panel-body {
   overflow-y: auto;
   padding: 8px 0;
   flex: 1;
@@ -5000,6 +5005,8 @@ input:checked+.slider:before {
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
   border: 1px solid var(--border-weak);
   overflow-y: auto;
+  background: var(--bg-primary);
+  backdrop-filter: blur(2394a3b8);
 }
 
 .comm-label-sm-center {
@@ -5136,8 +5143,8 @@ input:checked+.slider:before {
 .mi-sidebar .sidebar-expanded-content {
   display: flex;
   flex-direction: column;
-  height: 100%;
   flex: 1;
+  overflow: hidden;
 }
 
 .mi-sidebar .sidebar-resize-handle {
@@ -5304,7 +5311,6 @@ input:checked+.slider:before {
   flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
-  gap: 16px;
 }
 
 /* Prevent text selection during drag/resize operations */

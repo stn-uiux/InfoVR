@@ -591,11 +591,11 @@ export const HierarchyTree = React.memo(() => {
   return (
     <div className="tree-sidebar-container">
       <div
-        className={`hierarchy-tree ${isCollapsed ? "collapsed" : "expanded"}`}
+        className={`collapse-panel ${isCollapsed ? "collapsed" : "expanded"}`}
         style={{ flex: 1, height: "auto", minHeight: 0 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="hierarchy-tree-header">
+        <div className="collapse-panel-header">
           <div
             className="comm-flex-center-10-flex1"
           >
@@ -670,7 +670,7 @@ export const HierarchyTree = React.memo(() => {
           </div>
         )}
 
-        <div className="hierarchy-tree-body">
+        <div className="collapse-panel-body">
           {rootNodes.map((root) => (
             <TreeNodeItem
               key={root.nodeId}

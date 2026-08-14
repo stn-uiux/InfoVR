@@ -234,6 +234,8 @@ export function CyberSpaceEnvironment() {
     csCustomSpaceSize,
     csRoomWidthCm,
     csRoomLengthCm,
+    csOffsetXCm,
+    csOffsetZCm,
     csWallColor,
     csCeilingColor,
     csFloorColor,
@@ -271,7 +273,7 @@ export function CyberSpaceEnvironment() {
       )}
 
       {cyberSpaceEnabled && (
-        <>
+        <group position={[csCustomSpaceSize ? csOffsetXCm / 100 : 0, 0, csCustomSpaceSize ? csOffsetZCm / 100 : 0]}>
           {/* Floor Dark Recessed Background */}
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
             <planeGeometry args={[roomWidth + 0.1, roomLength + 0.1]} />
@@ -316,7 +318,7 @@ export function CyberSpaceEnvironment() {
             ceilingColor={csCeilingColor}
             isLightMode={csIsLightMode}
           />
-        </>
+        </group>
       )}
 
       <EffectComposer>
