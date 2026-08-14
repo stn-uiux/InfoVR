@@ -16,7 +16,7 @@ iconsBundle.forEach((collection: any) => {
   addCollection(collection);
 });
 
-const PortSentinelApp = lazy(() => import("./port-sentinel/App.tsx"));
+const PortWizardApp = lazy(() => import("./port-wizard/App.tsx"));
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -25,10 +25,10 @@ createRoot(document.getElementById("root")!).render(
         <Routes>
           <Route path="/" element={<App />} />
           <Route
-            path="/port-sentinel"
+            path="/port-wizard"
             element={
               <Suspense fallback={<div style={{background:'#0a0a0a',color:'#fff',height:'100vh',display:'flex',alignItems:'center',justifyContent:'center'}}>Loading 포트맵핑 마법사 <Icon icon="mdi:magic" style={{ marginLeft: '6px' }} />...</div>}>
-                <PortSentinelApp />
+                <PortWizardApp />
               </Suspense>
             }
           />

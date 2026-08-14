@@ -16,7 +16,7 @@
 [data-theme=light] {
   /* Background colors - Tech Light */
   --bg-canvas: #ffffff;
-  --bg-primary: rgba(255, 255, 255, 0.8);
+  --bg-primary: rgba(255, 255, 255, 0.7);
   --bg-secondary: #f4f6f9;
   --bg-tertiary: #e3e8ef;
   /* Text colors */
@@ -34,7 +34,7 @@
   --panel-bg: rgba(255, 255, 255, 0.7);
   --panel-border: rgba(255, 255, 255, 0.8);
   --panel-header-bg: rgba(255, 255, 255, 0.5);
-  --panel-in-bg: rgba(0, 0, 0, 0.03);
+  --panel-in-bg: rgba(0, 0, 0, 0.05);
   --panel-shadow: 0 4px 24px rgba(0, 0, 0, 0.06), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
   /* Interactive states */
   --hover-bg: rgba(var(--theme-primary-rgb), 0.05);
@@ -141,7 +141,7 @@
   /* Background colors - arcVRoom Dark */
   --bg-canvas: #0a0a0a;
   --bg-primary: rgba(0, 19, 44, 0.7);
-  --bg-secondary: rgba(20, 184, 134, 0.05);
+  --bg-secondary: rgba(14, 22, 32, 0.7);
   --bg-tertiary: rgba(var(--theme-primary-rgb), 0.1);
   /* Text colors - Crisp and readable */
   --text-primary: #f8fafc;
@@ -158,7 +158,7 @@
   --panel-bg: rgba(0, 0, 0, 0.7);
   --panel-border: rgba(255, 255, 255, 0.1);
   --panel-header-bg: rgba(255, 255, 255, 0.05);
-  --panel-in-bg: rgba(0, 0, 0, 1);
+  --panel-in-bg: rgba(0, 0, 0, 0.3);
   --panel-shadow: none;
   /* Interactive states */
   --hover-bg: rgba(var(--theme-primary-rgb), 0.05);

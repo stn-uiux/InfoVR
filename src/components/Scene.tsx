@@ -53,16 +53,26 @@ const CameraRefSync = () => {
   return null;
 };
 
+import { useProgress } from "@react-three/drei";
+
 /** Waits for Suspense to resolve and shaders to compile before hiding loader */
 const SceneReadyMonitor = ({ isReadyToMonitor }: { isReadyToMonitor: boolean }) => {
   const setCanvasReady = useStore((s) => s.setCanvasReady);
+  const { active } = useProgress();
   const frameCount = useRef(0);
 
   useFrame(() => {
-    if (!isReadyToMonitor) return;
+    // If not ready to monitor, or if ThreeJS is still actively loading textures/models, reset.
+    if (!isReadyToMonitor || active) {
+      frameCount.current = 0;
+      setCanvasReady(false);
+      return;
+    }
+    
     frameCount.current++;
-    // Wait for 2 frames to ensure WebGL shaders are compiled and the first frame is painted
-    if (frameCount.current === 2) {
+    // Wait for 5 continuous frames AFTER all loading finishes to ensure WebGL shaders 
+    // are compiled and the mapped textures are fully painted on the screen.
+    if (frameCount.current === 5) {
       setCanvasReady(true);
     }
   });
@@ -309,7 +319,7 @@ export const Scene = () => {
                 <mesh>
                   <boxGeometry args={[dynamicWidth, 4.0, dynamicLength]} />
                   <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-                  <Edges scale={1.0} color={isDarkMode ? "#4b5563" : "#9ca3af"} />
+                  <Edges scale={1.0} color={isDarkMode ? "#38bdf8" : "#0ea5e9"} />
                 </mesh>
               </group>
             )}

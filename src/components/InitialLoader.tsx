@@ -21,27 +21,13 @@ export const InitialLoader = () => {
     const isNodeSelected = nodes.length === 0 || activeNodeId !== null;
     if (!isNodeSelected) return;
 
-    // Wait until the canvas has painted its first frame
-    if (!isCanvasReady) return;
-
-    if (hasStarted) {
-      // If loading started, wait for it to finish (active becomes false)
-      if (!active) {
-        // Wait a tiny bit just in case it flips back to active (common in Suspense)
-        const timer = setTimeout(() => {
-          setIsReady(true);
-        }, 200);
-        return () => clearTimeout(timer);
-      }
-    } else {
-      // If loading never started, wait 1.5s to be absolutely sure there's nothing to load
-      // If it starts loading during this time, hasStarted becomes true and this timer cancels
-      const timer = setTimeout(() => {
-        setIsReady(true);
-      }, 1500);
-      return () => clearTimeout(timer);
+    // Scene.tsx의 SceneReadyMonitor에서 모든 로딩(active false)이 끝난 후 
+    // 최소 5프레임 이상 렌더링이 안정화되면 isCanvasReady를 true로 만듭니다.
+    // 타이머 없이 완벽하게 맵핑이 완료된 시점을 감지합니다.
+    if (isCanvasReady && !active && progress === 100) {
+      setIsReady(true);
     }
-  }, [active, progress, isCanvasReady, hasStarted, nodes.length, activeNodeId, isReady]);
+  }, [active, progress, isCanvasReady, nodes.length, activeNodeId, isReady]);
 
   if (isReady) return null;
 

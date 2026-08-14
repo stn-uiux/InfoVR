@@ -757,7 +757,7 @@ export const useStore = create<AppState>()(
             });
 
             const nodeEnv = (targetNodeId && get().nodeEnvironments[targetNodeId]) || {};
-            const cyberSpaceConfig = { ...DEFAULT_CYBER_SPACE_CONFIG, ...nodeEnv };
+            const cyberSpaceConfig = { ...(get().csIsLightMode ? LIGHT_THEME_CYBER_SPACE_CONFIG : DEFAULT_CYBER_SPACE_CONFIG), ...nodeEnv };
 
             set({
               ...cyberSpaceConfig,
@@ -814,7 +814,7 @@ export const useStore = create<AppState>()(
 
           // Re-apply the active node's CyberSpace config from restored environments
           const nodeEnv = (activeNodeId && restoredNodeEnvs[activeNodeId]) || {};
-          const cyberSpaceConfig = { ...DEFAULT_CYBER_SPACE_CONFIG, ...nodeEnv };
+          const cyberSpaceConfig = { ...(get().csIsLightMode ? LIGHT_THEME_CYBER_SPACE_CONFIG : DEFAULT_CYBER_SPACE_CONFIG), ...nodeEnv };
 
           set({
             ...cyberSpaceConfig,
@@ -871,7 +871,7 @@ export const useStore = create<AppState>()(
             });
 
             const nodeEnv = (targetNodeId && get().nodeEnvironments[targetNodeId]) || {};
-            const cyberSpaceConfig = { ...DEFAULT_CYBER_SPACE_CONFIG, ...nodeEnv };
+            const cyberSpaceConfig = { ...(get().csIsLightMode ? LIGHT_THEME_CYBER_SPACE_CONFIG : DEFAULT_CYBER_SPACE_CONFIG), ...nodeEnv };
 
             set({
               ...cyberSpaceConfig,
@@ -933,7 +933,7 @@ export const useStore = create<AppState>()(
 
         // Fetch Node-specific CyberSpace Environment or Default
         const nodeEnv = (nodeId && get().nodeEnvironments[nodeId]) || {};
-        const cyberSpaceConfig = { ...DEFAULT_CYBER_SPACE_CONFIG, ...nodeEnv };
+        const cyberSpaceConfig = { ...(get().csIsLightMode ? LIGHT_THEME_CYBER_SPACE_CONFIG : DEFAULT_CYBER_SPACE_CONFIG), ...nodeEnv };
 
         set({
           ...cyberSpaceConfig,
@@ -1957,7 +1957,7 @@ export const useStore = create<AppState>()(
 
         // Fetch Node-specific CyberSpace Environment or Default
         const nodeEnv = (activeNodeId && get().nodeEnvironments[activeNodeId]) || {};
-        const cyberSpaceConfig = { ...DEFAULT_CYBER_SPACE_CONFIG, ...nodeEnv };
+        const cyberSpaceConfig = { ...(get().csIsLightMode ? LIGHT_THEME_CYBER_SPACE_CONFIG : DEFAULT_CYBER_SPACE_CONFIG), ...nodeEnv };
 
         set((state) => ({
           ...cyberSpaceConfig,

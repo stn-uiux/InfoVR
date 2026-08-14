@@ -42,7 +42,7 @@ export const ModelImporter = () => {
   const deleteModel = useStore((s) => s.deleteModel);
   const updateModel = useStore((s) => s.updateModel);
   const toggleModelMove = useStore((s) => s.toggleModelMove);
-  
+
   const csCustomSpaceSize = useStore((s) => s.csCustomSpaceSize);
   const csRoomWidthCm = useStore((s) => s.csRoomWidthCm);
   const csRoomLengthCm = useStore((s) => s.csRoomLengthCm);
@@ -203,7 +203,7 @@ export const ModelImporter = () => {
     [addImportedModel],
   );
 
-  type PanelType = "hierarchy" | "project" | "builtin" | "imported" | null;
+  type PanelType = "hierarchy" | "serverRoomEnv" | "project" | "builtin" | "imported" | null;
   const [floatingPanel, setFloatingPanel] = useState<PanelType>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(280);
@@ -213,9 +213,23 @@ export const ModelImporter = () => {
   const [isDraggingTree, setIsDraggingTree] = useState(false);
 
   const [floatingWidth, setFloatingWidth] = useState(300);
-  const [floatingHeight, setFloatingHeight] = useState<number | string>("calc(100vh - 120px)");
+  const [floatingHeight, setFloatingHeight] = useState<number | string>("auto");
   const [floatingResizeMode, setFloatingResizeMode] = useState<"width" | "height" | "both" | null>(null);
+  
+  const [floatingTop, setFloatingTop] = useState(0);
 
+  const toggleFloatingPanel = useCallback((panel: PanelType, e: React.MouseEvent<HTMLButtonElement>) => {
+    const offsetTop = e.currentTarget.offsetTop;
+    setFloatingPanel((prev) => {
+      const isOpening = prev !== panel;
+      if (isOpening) {
+        setFloatingTop(offsetTop);
+        setFloatingHeight("auto");
+        return panel;
+      }
+      return null;
+    });
+  }, []);
   useEffect(() => {
     if (!isCollapsed) setFloatingPanel(null);
   }, [isCollapsed]);
@@ -382,7 +396,7 @@ export const ModelImporter = () => {
               <span className="slider"></span>
             </label>
             <span style={{ fontSize: "var(--font-size-sm)", color: "var(--text-primary)", fontWeight: 500 }}>
-              공간 사이즈 (cm)
+              공간 사이즈 고정(cm)
             </span>
           </div>
 
@@ -392,7 +406,7 @@ export const ModelImporter = () => {
               <input
                 type="number"
                 className="comm-input-full"
-                style={{ 
+                style={{
                   background: "transparent",
                   border: "1px solid var(--border-weak, rgba(255,255,255,0.2))",
                   borderRadius: "4px",
@@ -426,7 +440,7 @@ export const ModelImporter = () => {
               <input
                 type="number"
                 className="comm-input-full"
-                style={{ 
+                style={{
                   background: "transparent",
                   border: "1px solid var(--border-weak, rgba(255,255,255,0.2))",
                   borderRadius: "4px",
@@ -458,6 +472,16 @@ export const ModelImporter = () => {
               {sizeWarning}
             </div>
           )}
+
+          <div style={{ marginTop: "8px" }}>
+            <button
+              className="comm-btn comm-btn-md comm-btn-primary comm-w-full"
+              onClick={() => window.open('/arcVRoom/', '_blank')}
+            >
+              <Icon icon="mdi:cube-outline" className="icon" style={{ marginRight: '6px' }} />
+              3D공간 제작
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -490,26 +514,26 @@ export const ModelImporter = () => {
               Project Data
             </span>
             <div className="comm-flex-gap-8">
-            <button
-              className="comm-btn comm-btn-md comm-btn-secondary"
-              style={{ flex: 1, background: importedModels.length > 0 ? "rgba(128, 128, 128, 0.2)" : "transparent", color: importedModels.length > 0 ? "var(--text-primary)" : "var(--text-disabled)", borderColor: importedModels.length > 0 ? "var(--border-medium)" : "var(--border-weak)" }}
-              disabled={importedModels.length === 0}
-              onClick={handleExportModels}
-            >
-              <span role="img" aria-label="save">💾</span> Save
-            </button>
-            <button
-              className="comm-flex-1"
-              onClick={() => modelImportRef.current?.click()}
-            >
-              <span role="img" aria-label="load">📂</span> Load
-            </button>
-          </div>
-          {(successMsg || error || importError) && (
-            <div style={{ marginTop: "8px", fontSize: "10px", color: error || importError ? "#ef4444" : "#22c55e", fontWeight: 500, textAlign: "center", padding: "6px", background: error || importError ? "rgba(239, 68, 68, 0.05)" : "rgba(34, 197, 94, 0.05)", borderRadius: "4px", border: "1px solid", borderColor: error || importError ? "rgba(239, 68, 68, 0.1)" : "rgba(34, 197, 94, 0.1)" }}>
-              {(error || importError || successMsg)?.replace("Exported", "Saved").replace("Import", "Load")}
+              <button
+                className="comm-btn comm-btn-md comm-btn-secondary"
+                style={{ flex: 1, background: importedModels.length > 0 ? "rgba(128, 128, 128, 0.2)" : "transparent", color: importedModels.length > 0 ? "var(--text-primary)" : "var(--text-disabled)", borderColor: importedModels.length > 0 ? "var(--border-medium)" : "var(--border-weak)" }}
+                disabled={importedModels.length === 0}
+                onClick={handleExportModels}
+              >
+                <span role="img" aria-label="save">💾</span> Save
+              </button>
+              <button
+                className="comm-flex-1"
+                onClick={() => modelImportRef.current?.click()}
+              >
+                <span role="img" aria-label="load">📂</span> Load
+              </button>
             </div>
-          )}
+            {(successMsg || error || importError) && (
+              <div style={{ marginTop: "8px", fontSize: "10px", color: error || importError ? "#ef4444" : "#22c55e", fontWeight: 500, textAlign: "center", padding: "6px", background: error || importError ? "rgba(239, 68, 68, 0.05)" : "rgba(34, 197, 94, 0.05)", borderRadius: "4px", border: "1px solid", borderColor: error || importError ? "rgba(239, 68, 68, 0.1)" : "rgba(34, 197, 94, 0.1)" }}>
+                {(error || importError || successMsg)?.replace("Exported", "Saved").replace("Import", "Load")}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -531,115 +555,115 @@ export const ModelImporter = () => {
       <div className="hierarchy-tree-body" style={{ padding: "12px 16px" }}>
         <div className="comm-grid-2col-8">
           {BUILTIN_MODELS.map((def) => (
-          <button
-            key={def.type}
-            className="comm-w-full"
-            onClick={() => handleAddBuiltin(def)}
-          >
-            <span role="img" aria-label={def.label}>{def.emoji}</span> {def.label}
-          </button>
-        ))}
+            <button
+              key={def.type}
+              className="comm-w-full"
+              onClick={() => handleAddBuiltin(def)}
+            >
+              <span role="img" aria-label={def.label}>{def.emoji}</span> {def.label}
+            </button>
+          ))}
         </div>
       </div>
     </div>
   );
 
   const renderImportedPanel = () => {
-  if (importedModels.length === 0) return null;
-  return (
-    <div className="hierarchy-tree expanded" style={{ flexShrink: 0, height: "auto", minHeight: 0 }}>
-      <div className="hierarchy-tree-header">
-        <div className="comm-flex-center-10-flex1">
-          <span className="comm-flex-center-8-noshrink">
-            <span className="comm-icon-primary-lg">
-              <Icon icon="material-symbols:cube" className="icon comm-icon-md" />
+    if (importedModels.length === 0) return null;
+    return (
+      <div className="hierarchy-tree expanded" style={{ flexShrink: 0, height: "auto", minHeight: 0 }}>
+        <div className="hierarchy-tree-header">
+          <div className="comm-flex-center-10-flex1">
+            <span className="comm-flex-center-8-noshrink">
+              <span className="comm-icon-primary-lg">
+                <Icon icon="material-symbols:cube" className="icon comm-icon-md" />
+              </span>
+              <span className="tree-node-header-text">가져온 모델 ({importedModels.length})</span>
             </span>
-            <span className="tree-node-header-text">가져온 모델 ({importedModels.length})</span>
-          </span>
+          </div>
         </div>
-      </div>
-      <div className="hierarchy-tree-body" style={{ padding: "8px", overflowY: "auto", maxHeight: "260px" }}>
-        {importedModels.map((m) => {
-          const isSelected = selectedModelId === m.id;
-          return (
-            <div
-              key={m.id}
-              onClick={() => selectModel(selectedModelId === m.id ? null : m.id)}
-              style={{
-                padding: "10px 12px",
-                borderRadius: "var(--radius-md)",
-                cursor: "pointer",
-                background: isSelected ? "var(--selected-bg)" : "transparent",
-                border: "1px solid",
-                borderColor: isSelected ? "var(--theme-primary)" : "transparent",
-                marginBottom: "4px",
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                transition: "all 0.15s ease",
-              }}
-            >
+        <div className="hierarchy-tree-body" style={{ padding: "8px", overflowY: "auto", maxHeight: "260px" }}>
+          {importedModels.map((m) => {
+            const isSelected = selectedModelId === m.id;
+            return (
               <div
+                key={m.id}
+                onClick={() => selectModel(selectedModelId === m.id ? null : m.id)}
                 style={{
-                  width: "8px",
-                  height: "8px",
-                  borderRadius: "50%",
-                  background: isSelected ? "var(--theme-primary)" : "var(--text-disabled)",
-                  flexShrink: 0,
-                }}
-              />
-              <span
-                style={{
-                  fontSize: "13px",
-                  fontWeight: isSelected ? 600 : 400,
-                  color: isSelected ? "var(--text-primary)" : "var(--text-secondary)",
-                  flex: 1,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
+                  padding: "10px 12px",
+                  borderRadius: "var(--radius-md)",
+                  cursor: "pointer",
+                  background: isSelected ? "var(--selected-bg)" : "transparent",
+                  border: "1px solid",
+                  borderColor: isSelected ? "var(--theme-primary)" : "transparent",
+                  marginBottom: "4px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  transition: "all 0.15s ease",
                 }}
               >
-                {m.name}
-              </span>
-              <div className="comm-flex-gap-4">
-                <button
+                <div
                   style={{
-                    background: m.isMoveEnabled ? "rgba(34, 197, 94, 0.1)" : "rgba(249, 115, 22, 0.08)",
-                    color: m.isMoveEnabled ? "#22c55e" : "#f97316",
-                    border: "1px solid",
-                    borderColor: m.isMoveEnabled ? "rgba(34, 197, 94, 0.2)" : "rgba(249, 115, 22, 0.2)",
-                    borderRadius: "4px",
-                    padding: "2px 6px",
-                    fontSize: "10px",
-                    cursor: "pointer",
+                    width: "8px",
+                    height: "8px",
+                    borderRadius: "50%",
+                    background: isSelected ? "var(--theme-primary)" : "var(--text-disabled)",
+                    flexShrink: 0,
                   }}
-                  onClick={(e) => { e.stopPropagation(); toggleModelMove(m.id); }}
-                >
-                  {m.isMoveEnabled ? "🔓" : "🔒"}
-                </button>
-                <button
+                />
+                <span
                   style={{
-                    background: "transparent",
-                    color: "var(--text-tertiary)",
-                    border: "none",
-                    fontSize: "14px",
-                    padding: "0 4px",
-                    cursor: "pointer",
+                    fontSize: "13px",
+                    fontWeight: isSelected ? 600 : 400,
+                    color: isSelected ? "var(--text-primary)" : "var(--text-secondary)",
+                    flex: 1,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
                   }}
-                  onClick={(e) => { e.stopPropagation(); deleteModel(m.id); }}
-                  onMouseOver={(e) => (e.currentTarget.style.color = "#ef4444")}
-                  onMouseOut={(e) => (e.currentTarget.style.color = "var(--text-tertiary)" )}
                 >
-                  ×
-                </button>
+                  {m.name}
+                </span>
+                <div className="comm-flex-gap-4">
+                  <button
+                    style={{
+                      background: m.isMoveEnabled ? "rgba(34, 197, 94, 0.1)" : "rgba(249, 115, 22, 0.08)",
+                      color: m.isMoveEnabled ? "#22c55e" : "#f97316",
+                      border: "1px solid",
+                      borderColor: m.isMoveEnabled ? "rgba(34, 197, 94, 0.2)" : "rgba(249, 115, 22, 0.2)",
+                      borderRadius: "4px",
+                      padding: "2px 6px",
+                      fontSize: "10px",
+                      cursor: "pointer",
+                    }}
+                    onClick={(e) => { e.stopPropagation(); toggleModelMove(m.id); }}
+                  >
+                    {m.isMoveEnabled ? "🔓" : "🔒"}
+                  </button>
+                  <button
+                    style={{
+                      background: "transparent",
+                      color: "var(--text-tertiary)",
+                      border: "none",
+                      fontSize: "14px",
+                      padding: "0 4px",
+                      cursor: "pointer",
+                    }}
+                    onClick={(e) => { e.stopPropagation(); deleteModel(m.id); }}
+                    onMouseOver={(e) => (e.currentTarget.style.color = "#ef4444")}
+                    onMouseOut={(e) => (e.currentTarget.style.color = "var(--text-tertiary)")}
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
   return (
     <>
@@ -683,32 +707,39 @@ export const ModelImporter = () => {
 
           {/* Folded State: Icon Toolbar */}
           <div className="sidebar-icon-toolbar">
-            <button
-              className={`sidebar-tab-btn ${floatingPanel === "hierarchy" ? "active" : ""}`}
-              onClick={() => setFloatingPanel((p) => p === "hierarchy" ? null : "hierarchy")}
-              title="구조 (Hierarchy)"
-            >
+                <button
+                  className={`sidebar-tab-btn ${floatingPanel === "hierarchy" ? "active" : ""}`}
+                  onClick={(e) => toggleFloatingPanel("hierarchy", e)}
+                  title="구조 (Hierarchy)"
+                >
               <Icon icon="material-symbols:grid-view" className="icon" />
             </button>
             {isEditMode && (
               <>
                 <button
+                  className={`sidebar-tab-btn ${floatingPanel === "serverRoomEnv" ? "active" : ""}`}
+                  onClick={(e) => toggleFloatingPanel("serverRoomEnv", e)}
+                  title="서버룸 환경"
+                >
+                  <Icon icon="mdi:server-network" className="icon" />
+                </button>
+                <button
                   className={`sidebar-tab-btn ${floatingPanel === "project" ? "active" : ""}`}
-                  onClick={() => setFloatingPanel((p) => p === "project" ? null : "project")}
+                  onClick={(e) => toggleFloatingPanel("project", e)}
                   title="프로젝트 & 에셋 (Project)"
                 >
                   <Icon icon="material-symbols:folder" className="icon" />
                 </button>
                 <button
                   className={`sidebar-tab-btn ${floatingPanel === "builtin" ? "active" : ""}`}
-                  onClick={() => setFloatingPanel((p) => p === "builtin" ? null : "builtin")}
+                  onClick={(e) => toggleFloatingPanel("builtin", e)}
                   title="기본 모델 (Built-in)"
                 >
                   <Icon icon="material-symbols:inventory-2" className="icon" />
                 </button>
                 <button
                   className={`sidebar-tab-btn ${floatingPanel === "imported" ? "active" : ""}`}
-                  onClick={() => setFloatingPanel((p) => p === "imported" ? null : "imported")}
+                  onClick={(e) => toggleFloatingPanel("imported", e)}
                   title="가져온 모델 (Imported)"
                 >
                   <Icon icon="material-symbols:archive" className="icon" />
@@ -762,22 +793,27 @@ export const ModelImporter = () => {
 
           {/* Floating Panel Popup (only active when collapsed) */}
           {floatingPanel && isCollapsed && (
-            <div
-              className="sidebar-floating-panel"
-              style={{
-                width: `${floatingWidth}px`,
-              }}
-            >
-              <div className="sidebar-floating-header">
-                <span className="sidebar-floating-title">
-                  {floatingPanel === "hierarchy" && "구조 (Hierarchy)"}
-                  {floatingPanel === "project" && "프로젝트 & 에셋"}
-                  {floatingPanel === "builtin" && "기본 모델"}
-                  {floatingPanel === "imported" && "가져온 모델"}
-                </span>
+              <div
+                className="sidebar-floating-panel"
+                style={{
+                  width: `${floatingWidth}px`,
+                  top: `${floatingTop}px`,
+                }}
+              >
+              <div
+                className="sidebar-floating-header"
+                style={{
+                  position: "absolute",
+                  right: "8px",
+                  top: "6px",
+                  marginBottom: 0,
+                  zIndex: 10
+                }}
+              >
                 <button
                   onClick={() => setFloatingPanel(null)}
                   className="sidebar-floating-close"
+                  style={{ background: "transparent", border: "none" }}
                 >
                   ×
                 </button>
@@ -790,12 +826,8 @@ export const ModelImporter = () => {
                 }}
               >
                 {floatingPanel === "hierarchy" && <HierarchyTree />}
-                {floatingPanel === "project" && isEditMode && (
-                  <>
-                    {renderServerRoomEnvPanel()}
-                    {renderProjectPanel()}
-                  </>
-                )}
+                {floatingPanel === "serverRoomEnv" && isEditMode && renderServerRoomEnvPanel()}
+                {floatingPanel === "project" && isEditMode && renderProjectPanel()}
                 {floatingPanel === "builtin" && isEditMode && renderBuiltinPanel()}
                 {floatingPanel === "imported" && isEditMode && renderImportedPanel()}
               </div>

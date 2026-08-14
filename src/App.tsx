@@ -350,9 +350,9 @@ function App() {
 
             {/* Port Sentinel & Device Registration */}
             <button
-              className="comm-btn comm-btn-md comm-btn-tertiary"
-              onClick={() => navigate('/port-sentinel')}
-              title="포트맵핑 마법사 - 하드웨어 포트 매핑 도구"
+              className="comm-btn comm-btn-md comm-btn-tertiary stn-toolbar-nav-btn stn-toolbar-nav-btn--magic"
+              onClick={() => navigate('/port-wizard')}
+              title="포트맵핑 마법사로 이동"
             >
               포트맵핑 마법사 <Icon icon="mdi:magic" />
             </button>

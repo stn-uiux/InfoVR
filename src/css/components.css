@@ -3997,7 +3997,7 @@ input:checked+.slider:before {
 }
 
 .unsaved-dialog {
-  background: var(--bg-primary);
+  background: var(--bg-secondary);
   border: 1px solid var(--border-medium);
   border-radius: var(--radius-lg);
   box-shadow: var(--elevation-3);
@@ -5206,7 +5206,7 @@ input:checked+.slider:before {
   display: flex;
   flex-direction: column;
   overflow: visible;
-  padding: 16px;
+  padding: 16px 0;
   z-index: 102;
   pointer-events: auto;
 }
