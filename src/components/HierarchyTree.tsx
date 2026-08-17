@@ -7,6 +7,7 @@ import React, {
   useMemo,
 } from "react";
 import { createPortal } from "react-dom";
+import { SharedTreeNodeItem } from "./SharedTreeNodeItem";
 import { useStore } from "../store/useStore";
 import type { HierarchyNode } from "../types";
 import {
@@ -317,6 +318,7 @@ export const HierarchyTree = React.memo(() => {
   const activeNodeId = useStore((s) => s.activeNodeId);
   const setActiveNode = useStore((s) => s.setActiveNode);
   const pinnedNodeId = useStore((s) => s.pinnedNodeId);
+  const setPinnedNode = useStore((s) => s.setPinnedNode);
   const collapsedNodeIds = useStore((s) => s.collapsedNodeIds);
   const toggleNodeExpansion = useStore((s) => s.toggleNodeExpansion);
   const expandNodePath = useStore((s) => s.expandNodePath);
@@ -627,6 +629,50 @@ export const HierarchyTree = React.memo(() => {
     hasAppliedPinnedDefault.current = true;
   }, [pinnedNodeId, activeNodeId, rootNodes, nodes, setActiveNode]);
 
+  const renderSharedTree = (node: HierarchyNode, depth: number) => {
+    const isExpanded = !collapsedNodeIds.has(node.nodeId);
+    const count = equipmentCounts.get(node.nodeId) || 0;
+    const isPinned = pinnedNodeId === node.nodeId;
+    const isRenaming = renamingId === node.nodeId;
+    const isDirty = useStore.getState().getDirtyNodeIds().has(node.nodeId);
+
+    return (
+      <SharedTreeNodeItem
+        key={node.nodeId}
+        node={node}
+        depth={depth}
+        childNodes={nodes.filter(n => n.parentId === node.nodeId).sort((a,b) => a.order - b.order)}
+        getAllChildren={(id) => nodes.filter(n => n.parentId === id)}
+        isSelected={activeNodeId === node.nodeId}
+        onSelect={handleSelect}
+        isExpanded={isExpanded}
+        onToggle={handleToggle}
+        nodeSearch={nodeSearch}
+        count={count}
+        isPinned={isPinned}
+        onPinToggle={setPinnedNode}
+        isDirty={isDirty}
+        isDraggable={isEditMode}
+        draggedNodeId={draggedNodeId}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onContextMenu={handleContextMenu}
+        isRenaming={isRenaming}
+        onRenameStart={(id) => {
+          setRenamingId(id);
+        }}
+        onRenameComplete={(id, newName) => {
+          renameNode(id, newName);
+          setRenamingId(null);
+        }}
+        onRenameCancel={() => setRenamingId(null)}
+        renderChild={renderSharedTree}
+      />
+    );
+  };
+
   return (
     <div className="tree-sidebar-container">
       <div
@@ -711,30 +757,7 @@ export const HierarchyTree = React.memo(() => {
         )}
 
         <div className="collapse-panel-body">
-          {rootNodes.map((root) => (
-            <TreeNodeItem
-              key={root.nodeId}
-              node={root}
-              depth={0}
-              nodes={nodes}
-              activeNodeId={activeNodeId || ""}
-              collapsedIds={collapsedNodeIds}
-              equipmentCounts={equipmentCounts}
-              isEditMode={isEditMode}
-              showEquipment={showEquipment}
-              highlightedDeviceId={highlightedDeviceId}
-              onToggle={handleToggle}
-              onSelect={handleSelect}
-              onContextMenu={handleContextMenu}
-              draggedNodeId={draggedNodeId}
-              dragOverNodeId={dragOverNodeId}
-              onDragStart={handleDragStart}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              nodeSearch={nodeSearch}
-            />
-          ))}
+          {rootNodes.map((root) => renderSharedTree(root, 0))}
         </div>
       </div>
 
@@ -844,48 +867,7 @@ export const HierarchyTree = React.memo(() => {
         })()
       )}
 
-      {/* Rename overlay (displayed over the tree node name) */}
-      {renamingId && (
-        <div
-          className="comm-modal-overlay-top"
-          onClick={handleRenameConfirm}
-        >
-          <div
-            className="comm-modal-dialog-center"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              className="comm-title-md"
-            >
-              노드 이름 변경
-            </div>
-            <input
-              ref={renameInputRef}
-              className="tree-inline-input comm-input-full"
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleRenameConfirm();
-                if (e.key === "Escape") setRenamingId(null);
-              }}
-            />
-            <div className="comm-modal-footer">
-              <button
-                className="comm-btn comm-btn-primary comm-modal-btn"
-                onClick={handleRenameConfirm}
-              >
-                확인
-              </button>
-              <button
-                className="comm-btn comm-btn-secondary comm-modal-btn"
-                onClick={() => setRenamingId(null)}
-              >
-                취소
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Context menu */}
       {contextMenu &&

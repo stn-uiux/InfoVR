@@ -21,7 +21,7 @@ import {
   getSubtreeNodeIds,
 } from "../utils/nodeUtils";
 import { getHighestError } from "../utils/errorHelpers";
-import { TreeNodeItem } from "./DeviceRegistrationModal/TreeNodeItem";
+import { SharedTreeNodeItem } from "./SharedTreeNodeItem";
 import { RegistrationFormModal } from "./DeviceRegistrationModal/RegistrationFormModal";
 import { ChildMultiPicker } from "./DeviceRegistrationModal/ChildMultiPicker";
 import { DeviceRow } from "./DeviceRegistrationModal/DeviceRow";
@@ -167,7 +167,7 @@ export const DeviceRegistrationModal = () => {
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      if ((e.target as HTMLElement).closest(".drm-context-menu")) return;
+      if ((e.target as HTMLElement).closest(".tree-context-menu")) return;
       setContextMenu(null);
     };
     window.addEventListener("click", handleClick, { capture: true });
@@ -176,7 +176,7 @@ export const DeviceRegistrationModal = () => {
   }, []);
 
   // Node Editing
-  const handleAddSubNode = useCallback(
+  const handleAddGroup = useCallback(
     (parentId: string) => {
       // Auto expand parent for visibility
       setNodeExpandedIds((prev) => {
@@ -188,8 +188,30 @@ export const DeviceRegistrationModal = () => {
       const siblings = nodes.filter((n) => n.parentId === parentId);
       const newId = addNode({
         parentId,
-        name: "새 노드",
+        name: "새 그룹",
         type: "group",
+        order: siblings.length,
+      });
+
+      setRenamingId(newId);
+    },
+    [nodes, addNode],
+  );
+
+  const handleAddRoom = useCallback(
+    (parentId: string) => {
+      // Auto expand parent for visibility
+      setNodeExpandedIds((prev) => {
+        const next = new Set(prev);
+        next.add(parentId);
+        return next;
+      });
+
+      const siblings = nodes.filter((n) => n.parentId === parentId);
+      const newId = addNode({
+        parentId,
+        name: "새 전산실",
+        type: "room",
         order: siblings.length,
       });
 
@@ -209,34 +231,9 @@ export const DeviceRegistrationModal = () => {
     setRenamingId(newId);
   }, [nodes, addNode]);
 
-  const handleRenameNode = useCallback(
-    (node: HierarchyNode) => {
-      renameNode(node.nodeId, node.name);
-    },
-    [renameNode],
-  );
 
-  const handleDeleteNodeClick = useCallback(
-    (e: React.MouseEvent, node: HierarchyNode) => {
-      e.stopPropagation();
-      const hasChildren = nodes.some((n) => n.parentId === node.nodeId);
-      const count = getSubtreeEquipmentCount(
-        nodes,
-        registeredDevices,
-        node.nodeId,
-      );
-      if (hasChildren || count > 0) {
-        showToast(
-          "하위 노드가 있거나 등록된 장비가 있어 삭제할 수 없습니다.",
-          "error",
-        );
-        return;
-      }
-      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-      setNodeDeleteConfirm({ node, rect });
-    },
-    [nodes, registeredDevices, showToast],
-  );
+
+
 
   const confirmNodeDelete = useCallback(() => {
     if (!nodeDeleteConfirm) return;
@@ -686,113 +683,141 @@ export const DeviceRegistrationModal = () => {
                     </div>
                   </div>
                   <div className="drm-sidebar-content">
-                    {nodes
-                      .filter((n) => n.parentId === null)
-                      .map((root) => (
-                        <TreeNodeItem
-                          key={root.nodeId}
-                          node={root}
-                          depth={0}
-                          nodes={nodes}
-                          selectedNodeId={nodeFilter}
-                          expandedIds={nodeExpandedIds}
-                          nodeSearch={nodeSearch}
-                          equipCountMap={equipCountMap}
-                          onToggle={(id) =>
-                            setNodeExpandedIds((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(id)) next.delete(id);
-                              else next.add(id);
-                              return next;
-                            })
-                          }
-                          onSelect={(id) => {
-                            setNodeFilter(id);
-                            setSelectedIds(new Set());
-                          }}
-                          isEditMode={isEditMode}
-                          draggedNodeId={draggedNodeId}
-                          dragOverNodeId={dragOverNodeId}
-                          onDragStart={handleDragStart}
-                          onDragOver={handleDragOver}
-                          onDragLeave={handleDragLeave}
-                          onDrop={handleDrop}
-                          onContextMenu={handleContextMenu}
-                          onAddSubNode={handleAddSubNode}
-                          onDeleteNode={handleDeleteNodeClick}
-                          onRenameNode={handleRenameNode}
-                          renamingId={renamingId}
-                          setRenamingId={setRenamingId}
-                        />
-                      ))}
+                    {(() => {
+                      const renderSharedTree = (node: HierarchyNode, depth: number) => {
+                        const isExpanded = nodeExpandedIds.has(node.nodeId);
+                        const count = equipCountMap.get(node.nodeId) || 0;
+                        const isSelected = nodeFilter === node.nodeId;
+                        const isRenaming = renamingId === node.nodeId;
+                        return (
+                          <SharedTreeNodeItem
+                            key={node.nodeId}
+                            node={node}
+                            depth={depth}
+                            childNodes={nodes.filter(n => n.parentId === node.nodeId).sort((a,b) => a.order - b.order)}
+                            getAllChildren={(id) => nodes.filter(n => n.parentId === id)}
+                            isSelected={isSelected}
+                            onSelect={(id) => {
+                              setNodeFilter(id);
+                              setSelectedIds(new Set());
+                            }}
+                            isExpanded={isExpanded}
+                            onToggle={(id) =>
+                              setNodeExpandedIds((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(id)) next.delete(id);
+                                else next.add(id);
+                                return next;
+                              })
+                            }
+                            nodeSearch={nodeSearch}
+                            count={count}
+                            isDraggable={isEditMode}
+                            draggedNodeId={draggedNodeId}
+                            onDragStart={handleDragStart}
+                            onDragOver={handleDragOver}
+                            onDragLeave={handleDragLeave}
+                            onDrop={handleDrop}
+                            onContextMenu={handleContextMenu}
+                            isRenaming={isRenaming}
+                            onRenameStart={(id) => {
+                              setRenamingId(id);
+                            }}
+                            onRenameComplete={(id, newName) => {
+                              renameNode(id, newName);
+                              setRenamingId(null);
+                            }}
+                            onRenameCancel={() => setRenamingId(null)}
+                            renderChild={renderSharedTree}
+                          />
+                        );
+                      };
+                      
+                      return nodes
+                        .filter((n) => n.parentId === null)
+                        .map((root) => renderSharedTree(root, 0));
+                    })()}
                   </div>
                 </div>
 
                 {contextMenu &&
                   createPortal(
-                    <div
-                      className="drm-context-menu"
-                      style={{ top: contextMenu.y, left: contextMenu.x }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
                       <div
-                        className="drm-context-item"
-                        onClick={() => {
-                          handleAddSubNode(contextMenu.nodeId);
-                          setContextMenu(null);
-                        }}
+                        className="tree-context-menu"
+                        style={{ top: contextMenu.y, left: contextMenu.x }}
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        <Icon icon="material-symbols:add" className="icon"
-                          style={{ width: 14, height: 14, marginRight: 8 }}
-                        />{" "}
-                        하위 노드 추가
-                      </div>
-                      <div
-                        className="drm-context-item"
-                        onClick={() => {
-                          setRenamingId(contextMenu.nodeId);
-                          setContextMenu(null);
-                        }}
-                      >
-                        <Icon icon="material-symbols:edit" className="icon"
-                          style={{ width: 16, height: 16, marginRight: 8 }}
-                        />{" "}
-                        이름 변경
-                      </div>
-                      {nodes.find((n) => n.nodeId === contextMenu.nodeId)
-                        ?.parentId !== null && (
-                          <div
-                            className="drm-context-item danger"
-                            onClick={() => {
-                              const node = nodes.find(
-                                (n) => n.nodeId === contextMenu.nodeId,
-                              );
-                              if (node) {
-                                // Find the element for rect
-                                const target = document.querySelector(
-                                  `[className*="drm-tree-node"][onClick*="${node.nodeId}"]`,
+                        <div
+                          className="tree-context-item"
+                          onClick={() => {
+                            handleAddGroup(contextMenu.nodeId);
+                            setContextMenu(null);
+                          }}
+                        >
+                          <Icon icon="material-symbols:create-new-folder" className="icon comm-icon-mr8" /> 그룹 추가
+                        </div>
+                        <div
+                          className="tree-context-item"
+                          onClick={() => {
+                            handleAddRoom(contextMenu.nodeId);
+                            setContextMenu(null);
+                          }}
+                        >
+                          <Icon icon="mdi:server" className="icon comm-icon-mr8" /> 전산실 추가
+                        </div>
+                        <div
+                          className="tree-context-item"
+                          onClick={() => {
+                            setRenamingId(contextMenu.nodeId);
+                            setContextMenu(null);
+                          }}
+                        >
+                          <Icon icon="material-symbols:edit" className="icon comm-icon-mr8" /> 이름 변경
+                        </div>
+                        {nodes.find((n) => n.nodeId === contextMenu.nodeId)
+                          ?.parentId !== null && (
+                            <div
+                              className="tree-context-item danger"
+                              onClick={() => {
+                                const node = nodes.find(
+                                  (n) => n.nodeId === contextMenu.nodeId,
                                 );
-                                const rect =
-                                  target?.getBoundingClientRect() ||
-                                  ({
-                                    left: contextMenu.x,
-                                    bottom: contextMenu.y,
-                                  } as DOMRect);
-                                setNodeDeleteConfirm({
-                                  node,
-                                  rect: rect as DOMRect,
-                                });
-                              }
-                              setContextMenu(null);
-                            }}
-                          >
-                            <Icon icon="material-symbols:delete" className="icon"
-                              style={{ width: 14, height: 14, marginRight: 8 }}
-                            />{" "}
-                            삭제
-                          </div>
-                        )}
-                    </div>,
+                                if (node) {
+                                  const hasChildren = nodes.some((n) => n.parentId === node.nodeId);
+                                  const count = getSubtreeEquipmentCount(
+                                    nodes,
+                                    registeredDevices,
+                                    node.nodeId,
+                                  );
+                                  if (hasChildren || count > 0) {
+                                    showToast(
+                                      "하위 노드가 있거나 등록된 장비가 있어 삭제할 수 없습니다.",
+                                      "error",
+                                    );
+                                  } else {
+                                    // Find the element for rect
+                                    const target = document.querySelector(
+                                      `.tree-node`
+                                    );
+                                    const rect =
+                                      target?.getBoundingClientRect() ||
+                                      ({
+                                        left: contextMenu.x,
+                                        bottom: contextMenu.y,
+                                      } as DOMRect);
+                                    setNodeDeleteConfirm({
+                                      node,
+                                      rect: rect as DOMRect,
+                                    });
+                                  }
+                                }
+                                setContextMenu(null);
+                              }}
+                            >
+                              <Icon icon="material-symbols:delete" className="icon comm-icon-mr8" /> 삭제
+                            </div>
+                          )}
+                      </div>,
                     document.body,
                   )}
 

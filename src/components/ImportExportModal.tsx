@@ -4,6 +4,7 @@ import { Icon } from "@iconify/react";
 import { useStore } from "../store/useStore";
 import type { Rack, RegisteredDevice, HierarchyNode } from "../types";
 import type { ExportScope } from "../utils/storage";
+import { SharedTreeNodeItem } from "./SharedTreeNodeItem";
 import { getNodeName, getAncestorPath, getNodeEquipmentCount, getSubtreeNodeIds } from "../utils/nodeUtils";
 import {
   exportGroupWorkbook,
@@ -355,77 +356,32 @@ export const ImportExportModal = () => {
   };
 
 
-  const renderExportTree = (parentId: string | null = null, depth = 0) => {
-    const children = nodes
-      .filter((n) => n.parentId === parentId)
-      .sort((a, b) => a.order - b.order);
-    if (children.length === 0) return null;
+  const renderSharedExportTree = (node: HierarchyNode, depth: number) => {
+    const isExpanded = expandedNodes.has(node.nodeId);
+    const isChecked = checkedNodes.has(node.nodeId);
 
-    return children.map((node) => {
-      const isExpanded = expandedNodes.has(node.nodeId);
-      const isChecked = checkedNodes.has(node.nodeId);
-      const subChildren = nodes.filter((n) => n.parentId === node.nodeId);
-      const hasChildren = subChildren.length > 0;
-
-      return (
-        <React.Fragment key={node.nodeId}>
-          <div
-            className={`tree-node ${isChecked ? "selected" : ""}`}
-            style={{ paddingLeft: `${depth * 16 + 12}px` }}
-            onClick={() => toggleNodeCheck(node.nodeId, !isChecked)}
-            title={node.name}
-          >
-            <span
-              className={`tree-node-toggle ${isExpanded ? "expanded" : ""}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                setExpandedNodes((prev) => {
-                  const next = new Set(prev);
-                  if (next.has(node.nodeId)) next.delete(node.nodeId);
-                  else next.add(node.nodeId);
-                  return next;
-                });
-              }}
-              style={{ visibility: hasChildren ? "visible" : "hidden" }}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                width="10"
-                height="10"
-                stroke="currentColor"
-                strokeWidth="3"
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </span>
-            <span style={{ fontSize: "16px", flexShrink: 0, display: "flex", alignItems: "center", marginRight: "4px" }}>
-              <input 
-                type="checkbox" 
-                checked={isChecked} 
-                onChange={(e) => {
-                  e.stopPropagation();
-                  toggleNodeCheck(node.nodeId, e.target.checked);
-                }}
-                onClick={(e) => e.stopPropagation()}
-                style={{ marginRight: '6px' }} 
-              />
-              {node.type === "root" ? (
-                <Icon icon="gis:network" className="icon" style={{ color: "var(--text-secondary)" }} />
-              ) : node.type === "room" ? (
-                <Icon icon="mdi:server" className="icon" style={{ color: "var(--theme-primary)" }} />
-              ) : (
-                <Icon icon="material-symbols:folder" className="icon" style={{ color: "var(--text-secondary)" }} />
-              )}
-            </span>
-            <span className="node-name">{node.name}</span>
-          </div>
-          {isExpanded && renderExportTree(node.nodeId, depth + 1)}
-        </React.Fragment>
-      );
-    });
+    return (
+      <SharedTreeNodeItem
+        key={node.nodeId}
+        node={node}
+        depth={depth}
+        childNodes={nodes.filter((n) => n.parentId === node.nodeId).sort((a, b) => a.order - b.order)}
+        getAllChildren={(id) => nodes.filter((n) => n.parentId === id)}
+        hasCheckbox={true}
+        isChecked={isChecked}
+        onCheck={(id, checked) => toggleNodeCheck(id, checked)}
+        isExpanded={isExpanded}
+        onToggle={(id) => {
+          setExpandedNodes((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+          });
+        }}
+        renderChild={renderSharedExportTree}
+      />
+    );
   };
 
   const renderGlobalGroupContent = () => {
@@ -440,7 +396,7 @@ export const ImportExportModal = () => {
           </div>
 
           <div className="export-tree-container">
-            {renderExportTree()}
+            {nodes.filter(n => n.parentId === null).sort((a, b) => a.order - b.order).map(root => renderSharedExportTree(root, 0))}
           </div>
 
           <div className="export-selection-preview">

@@ -395,7 +395,7 @@ function App() {
                 title="Export Room Data"
               >
                 <Icon icon="material-symbols:upload" className="icon" />
-                Export
+                내보내기
               </button>
               <button
                 className="comm-btn comm-btn-md comm-btn-secondary"
@@ -403,7 +403,7 @@ function App() {
                 onClick={handleToolbarImportClick}
               >
                 <Icon icon="material-symbols:download" className="icon" />
-                Import
+                가져오기
               </button>
               <input
                 type="file"
@@ -430,14 +430,14 @@ function App() {
                 }}
               >
                 <Icon icon="material-symbols:save" className="icon" />
-                Save
+                저장
               </button>
 
               <button
                 className="comm-btn comm-btn-md comm-btn-tertiary"
                 onClick={loadSample}
               >
-                <Icon icon="fluent:sparkle-28-filled" /> Sample
+                <Icon icon="fluent:sparkle-28-filled" /> 샘플 데이터
               </button>
               <button
                 className="comm-btn comm-btn-md comm-btn-tertiary"

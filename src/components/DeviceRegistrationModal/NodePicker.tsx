@@ -1,12 +1,10 @@
 import { Icon } from "@iconify/react";
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
-import { TreeNodeItem } from "./TreeNodeItem";
+import { SharedTreeNodeItem } from "../SharedTreeNodeItem";
 import { useClickOutside } from "../../hooks/useClickOutside";
 import { getNodeName, getAncestorPath } from "../../utils/nodeUtils";
 import type { HierarchyNode, RegisteredDevice } from "../../types";
 
-// Stable no-op function to avoid re-creating arrow functions on every render
-const NOOP = () => {};
 
 // --- Custom Hierarchical Node Picker Component ---
 export const NodePicker = ({
@@ -119,45 +117,51 @@ export const NodePicker = ({
             />
           </div>
           <div className="drm-node-picker-tree">
-            {nodes
-              .filter((n) => n.parentId === null)
-              .map((root) => (
-                <TreeNodeItem
-                  key={root.nodeId}
-                  node={root}
-                  depth={0}
-                  nodes={nodes}
-                  selectedNodeId={selectedNodeId}
-                  expandedIds={expandedIds}
-                  nodeSearch={search}
-                  equipCountMap={pickerEquipCountMap}
-                  onToggle={(id) =>
-                    setExpandedIds((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(id)) next.delete(id);
-                      else next.add(id);
-                      return next;
-                    })
-                  }
-                  onSelect={(id) => {
-                    onSelect(id);
-                    setIsOpen(false);
-                  }}
-                  isEditMode={false}
-                  draggedNodeId={null}
-                  dragOverNodeId={null}
-                  onDragStart={NOOP}
-                  onDragOver={NOOP}
-                  onDragLeave={NOOP}
-                  onDrop={NOOP}
-                  onContextMenu={NOOP}
-                  onAddSubNode={NOOP}
-                  onDeleteNode={NOOP}
-                  onRenameNode={NOOP}
-                  renamingId={null}
-                  setRenamingId={NOOP}
-                />
-              ))}
+            {(() => {
+              const renderSharedTree = (node: HierarchyNode, depth: number) => {
+                const isExpanded = expandedIds.has(node.nodeId);
+                const count = pickerEquipCountMap.get(node.nodeId) || 0;
+                const isSelected = selectedNodeId === node.nodeId;
+                
+                return (
+                  <SharedTreeNodeItem
+                    key={node.nodeId}
+                    node={node}
+                    depth={depth}
+                    childNodes={nodes.filter(n => n.parentId === node.nodeId).sort((a,b) => a.order - b.order)}
+                    getAllChildren={(id) => nodes.filter(n => n.parentId === id)}
+                    isSelected={isSelected}
+                    onSelect={(id) => {
+                      onSelect(id);
+                      setIsOpen(false);
+                    }}
+                    isExpanded={isExpanded}
+                    onToggle={(id) => {
+                      setExpandedIds((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(id)) next.delete(id);
+                        else next.add(id);
+                        return next;
+                      });
+                    }}
+                    nodeSearch={search}
+                    count={count}
+                    isDraggable={false}
+                    draggedNodeId={null}
+                    onDragStart={() => {}}
+                    onDragOver={() => {}}
+                    onDragLeave={() => {}}
+                    onDrop={() => {}}
+                    onContextMenu={() => {}}
+                    renderChild={renderSharedTree}
+                  />
+                );
+              };
+
+              return nodes
+                .filter((n) => n.parentId === null)
+                .map((root) => renderSharedTree(root, 0));
+            })()}
           </div>
         </div>
       )}
