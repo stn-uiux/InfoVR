@@ -487,16 +487,20 @@ export interface ExportRequest {
   exportedAt: string;
 }
 
-const buildMetaSheet = (request: ExportRequest) =>
-  XLSX.utils.json_to_sheet([
+const buildMetaSheet = (request: ExportRequest) => {
+  const isAllScope = request.scopeId === "ALL";
+  const isMultiScope = Array.isArray(request.scopeId);
+
+  return XLSX.utils.json_to_sheet([
     { key: "schemaVersion", value: SCHEMA_VERSION },
     { key: "lastExportAt", value: request.exportedAt },
     { key: "hierarchyEnabled", value: true },
-    { key: "exportScopeType", value: request.scopeId === "ALL" ? "ALL" : "NODE" },
-    { key: "exportScopeId", value: request.scopeId },
+    { key: "exportScopeType", value: isAllScope ? "ALL" : (isMultiScope ? "MULTI" : "NODE") },
+    { key: "exportScopeId", value: isMultiScope ? (request.scopeId as string[]).join(",") : request.scopeId },
     { key: "exportScopeLabel", value: request.scopeLabel },
     { key: "requestId", value: request.requestId },
   ]);
+};
 
 const buildGroupsSheet = (nodes: HierarchyNode[]) =>
   XLSX.utils.json_to_sheet(
@@ -511,7 +515,7 @@ const buildGroupsSheet = (nodes: HierarchyNode[]) =>
 
 // ─── Group-Scoped Export/Import ─────────────────────────────────────────────
 
-export type ExportScope = "ALL" | string; // "ALL" or nodeId
+export type ExportScope = "ALL" | string | string[]; // "ALL", nodeId, or array of nodeIds
 
 /**
  * Export full workbook with all master sheets.
@@ -527,17 +531,25 @@ export const exportGroupWorkbook = (
   
   const wb = XLSX.utils.book_new();
   const isAllScope = request.scopeId === "ALL";
+  const isMultiScope = Array.isArray(request.scopeId);
 
   // Filter dataset by scope before building sheets: Include subtree (descendants)
-  const subtreeIds = isAllScope ? null : getSubtreeNodeIds(nodes, request.scopeId);
+  let subtreeIds: Set<string>;
+  if (isAllScope) {
+    subtreeIds = new Set(nodes.map(n => n.nodeId));
+  } else if (isMultiScope) {
+    subtreeIds = new Set(request.scopeId as string[]);
+  } else {
+    subtreeIds = getSubtreeNodeIds(nodes, request.scopeId as string);
+  }
   
   const filteredRacks = isAllScope 
     ? racks 
-    : racks.filter(r => subtreeIds!.has(r.mapId));
+    : racks.filter(r => subtreeIds.has(r.mapId));
   
   const filteredRegDevices = isAllScope
     ? registeredDevices
-    : registeredDevices.filter(d => subtreeIds!.has(d.deviceGroupId || ''));
+    : registeredDevices.filter(d => subtreeIds.has(d.deviceGroupId || ''));
 
   // ── Master sheets (always present) ──
   XLSX.utils.book_append_sheet(wb, buildMetaSheet(request), "_META");
@@ -546,9 +558,18 @@ export const exportGroupWorkbook = (
   let filteredNodes: HierarchyNode[] = [];
   if (isAllScope) {
     filteredNodes = nodes;
+  } else if (isMultiScope) {
+    const nodeMap = new Map<string, HierarchyNode>();
+    (request.scopeId as string[]).forEach(id => {
+      const ancestors = getAncestorPath(nodes, id);
+      ancestors.forEach(n => nodeMap.set(n.nodeId, n));
+      const node = nodes.find(n => n.nodeId === id);
+      if (node) nodeMap.set(node.nodeId, node);
+    });
+    filteredNodes = Array.from(nodeMap.values());
   } else {
-    const ancestors = getAncestorPath(nodes, request.scopeId);
-    const descendants = nodes.filter(n => subtreeIds!.has(n.nodeId));
+    const ancestors = getAncestorPath(nodes, request.scopeId as string);
+    const descendants = nodes.filter(n => subtreeIds.has(n.nodeId));
     const nodeMap = new Map<string, HierarchyNode>();
     ancestors.forEach(n => nodeMap.set(n.nodeId, n));
     descendants.forEach(n => nodeMap.set(n.nodeId, n));

@@ -24,7 +24,7 @@ export const InitialLoader = () => {
     // Scene.tsx의 SceneReadyMonitor에서 모든 로딩(active false)이 끝난 후 
     // 최소 5프레임 이상 렌더링이 안정화되면 isCanvasReady를 true로 만듭니다.
     // 타이머 없이 완벽하게 맵핑이 완료된 시점을 감지합니다.
-    if (isCanvasReady && !active && progress === 100) {
+    if (isCanvasReady && !active && (progress === 100 || total === 0)) {
       setIsReady(true);
     }
   }, [active, progress, isCanvasReady, nodes.length, activeNodeId, isReady]);

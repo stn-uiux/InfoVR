@@ -74,8 +74,8 @@ function Wall({
             <meshStandardMaterial color={color} roughness={isLightMode ? 0.9 : 0.7} metalness={isLightMode ? 0.0 : 0.5} side={THREE.FrontSide} />
           </Plane>
 
-          {/* Top Panel - height 0.6m, position y=3.65 */}
-          <Plane position={[x, 3.65, 0]} args={[panelWidth - 0.01, 0.6]}>
+          {/* Top Panel - height 0.625m, position y=3.6625 */}
+          <Plane position={[x, 3.6625, 0]} args={[panelWidth - 0.01, 0.625]}>
             <meshStandardMaterial color={color} roughness={isLightMode ? 0.9 : 0.7} metalness={isLightMode ? 0.0 : 0.5} side={THREE.FrontSide} />
           </Plane>
 
@@ -94,7 +94,7 @@ function Wall({
           {/* Spotlight hitting the wall from the ceiling */}
           {hasSpotlight && (
             <SpotLightWithTarget
-              position={[x, 3.9, 0.3]}
+              position={[x, 3.9, 0.26]}
               targetPosition={[x, 0, 0]}
               color="#99ccff"
               intensity={5 * brightness}
@@ -191,25 +191,25 @@ function RoomGeometry({
       {widthPanelCenters.map((x, colIndex) => (
         <group key={`circle-light-${colIndex}`}>
           {/* Front Wall Circular Light */}
-          <group position={[x, 3.98, -roomLength / 2 + 0.16]}>
+          <group position={[x, 3.98, -roomLength / 2 + 0.26]}>
             <mesh rotation={[Math.PI / 2, 0, 0]}>
-              <circleGeometry args={[0.046, 32]} />
+              <circleGeometry args={[0.069, 32]} />
               <meshStandardMaterial color={isLightMode ? "#e2e8f0" : "#0f172a"} roughness={0.8} side={THREE.FrontSide} />
             </mesh>
             <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, -0.005, 0]}>
-              <circleGeometry args={[0.04, 32]} />
+              <circleGeometry args={[0.06, 32]} />
               <meshStandardMaterial emissive={CEILING_LIGHT} emissiveIntensity={2.0 * brightness * ceilingLightIntensity} color="#ffffff" toneMapped={false} side={THREE.FrontSide} />
             </mesh>
           </group>
 
           {/* Back Wall Circular Light */}
-          <group position={[x, 3.98, roomLength / 2 - 0.16]}>
+          <group position={[x, 3.98, roomLength / 2 - 0.26]}>
             <mesh rotation={[Math.PI / 2, 0, 0]}>
-              <circleGeometry args={[0.046, 32]} />
+              <circleGeometry args={[0.069, 32]} />
               <meshStandardMaterial color={isLightMode ? "#e2e8f0" : "#0f172a"} roughness={0.8} side={THREE.FrontSide} />
             </mesh>
             <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, -0.005, 0]}>
-              <circleGeometry args={[0.04, 32]} />
+              <circleGeometry args={[0.06, 32]} />
               <meshStandardMaterial emissive={CEILING_LIGHT} emissiveIntensity={2.0 * brightness * ceilingLightIntensity} color="#ffffff" toneMapped={false} side={THREE.FrontSide} />
             </mesh>
           </group>
@@ -222,6 +222,7 @@ function RoomGeometry({
 export function CyberSpaceEnvironment() {
   const {
     cyberSpaceEnabled,
+    csIsVisible,
     csIsLightMode,
     csFloorMirror,
     csFloorRoughness,
@@ -241,9 +242,10 @@ export function CyberSpaceEnvironment() {
     csFloorColor,
     csFogColor,
     racks,
-    importedModels,
-    activeNodeId,
   } = useStore();
+
+  const activeNodeId = useStore((state) => state.activeNodeId);
+  const importedModels = useStore((state) => state.importedModels);
 
   const { width: roomWidth, length: roomLength } = calculateDynamicRoomSize(
     racks,
@@ -272,7 +274,7 @@ export function CyberSpaceEnvironment() {
         </>
       )}
 
-      {cyberSpaceEnabled && (
+      {cyberSpaceEnabled && csIsVisible && (
         <group position={[csCustomSpaceSize ? csOffsetXCm / 100 : 0, 0, csCustomSpaceSize ? csOffsetZCm / 100 : 0]}>
           {/* Floor Dark Recessed Background */}
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>

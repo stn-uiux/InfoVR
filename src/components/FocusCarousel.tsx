@@ -81,6 +81,7 @@ export const FocusCarousel: React.FC = () => {
     const targetId = groupRacks[prevIndex].rackId;
     selectRack(targetId);
     focusRack(targetId);
+    setIsListOpen(false);
   };
 
   const handleNext = () => {
@@ -90,56 +91,26 @@ export const FocusCarousel: React.FC = () => {
     const targetId = groupRacks[nextIndex].rackId;
     selectRack(targetId);
     focusRack(targetId);
+    setIsListOpen(false);
   };
 
   return (
     <div
       ref={listRef}
-      style={{
-        position: "fixed",
-        bottom: "32px",
-        left: "50%",
-        transform: "translateX(-50%)",
-        zIndex: 100,
-        animation: "slideUp 0.3s ease-out",
-        display: "flex",
-      }}
+      className="focus-carousel-wrapper"
     >
       {/* 랙 리스트 팝오버 (backdrop-filter 버그 방지를 위해 comm-panel 밖으로 분리) */}
       {isListOpen && (
         <div
-          style={{
-            position: "absolute",
-            bottom: "calc(100% + 16px)",
-            left: 0,
-            background: "var(--panel-bg)",
-            border: "1px solid var(--panel-border)",
-            borderRadius: "12px",
-            boxShadow: "var(--elevation-3)",
-            width: "280px",
-            maxHeight: "300px",
-            display: "flex",
-            flexDirection: "column",
-            zIndex: 200,
-            padding: "8px 0",
-            backdropFilter: "blur(24px)",
-            WebkitBackdropFilter: "blur(24px)"
-          }}
+          className="focus-carousel-popover"
         >
           {/* 정렬 헤더 */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 16px 8px 16px', borderBottom: '1px solid var(--border-weak)', marginBottom: '4px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>랙 리스트</span>
-            <select 
-              value={sortType} 
+          <div className="focus-list-header">
+            <span className="focus-list-title">랙 리스트</span>
+            <select
+              value={sortType}
               onChange={(e) => setSortType(e.target.value as any)}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--text-tertiary)',
-                fontSize: '11px',
-                outline: 'none',
-                cursor: 'pointer'
-              }}
+              className="focus-list-select"
             >
               <option value="default">랙등록순</option>
               <option value="name">랙명순</option>
@@ -148,103 +119,64 @@ export const FocusCarousel: React.FC = () => {
           </div>
 
           {/* 랙 목록 영역 (스크롤 가능) */}
-          <div style={{ overflowY: "auto", flex: 1 }}>
+          <div className="focus-list-body">
             {sortedPopoverRacks.map((rack) => {
-            const isCurrent = rack.rackId === selectedRackId;
-            const errors = getRackErrorCounts(rack);
-            return (
-              <div
-                key={rack.rackId}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "10px 16px",
-                  cursor: "pointer",
-                  background: isCurrent ? "rgba(26, 115, 232, 0.1)" : "transparent",
-                  borderLeft: isCurrent ? "3px solid var(--theme-primary)" : "3px solid transparent",
-                  transition: "background 0.2s",
-                }}
-                onClick={() => {
-                  selectRack(rack.rackId);
-                  focusRack(rack.rackId);
-                  setIsListOpen(false);
-                }}
-                onMouseEnter={(e) => {
-                  if (!isCurrent) e.currentTarget.style.background = "var(--hover-bg)";
-                }}
-                onMouseLeave={(e) => {
-                  if (!isCurrent) e.currentTarget.style.background = "transparent";
-                }}
-              >
-                <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                  <span style={{ fontSize: "13px", fontWeight: isCurrent ? 700 : 500, color: "var(--text-primary)" }}>
-                    {rack.rackTitle || `Rack ${rack.rackId.slice(0, 4).toUpperCase()}`}
-                  </span>
-                  <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
-                    {rack.rackSize}U
-                  </span>
-                </div>
-                {errors.total > 0 && (
-                  <div style={{ display: "flex", gap: "4px" }}>
-                    {errors.critical > 0 && (
-                      <span style={{ background: ERROR_COLORS.critical, color: "#fff", fontSize: "10px", padding: "2px 6px", borderRadius: "10px", fontWeight: 700 }}>
-                        C{errors.critical}
-                      </span>
-                    )}
-                    {errors.major > 0 && (
-                      <span style={{ background: ERROR_COLORS.major, color: "#fff", fontSize: "10px", padding: "2px 6px", borderRadius: "10px", fontWeight: 700 }}>
-                        M{errors.major}
-                      </span>
-                    )}
-                    {errors.minor > 0 && (
-                      <span style={{ background: ERROR_COLORS.minor, color: "#fff", fontSize: "10px", padding: "2px 6px", borderRadius: "10px", fontWeight: 700 }}>
-                        m{errors.minor}
-                      </span>
-                    )}
-                    {errors.warning > 0 && (
-                      <span style={{ background: ERROR_COLORS.warning, color: "#fff", fontSize: "10px", padding: "2px 6px", borderRadius: "10px", fontWeight: 700 }}>
-                        W{errors.warning}
-                      </span>
-                    )}
+              const isCurrent = rack.rackId === selectedRackId;
+              const errors = getRackErrorCounts(rack);
+              return (
+                <div
+                  key={rack.rackId}
+                  className={`focus-list-item ${isCurrent ? 'is-current' : ''}`}
+                  onClick={() => {
+                    selectRack(rack.rackId);
+                    focusRack(rack.rackId);
+                    setIsListOpen(false);
+                  }}
+                  onMouseEnter={() => { }}
+                  onMouseLeave={() => { }}
+                >
+                  <div className="focus-item-info">
+                    <span className="focus-item-title">
+                      {rack.rackTitle || `Rack ${rack.rackId.slice(0, 4).toUpperCase()}`}
+                    </span>
+                    <span className="focus-item-size">
+                      {rack.rackSize}U
+                    </span>
                   </div>
-                )}
-              </div>
-            );
-          })}
+                  {errors.total > 0 && (
+                    <div className="focus-item-errors">
+                      {errors.critical > 0 && (
+                        <span className="focus-error-badge" style={{ background: ERROR_COLORS.critical }}>
+                          C{errors.critical}
+                        </span>
+                      )}
+                      {errors.major > 0 && (
+                        <span className="focus-error-badge" style={{ background: ERROR_COLORS.major }}>
+                          M{errors.major}
+                        </span>
+                      )}
+                      {errors.minor > 0 && (
+                        <span className="focus-error-badge" style={{ background: ERROR_COLORS.minor }}>
+                          m{errors.minor}
+                        </span>
+                      )}
+                      {errors.warning > 0 && (
+                        <span className="focus-error-badge" style={{ background: ERROR_COLORS.warning }}>
+                          W{errors.warning}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
-      <div
-        className="comm-panel"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "var(--spacing-sm)",
-          padding: "var(--spacing-sm) var(--spacing-sm)",
-          borderRadius: "40px",
-          boxShadow: "var(--elevation-3)",
-          border: "1px solid var(--panel-border)",
-          background: "var(--panel-bg)",
-        }}
-      >
+      <div className="comm-panel focus-nav-container">
         <button
-          className="comm-btn comm-btn-secondary"
-          style={{
-            borderRadius: "50%",
-            width: "36px",
-            height: "36px",
-            padding: 0,
-            minWidth: "36px",
-            fontSize: "20px",
-            border: "1px solid var(--border-weak)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: isListOpen ? "var(--theme-primary)" : "transparent",
-            color: isListOpen ? "#fff" : "inherit",
-          }}
+          className={`focus-nav-btn ${isListOpen ? 'is-active' : ''}`}
           onClick={() => setIsListOpen((prev) => !prev)}
           title="랙 목록 보기"
         >
@@ -252,124 +184,56 @@ export const FocusCarousel: React.FC = () => {
         </button>
 
 
-      {/* Previous Button */}
-      <button
-        className="comm-btn comm-btn-secondary"
-        style={{
-          borderRadius: "50%",
-          width: "36px",
-          height: "36px",
-          padding: 0,
-          minWidth: "36px",
-          fontSize: "24px",
-          border: "1px solid var(--border-weak)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-        onClick={handlePrev}
-        title="Previous Rack"
-      >
-        <Icon icon="mdi:chevron-left" />
-      </button>
-
-      {/* Status Info */}
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          minWidth: "200px",
-          userSelect: "none",
-        }}
-      >
-        <span
-          style={{
-            fontSize: "11px",
-            color: "var(--text-tertiary)",
-            textTransform: "uppercase",
-            letterSpacing: "0.1em",
-            fontWeight: 700,
-            marginBottom: "2px",
-          }}
+        {/* Previous Button */}
+        <button
+          className="focus-nav-btn"
+          onClick={handlePrev}
+          title="Previous Rack"
         >
-          {currentIndex !== -1
-            ? (groupRacks[currentIndex]?.rackTitle || `Rack ${groupRacks[currentIndex]?.rackId.slice(0, 4).toUpperCase()}`)
-            : (activeNodeId ? findNode(nodes, activeNodeId)?.name || '전산실' : '전산실')}
-        </span>
-        <div style={{ display: "flex", alignItems: "baseline", gap: "4px" }}>
-          {currentIndex !== -1 ? (
-            <>
-              <span
-                style={{
-                  fontSize: "var(--font-size-lg)",
-                  fontWeight: 700,
-                  color: "var(--theme-primary)",
-                }}
-              >
-                {currentIndex + 1}
-              </span>
-              <span
-                style={{
-                  fontSize: "var(--font-size-sm)",
-                  color: "var(--text-tertiary)",
-                }}
-              >
-                / {groupRacks.length}
-              </span>
-            </>
-          ) : (
-            <>
-              <span
-                style={{
-                  fontSize: "var(--font-size-sm)",
-                  color: "var(--text-tertiary)",
-                }}
-              >
-                전체
-              </span>
-              <span
-                style={{
-                  fontSize: "var(--font-size-lg)",
-                  fontWeight: 700,
-                  color: "var(--theme-primary)",
-                }}
-              >
-                {groupRacks.length}
-              </span>
-              <span
-                style={{
-                  fontSize: "var(--font-size-sm)",
-                  color: "var(--text-tertiary)",
-                }}
-              >
-                대
-              </span>
-            </>
-          )}
-        </div>
-      </div>
+          <Icon icon="mdi:chevron-left" />
+        </button>
 
-      {/* Next Button */}
-      <button
-        className="comm-btn comm-btn-secondary"
-        style={{
-          borderRadius: "50%",
-          width: "36px",
-          height: "36px",
-          padding: 0,
-          minWidth: "36px",
-          fontSize: "24px",
-          border: "1px solid var(--border-weak)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-        onClick={handleNext}
-        title="Next Rack"
-      >
-        <Icon icon="mdi:chevron-right" />
-      </button>
+        {/* Status Info */}
+        <div className="focus-status-wrapper">
+          <span className="focus-status-title">
+            {currentIndex !== -1
+              ? (groupRacks[currentIndex]?.rackTitle || `Rack ${groupRacks[currentIndex]?.rackId.slice(0, 4).toUpperCase()}`)
+              : (activeNodeId ? findNode(nodes, activeNodeId)?.name || '전산실' : '전산실')}
+          </span>
+          <div className="focus-status-numbers">
+            {currentIndex !== -1 ? (
+              <>
+                <span className="focus-num-primary">
+                  {currentIndex + 1}
+                </span>
+                <span className="focus-num-secondary">
+                  / {groupRacks.length}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="focus-num-secondary">
+                  전체
+                </span>
+                <span className="focus-num-primary">
+                  {groupRacks.length}
+                </span>
+                <span className="focus-num-secondary">
+                  대
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Next Button */}
+        <button
+          className="focus-nav-btn"
+          onClick={handleNext}
+          title="Next Rack"
+        >
+          <Icon icon="mdi:chevron-right" />
+        </button>
       </div>
     </div>
   );

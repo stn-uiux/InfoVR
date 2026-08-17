@@ -442,12 +442,8 @@ function App() {
               <button
                 className="comm-btn comm-btn-md comm-btn-tertiary"
                 onClick={() => {
-                  if (confirm("정말 모든 데이터를 초기화하시겠습니까?")) {
-                    localStorage.removeItem("server-room-storage");
-                    try {
-                      indexedDB.deleteDatabase("server-room-db");
-                    } catch (_e) { }
-                    window.location.reload();
+                  if (confirm("정말 모든 데이터를 초기화하시겠습니까?\n저장하지 않으면 새로고침 시 이전 데이터로 복구됩니다.")) {
+                    useStore.getState().resetAllData();
                   }
                 }}
                 style={{ color: "var(--severity-critical)" }}

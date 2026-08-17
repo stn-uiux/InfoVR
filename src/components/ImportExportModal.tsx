@@ -1,5 +1,6 @@
-﻿import React, { useCallback, useRef, useState, useMemo, useEffect } from "react";
+import React, { useCallback, useRef, useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { Icon } from "@iconify/react";
 import { useStore } from "../store/useStore";
 import type { Rack, RegisteredDevice, HierarchyNode } from "../types";
 import type { ExportScope } from "../utils/storage";
@@ -24,14 +25,54 @@ export const ImportExportModal = () => {
     setPendingImportFile,
   } = useStore();
 
-  const [selectedScopeId, setSelectedScopeId] = useState<ExportScope>("ALL");
+  const [checkedNodes, setCheckedNodes] = useState<Set<string>>(new Set());
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
   // Sync with activeNodeId when modal opens
   useEffect(() => {
     if (importExportModalRackId === "all") {
-       setSelectedScopeId(activeNodeId || "ALL");
+       if (activeNodeId) {
+         const subtree = getSubtreeNodeIds(nodes, activeNodeId);
+         const next = new Set<string>();
+         next.add(activeNodeId);
+         subtree.forEach(id => next.add(id));
+         setCheckedNodes(next);
+       } else {
+         setCheckedNodes(new Set(nodes.map(n => n.nodeId)));
+       }
+       // 모든 노드를 기본적으로 펼치기
+       setExpandedNodes(new Set(nodes.map(n => n.nodeId)));
     }
-  }, [importExportModalRackId, activeNodeId]);
+  }, [importExportModalRackId, activeNodeId, nodes]);
+
+  const toggleNodeCheck = useCallback((nodeId: string, isChecked: boolean) => {
+    setCheckedNodes((prev) => {
+      const next = new Set(prev);
+      const descendants = getSubtreeNodeIds(nodes, nodeId);
+      if (isChecked) {
+        next.add(nodeId);
+        descendants.forEach(id => next.add(id));
+        let currentId = nodes.find(n => n.nodeId === nodeId)?.parentId;
+        while (currentId) {
+          const siblings = nodes.filter(n => n.parentId === currentId);
+          if (siblings.every(s => next.has(s.nodeId))) {
+            next.add(currentId);
+          }
+          currentId = nodes.find(n => n.nodeId === currentId)?.parentId;
+        }
+      } else {
+        next.delete(nodeId);
+        descendants.forEach(id => next.delete(id));
+        let currentId = nodes.find(n => n.nodeId === nodeId)?.parentId;
+        while (currentId) {
+          next.delete(currentId);
+          currentId = nodes.find(n => n.nodeId === currentId)?.parentId;
+        }
+      }
+      return next;
+    });
+  }, [nodes]);
+
   const [isExporting, setIsExporting] = useState(false);
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [overwriteNodes, setOverwriteNodes] = useState(true);
@@ -48,35 +89,21 @@ export const ImportExportModal = () => {
     ignoredCount: number;
   } | null>(null);
 
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
-
   const selectedNodeCounts = useMemo(() => {
-    // Collect all racks from all layouts for global calculation if needed
     const allRacks: Rack[] = [];
     Object.values(useStore.getState().layouts).forEach(l => allRacks.push(...(l.racks || [])));
 
-    if (selectedScopeId === "ALL") {
-      const rackCount = allRacks.length;
-      const deviceCount = getNodeEquipmentCount(registeredDevices, "ALL");
-      const portCount = allRacks.reduce(
-        (sum, r) => sum + (r.devices?.reduce((s, d) => s + (d.portStates?.length || 0), 0) || 0),
-        0,
-      );
-      return { rackCount, deviceCount, portCount };
-    }
-
-    // Node-specific scope: Include subtree descendants
-    const subtreeIds = getSubtreeNodeIds(nodes, selectedScopeId);
-    const subtreeRacks = allRacks.filter((r) => subtreeIds.has(r.mapId));
-    
+    const subtreeRacks = allRacks.filter(r => checkedNodes.has(r.mapId));
     const rackCount = subtreeRacks.length;
-    const deviceCount = getNodeEquipmentCount(registeredDevices, selectedScopeId); // This utility already handles subtrees by default or can be updated
+    
+    const deviceCount = registeredDevices.filter(d => checkedNodes.has(d.deviceGroupId || '')).length;
+
     const portCount = subtreeRacks.reduce(
       (sum, r) => sum + (r.devices?.reduce((s, d) => s + (d.portStates?.length || 0), 0) || 0),
       0,
     );
     return { rackCount, deviceCount, portCount };
-  }, [selectedScopeId, nodes, registeredDevices]);
+  }, [checkedNodes, registeredDevices]);
 
   const groupImportRef = useRef<HTMLInputElement>(null);
 
@@ -84,16 +111,16 @@ export const ImportExportModal = () => {
 
   const handleGroupExport = async () => {
     if (isExporting) return;
+    if (checkedNodes.size === 0) {
+      showToast("내보낼 노드를 선택해주세요.", "error");
+      return;
+    }
 
-    // Create ONE immutable request object at click time
-    const currentScope = selectedScopeId;
-    const currentLabel =
-      currentScope === "ALL" ? "전체" : getNodeName(nodes, currentScope);
-
+    const isAll = checkedNodes.size === nodes.length;
     const request: ExportRequest = {
       requestId: crypto.randomUUID(),
-      scopeId: currentScope,
-      scopeLabel: currentLabel,
+      scopeId: isAll ? "ALL" : Array.from(checkedNodes),
+      scopeLabel: isAll ? "전체" : "다중 선택 노드",
       exportedAt: new Date().toISOString(),
     };
 
@@ -336,20 +363,20 @@ export const ImportExportModal = () => {
 
     return children.map((node) => {
       const isExpanded = expandedNodes.has(node.nodeId);
-      const isSelected = selectedScopeId === node.nodeId;
+      const isChecked = checkedNodes.has(node.nodeId);
       const subChildren = nodes.filter((n) => n.parentId === node.nodeId);
       const hasChildren = subChildren.length > 0;
 
       return (
         <React.Fragment key={node.nodeId}>
           <div
-            className={`export-tree-node ${isSelected ? "selected" : ""}`}
+            className={`tree-node ${isChecked ? "selected" : ""}`}
             style={{ paddingLeft: `${depth * 16 + 12}px` }}
-            onClick={() => setSelectedScopeId(node.nodeId)}
+            onClick={() => toggleNodeCheck(node.nodeId, !isChecked)}
             title={node.name}
           >
             <span
-              className={`export-tree-toggle ${isExpanded ? "expanded" : ""}`}
+              className={`tree-node-toggle ${isExpanded ? "expanded" : ""}`}
               onClick={(e) => {
                 e.stopPropagation();
                 setExpandedNodes((prev) => {
@@ -361,10 +388,37 @@ export const ImportExportModal = () => {
               }}
               style={{ visibility: hasChildren ? "visible" : "hidden" }}
             >
-              ▶
+              <svg
+                viewBox="0 0 24 24"
+                width="10"
+                height="10"
+                stroke="currentColor"
+                strokeWidth="3"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
             </span>
-            <span style={{ fontSize: "14px", flexShrink: 0 }}>
-              {node.type === "root" ? "🏢" : "📦"}
+            <span style={{ fontSize: "16px", flexShrink: 0, display: "flex", alignItems: "center", marginRight: "4px" }}>
+              <input 
+                type="checkbox" 
+                checked={isChecked} 
+                onChange={(e) => {
+                  e.stopPropagation();
+                  toggleNodeCheck(node.nodeId, e.target.checked);
+                }}
+                onClick={(e) => e.stopPropagation()}
+                style={{ marginRight: '6px' }} 
+              />
+              {node.type === "root" ? (
+                <Icon icon="gis:network" className="icon" style={{ color: "var(--text-secondary)" }} />
+              ) : node.type === "room" ? (
+                <Icon icon="mdi:server" className="icon" style={{ color: "var(--theme-primary)" }} />
+              ) : (
+                <Icon icon="material-symbols:folder" className="icon" style={{ color: "var(--text-secondary)" }} />
+              )}
             </span>
             <span className="node-name">{node.name}</span>
           </div>
@@ -375,37 +429,29 @@ export const ImportExportModal = () => {
   };
 
   const renderGlobalGroupContent = () => {
-    const selectedPath =
-      selectedScopeId === "ALL" ? [] : getAncestorPath(nodes, selectedScopeId);
-
     return (
       <>
         {/* EXPORT SECTION */}
         <div className="options-group">
           <div className="group-header">
             <div className="group-title">
-              <span>📤</span> Export Scope Selection
+              <span>📤</span> 데이터 내보내기 범위 선택
             </div>
           </div>
 
           <div className="export-tree-container">
-            <div
-              className={`export-tree-node ${selectedScopeId === "ALL" ? "selected" : ""}`}
-              onClick={() => setSelectedScopeId("ALL")}
-            >
-              <span style={{ width: "16px" }} />
-              <span style={{ fontSize: "14px", flexShrink: 0 }}>🌐</span>
-              <span className="node-name">전체 (ALL nodes)</span>
-            </div>
             {renderExportTree()}
           </div>
 
           <div className="export-selection-preview">
             <div className="export-breadcrumb">
               📍 Scope:{" "}
-              {selectedScopeId === "ALL"
-                ? "전체 (전역 데이터)"
-                : selectedPath.map((p) => p.name).join(" > ")}
+              {(() => {
+                if (checkedNodes.size === nodes.length) return "전체 (전역 데이터)";
+                const checkedGroupCount = nodes.filter(n => checkedNodes.has(n.nodeId) && n.type !== "room").length;
+                const checkedRoomCount = nodes.filter(n => checkedNodes.has(n.nodeId) && n.type === "room").length;
+                return `그룹 ${checkedGroupCount}개, 전산실 ${checkedRoomCount}개`;
+              })()}
             </div>
             <div className="export-counts-row">
               <span>
@@ -422,9 +468,9 @@ export const ImportExportModal = () => {
 
           <div className="export-helper-text">
             💡{" "}
-            {selectedScopeId === "ALL"
+            {checkedNodes.size === nodes.length
               ? "전체 노드의 모든 데이터(Racks & Devices)가 하나의 파일로 출력됩니다."
-              : `선택한 노드("${getNodeName(nodes, selectedScopeId)}") 및 그 하위 노드(서버실 등)의 모든 데이터가 포함됩니다.`}
+              : `선택한 노드 및 그 하위 노드(서버실 등)의 모든 데이터가 포함됩니다.`}
           </div>
 
           <div style={{ display: "flex", gap: "10px" }}>
@@ -437,242 +483,16 @@ export const ImportExportModal = () => {
                 opacity: isExporting ? 0.7 : 1,
               }}
               onClick={handleGroupExport}
-              disabled={!selectedScopeId || isExporting}
+              disabled={checkedNodes.size === 0 || isExporting}
             >
               {isExporting
-                ? "⏳ 생성 중..."
-                : `🚀 Export ${selectedScopeId === "ALL" ? "전체" : "선택 노드"}`}
+                ? "생성 중.."
+                : `🚀 Export ${checkedNodes.size === nodes.length ? "전체" : "선택 노드"}`}
             </button>
           </div>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            margin: "4px 0",
-          }}
-        >
-          <div
-            style={{ flex: 1, height: "1px", background: "var(--border-weak)" }}
-          />
-          <span
-            style={{
-              fontSize: "var(--font-size-xs)",
-              color: "var(--text-tertiary)",
-            }}
-          >
-            OR
-          </span>
-          <div
-            style={{ flex: 1, height: "1px", background: "var(--border-weak)" }}
-          />
-        </div>
 
-        {/* AUTOMATIC IMPORT SECTION */}
-        <div className="options-group">
-          <div className="group-header">
-            <div className="group-title">
-              <span>📥</span> 자동 가져오기 (Automatic Import)
-            </div>
-          </div>
-          <div
-            style={{
-              fontSize: "12px",
-              color: "var(--text-tertiary)",
-              marginBottom: "12px",
-              lineHeight: "1.5",
-            }}
-          >
-            파일 내의 <strong>Groups</strong> 시트를 분석하여 노드 계층을
-            복구하고 데이터를 자동으로 반영합니다.
-          </div>
-          <div className="import-warning">
-            <span style={{ fontSize: "14px", flexShrink: 0 }}>ℹ️</span>
-            <span>
-              노드 내 데이터(Rack/Device/Port)는 파일 기준으로 반영되며, 다른
-              노드에는 영향이 없습니다.
-            </span>
-          </div>
-
-          {importPreview ? (
-            <div
-              style={{
-                background: "var(--selected-bg)",
-                border: "1px solid var(--theme-primary)",
-                borderRadius: "4px",
-                padding: "10px",
-                marginBottom: "12px",
-              }}
-            >
-              <div
-                style={{
-                  fontWeight: 600,
-                  fontSize: "12px",
-                  marginBottom: "8px",
-                  color: "var(--theme-primary)",
-                }}
-              >
-                📊 파일 분석 결과: {importPreview.fileName}
-              </div>
-
-              <div
-                style={{
-                  marginBottom: "10px",
-                  padding: "8px",
-                  background: "rgba(0,0,0,0.2)",
-                  borderRadius: "4px",
-                  fontSize: "12px",
-                }}
-              >
-                <div
-                  style={{ color: "var(--text-tertiary)", marginBottom: "4px" }}
-                >
-                  대상 범위 (Export Scope):
-                </div>
-                <div style={{ fontWeight: 600, color: "white" }}>
-                  {importPreview.exportScope.type === "ALL"
-                    ? "🌐 전체 (ALL)"
-                    : `📍 ${getNodeName(nodes, importPreview.exportScope.nodeId || "")} 전용`}
-                </div>
-              </div>
-
-              <div
-                style={{
-                  maxHeight: "150px",
-                  overflowY: "auto",
-                  fontSize: "11px",
-                }}
-              >
-                {Object.entries(importPreview.dataByNode).map(([nid, data]) => {
-                  const nodeName = getNodeName(importPreview.nodes, nid);
-                  return (
-                    <div
-                      key={nid}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        marginBottom: "4px",
-                        padding: "4px",
-                        background: "rgba(0,0,0,0.1)",
-                      }}
-                    >
-                      <span>📍 {nodeName}</span>
-                      <span style={{ fontWeight: 600 }}>
-                        Racks: {data.racks.length} | RegDevs: {data.registeredDevices.length}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {importPreview.ignoredCount > 0 && (
-                <div
-                  style={{
-                    marginTop: "10px",
-                    color: "#ffa940",
-                    fontSize: "11px",
-                    display: "flex",
-                    gap: "4px",
-                  }}
-                >
-                  <span>⚠️</span>
-                  <span>
-                    파일 내 범위 밖 데이터 {importPreview.ignoredCount}건은
-                    무시되었습니다.
-                  </span>
-                </div>
-              )}
-              <div style={{ marginTop: "12px", display: "flex", gap: "8px" }}>
-                <button
-                  className="comm-btn comm-btn-md comm-btn-primary"
-                  style={{ flex: 1 }}
-                  onClick={handleApplyImport}
-                >
-                  🚀 Confirm & REPLACE
-                </button>
-                <button
-                  className="comm-btn comm-btn-md comm-btn-secondary"
-                  onClick={() => setImportPreview(null)}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div style={{ marginBottom: "12px" }}>
-                <label
-                  className="checkbox-item"
-                  style={{ marginBottom: overwriteNodes ? "8px" : "0" }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={overwriteNodes}
-                    onChange={(e) => setOverwriteNodes(e.target.checked)}
-                  />
-                  기존 노드 정보(이름/타입) 덮어쓰기
-                </label>
-                {overwriteNodes && (
-                  <div className="import-warning" style={{ marginBottom: "0" }}>
-                    <span style={{ fontSize: "14px", flexShrink: 0 }}>⚠️</span>
-                    <span>
-                      주의: 체크 시 파일의 노드 정보(이름/타입)가 기존 노드
-                      정보에 덮어써집니다.
-                    </span>
-                  </div>
-                )}
-              </div>
-              <button
-                className="comm-btn comm-btn-lg comm-btn-secondary"
-                style={{
-                  padding: "12px",
-                  width: "100%",
-                  borderStyle: "dashed",
-                  borderWidth: "2px",
-                  fontWeight: 600,
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center"
-                }}
-                onClick={handleGroupImportClick}
-              >
-                📂 Select Excel File for Auto Import
-              </button>
-            </>
-          )}
-
-          {importStatus && (
-            <div
-              style={{
-                marginTop: "12px",
-                padding: "10px",
-                borderRadius: "6px",
-                fontSize: "13px",
-                background: importStatus.startsWith("✅")
-                  ? "rgba(34,197,94,0.12)"
-                  : "rgba(59,130,246,0.12)",
-                color: importStatus.startsWith("✅") ? "#22c55e" : "#3b82f6",
-                border: `1px solid ${importStatus.startsWith("✅") ? "#22c55e44" : "#3b82f644"}`,
-              }}
-            >
-              {importStatus}
-            </div>
-          )}
-        </div>
-
-        <input
-          type="file"
-          ref={groupImportRef}
-          style={{ display: "none" }}
-          accept=".xlsx"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handleGroupImportFile(file);
-            e.target.value = "";
-          }}
-        />
       </>
     );
   };
@@ -702,7 +522,7 @@ export const ImportExportModal = () => {
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <span style={{ fontSize: "20px" }}>💾</span>
             <h2 className="comm-modal-title">
-              데이터 내보내기 / 가져오기
+              데이터 내보내기
             </h2>
           </div>
           <button

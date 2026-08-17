@@ -44,6 +44,7 @@ export const ModelImporter = () => {
   const toggleModelMove = useStore((s) => s.toggleModelMove);
 
   const csCustomSpaceSize = useStore((s) => s.csCustomSpaceSize);
+  const cyberSpaceEnabled = useStore((s) => s.cyberSpaceEnabled);
   const csRoomWidthCm = useStore((s) => s.csRoomWidthCm);
   const csRoomLengthCm = useStore((s) => s.csRoomLengthCm);
   const csOffsetXCm = useStore((s) => s.csOffsetXCm);
@@ -383,169 +384,151 @@ export const ModelImporter = () => {
               <span className="comm-icon-primary-lg">
                 <Icon icon="mdi:server-network" className="icon comm-icon-md" />
               </span>
-              <span className="tree-node-header-text">서버룸 환경</span>
+              <span className="tree-node-header-text">가상 공간</span>
             </span>
           </div>
-        </div>
-        <div className="collapse-panel-body" style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
           <div className="comm-flex-center-8-noshrink">
-            <label className="switch">
+            <label className="switch" style={{ margin: 0 }} title={cyberSpaceEnabled ? "끄기" : "켜기"}>
               <input
                 type="checkbox"
-                checked={csCustomSpaceSize}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  if (checked) {
-                    useStore.getState().setCyberSpaceConfig({ 
-                      csCustomSpaceSize: true,
-                      csRoomWidthCm: Math.round(dynamicWidth * 100),
-                      csRoomLengthCm: Math.round(dynamicLength * 100),
-                      csOffsetXCm: 0,
-                      csOffsetZCm: 0
-                    });
-                  } else {
-                    useStore.getState().setCyberSpaceConfig({ csCustomSpaceSize: false });
-                  }
-                }}
+                checked={cyberSpaceEnabled}
+                onChange={(e) => useStore.getState().setCyberSpaceEnabled(e.target.checked)}
               />
               <span className="slider"></span>
             </label>
-            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--text-primary)", fontWeight: 500 }}>
-              공간 사이즈 고정(cm)
-            </span>
-          </div>
-
-          <div style={{ display: "flex", gap: "8px", alignItems: "center", opacity: csCustomSpaceSize ? 1 : 0.5 }}>
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px" }}>
-              <span style={{ fontSize: "var(--font-size-xs)", color: "var(--text-secondary)" }}>가로 (W)</span>
-              <input
-                type="number"
-                className="comm-input-full"
-                style={{
-                  background: "transparent",
-                  border: "1px solid var(--border-weak, rgba(255,255,255,0.2))",
-                  borderRadius: "4px",
-                  color: "var(--text-primary)",
-                  padding: "6px 8px"
-                }}
-                min="300"
-                step="10"
-                value={displayWidthCm || ""}
-                disabled={!csCustomSpaceSize}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value);
-                  useStore.getState().setCyberSpaceConfig({ csRoomWidthCm: isNaN(val) ? 0 : val });
-                }}
-                onBlur={(e) => {
-                  const rawVal = parseInt(e.target.value);
-                  if (rawVal < 300) {
-                    setSizeWarning("공간 사이즈는 300cm 이상이어야 합니다.");
-                    setTimeout(() => setSizeWarning(null), 3000);
-                  }
-                  const val = Math.max(300, rawVal || 300);
-                  useStore.getState().setCyberSpaceConfig({ csRoomWidthCm: val });
-                }}
-              />
-            </div>
-            <div style={{ paddingTop: "20px", color: "var(--text-secondary)", fontSize: "14px" }}>
-              <Icon icon="mdi:close" />
-            </div>
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px" }}>
-              <span style={{ fontSize: "var(--font-size-xs)", color: "var(--text-secondary)" }}>세로 (D)</span>
-              <input
-                type="number"
-                className="comm-input-full"
-                style={{
-                  background: "transparent",
-                  border: "1px solid var(--border-weak, rgba(255,255,255,0.2))",
-                  borderRadius: "4px",
-                  color: "var(--text-primary)",
-                  padding: "6px 8px"
-                }}
-                min="300"
-                step="10"
-                value={displayLengthCm || ""}
-                disabled={!csCustomSpaceSize}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value);
-                  useStore.getState().setCyberSpaceConfig({ csRoomLengthCm: isNaN(val) ? 0 : val });
-                }}
-                onBlur={(e) => {
-                  const rawVal = parseInt(e.target.value);
-                  if (rawVal < 300) {
-                    setSizeWarning("공간 사이즈는 300cm 이상이어야 합니다.");
-                    setTimeout(() => setSizeWarning(null), 3000);
-                  }
-                  const val = Math.max(300, rawVal || 300);
-                  useStore.getState().setCyberSpaceConfig({ csRoomLengthCm: val });
-                }}
-              />
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: "8px", alignItems: "center", opacity: csCustomSpaceSize ? 1 : 0.5, marginTop: "4px" }}>
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px" }}>
-              <span style={{ fontSize: "var(--font-size-xs)", color: "var(--text-secondary)" }}>좌우 이동 (X)</span>
-              <input
-                type="number"
-                className="comm-input-full"
-                style={{
-                  background: "transparent",
-                  border: "1px solid var(--border-weak, rgba(255,255,255,0.2))",
-                  borderRadius: "4px",
-                  color: "var(--text-primary)",
-                  padding: "6px 8px"
-                }}
-                step="10"
-                value={csCustomSpaceSize ? csOffsetXCm || 0 : 0}
-                disabled={!csCustomSpaceSize}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value);
-                  useStore.getState().setCyberSpaceConfig({ csOffsetXCm: isNaN(val) ? 0 : val });
-                }}
-              />
-            </div>
-            <div style={{ paddingTop: "20px", color: "transparent", fontSize: "14px" }}>
-              <Icon icon="mdi:close" />
-            </div>
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px" }}>
-              <span style={{ fontSize: "var(--font-size-xs)", color: "var(--text-secondary)" }}>앞뒤 이동 (Z)</span>
-              <input
-                type="number"
-                className="comm-input-full"
-                style={{
-                  background: "transparent",
-                  border: "1px solid var(--border-weak, rgba(255,255,255,0.2))",
-                  borderRadius: "4px",
-                  color: "var(--text-primary)",
-                  padding: "6px 8px"
-                }}
-                step="10"
-                value={csCustomSpaceSize ? csOffsetZCm || 0 : 0}
-                disabled={!csCustomSpaceSize}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value);
-                  useStore.getState().setCyberSpaceConfig({ csOffsetZCm: isNaN(val) ? 0 : val });
-                }}
-              />
-            </div>
-          </div>
-          {sizeWarning && (
-            <div style={{ color: "var(--color-danger, #ef4444)", fontSize: "12px", marginTop: "-4px" }}>
-              {sizeWarning}
-            </div>
-          )}
-
-          <div style={{ marginTop: "8px" }}>
-            <button
-              className="comm-btn comm-btn-md comm-btn-primary comm-w-full"
-              onClick={() => window.open('/arcVRoom/', '_blank')}
-            >
-              <Icon icon="mdi:cube-outline" className="icon" style={{ marginRight: '6px' }} />
-              3D공간 제작
-            </button>
           </div>
         </div>
+        {cyberSpaceEnabled && (
+          <div
+            className="collapse-panel-body"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "12px"
+            }}
+          >
+            <div className="comm-flex-center-8-noshrink">
+              <label className="switch">
+                <input
+                  type="checkbox"
+                  checked={csCustomSpaceSize}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    if (checked) {
+                      useStore.getState().setCyberSpaceConfig({
+                        csCustomSpaceSize: true,
+                        csRoomWidthCm: Math.round(dynamicWidth * 100),
+                        csRoomLengthCm: Math.round(dynamicLength * 100),
+                        csOffsetXCm: 0,
+                        csOffsetZCm: 0
+                      });
+                    } else {
+                      useStore.getState().setCyberSpaceConfig({ csCustomSpaceSize: false });
+                    }
+                  }}
+                />
+                <span className="slider"></span>
+              </label>
+              <span style={{ fontSize: "var(--font-size-sm)", color: "var(--text-primary)", fontWeight: 500 }}>
+                공간 사이즈 고정(cm)
+              </span>
+            </div>
+
+            <div className="mi-env-switch-wrapper" style={{ opacity: csCustomSpaceSize ? 1 : 0.5 }}>
+              <div className="mi-input-group">
+                <span className="mi-input-label">가로 (W)</span>
+                <input
+                  type="number"
+                  className="comm-input-full mi-input-field"
+                  min="300"
+                  step="10"
+                  value={displayWidthCm || ""}
+                  disabled={!csCustomSpaceSize}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    useStore.getState().setCyberSpaceConfig({ csRoomWidthCm: isNaN(val) ? 0 : val });
+                  }}
+                  onBlur={(e) => {
+                    const rawVal = parseInt(e.target.value);
+                    if (rawVal < 300) {
+                      setSizeWarning("공간 사이즈는 300cm 이상이어야 합니다.");
+                      setTimeout(() => setSizeWarning(null), 3000);
+                    }
+                    const val = Math.max(300, rawVal || 300);
+                    useStore.getState().setCyberSpaceConfig({ csRoomWidthCm: val });
+                  }}
+                />
+              </div>
+              <div style={{ paddingTop: "20px", color: "var(--text-secondary)", fontSize: "14px" }}>
+                <Icon icon="mdi:close" />
+              </div>
+              <div className="mi-input-group">
+                <span className="mi-input-label">세로 (D)</span>
+                <input
+                  type="number"
+                  className="comm-input-full mi-input-field"
+                  min="300"
+                  step="10"
+                  value={displayLengthCm || ""}
+                  disabled={!csCustomSpaceSize}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    useStore.getState().setCyberSpaceConfig({ csRoomLengthCm: isNaN(val) ? 0 : val });
+                  }}
+                  onBlur={(e) => {
+                    const rawVal = parseInt(e.target.value);
+                    if (rawVal < 300) {
+                      setSizeWarning("공간 사이즈는 300cm 이상이어야 합니다.");
+                      setTimeout(() => setSizeWarning(null), 3000);
+                    }
+                    const val = Math.max(300, rawVal || 300);
+                    useStore.getState().setCyberSpaceConfig({ csRoomLengthCm: val });
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="mi-env-switch-wrapper" style={{ opacity: csCustomSpaceSize ? 1 : 0.5 }}>
+              <div className="mi-input-group">
+                <span className="mi-input-label">좌우 이동 (X)</span>
+                <input
+                  type="number"
+                  className="comm-input-full mi-input-field"
+                  step="10"
+                  value={csCustomSpaceSize ? csOffsetXCm || 0 : 0}
+                  disabled={!csCustomSpaceSize}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    useStore.getState().setCyberSpaceConfig({ csOffsetXCm: isNaN(val) ? 0 : val });
+                  }}
+                />
+              </div>
+              <div style={{ paddingTop: "20px", color: "transparent", fontSize: "14px" }}>
+                <Icon icon="mdi:close" />
+              </div>
+              <div className="mi-input-group">
+                <span className="mi-input-label">앞뒤 이동 (Z)</span>
+                <input
+                  type="number"
+                  className="comm-input-full mi-input-field"
+                  step="10"
+                  value={csCustomSpaceSize ? csOffsetZCm || 0 : 0}
+                  disabled={!csCustomSpaceSize}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    useStore.getState().setCyberSpaceConfig({ csOffsetZCm: isNaN(val) ? 0 : val });
+                  }}
+                />
+              </div>
+            </div>
+            {sizeWarning && (
+              <div style={{ color: "var(--color-danger, #ef4444)", fontSize: "12px", marginTop: "-4px" }}>
+                {sizeWarning}
+              </div>
+            )}
+
+          </div>
+        )}
       </div>
     );
   };
@@ -558,37 +541,27 @@ export const ModelImporter = () => {
             <span className="comm-icon-primary-lg">
               <Icon icon="material-symbols:folder" className="icon comm-icon-md" />
             </span>
-            <span className="tree-node-header-text">프로젝트 & 에셋</span>
+            <span className="tree-node-header-text">에셋 레이아웃</span>
           </span>
         </div>
       </div>
-      <div className="collapse-panel-body" style={{ padding: "16px" }}>
+      <div className="collapse-panel-body">
         <div className="comm-flex-col-10">
-          <button
-            className="comm-btn comm-btn-md comm-btn-primary comm-w-full"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isLoading}
-          >
-            {isLoading ? <span className="spinner-mini" /> : <Icon icon="material-symbols:add" className="icon" />}
-            Add New Asset
-          </button>
-          <div style={{ paddingTop: "8px" }}>
-            <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-tertiary)", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-              PROJECT DATA
-            </div>
+          <div>
+
             <div className="comm-flex-gap-8">
               <button
                 className="comm-btn comm-btn-md comm-btn-secondary comm-flex-1"
                 disabled={importedModels.length === 0}
                 onClick={handleExportModels}
               >
-                <Icon icon="material-symbols:save" className="icon" /> Save
+                <Icon icon="material-symbols:save" className="icon" /> 내보내기
               </button>
               <button
                 className="comm-btn comm-btn-md comm-btn-secondary comm-flex-1"
                 onClick={() => modelImportRef.current?.click()}
               >
-                <Icon icon="material-symbols:folder-open" className="icon" /> Load
+                <Icon icon="material-symbols:folder-open" className="icon" /> 불러오기
               </button>
             </div>
             {(successMsg || error || importError) && (
@@ -610,11 +583,11 @@ export const ModelImporter = () => {
             <span className="comm-icon-primary-lg">
               <Icon icon="material-symbols:inventory-2" className="icon comm-icon-md" />
             </span>
-            <span className="tree-node-header-text">기본 모델</span>
+            <span className="tree-node-header-text">에셋 라이브러리</span>
           </span>
         </div>
       </div>
-      <div className="collapse-panel-body" style={{ padding: "12px 16px" }}>
+      <div className="collapse-panel-body">
         <div className="comm-grid-2col-8">
           {BUILTIN_MODELS.filter(def => !def.hidden).map((def) => (
             <button
@@ -626,6 +599,15 @@ export const ModelImporter = () => {
             </button>
           ))}
         </div>
+        <div style={{ borderTop: "1px solid var(--border-color)", marginTop: "12px" }}>
+          <button
+            className="comm-btn comm-btn-md comm-btn-primary comm-w-full"
+            onClick={() => window.open('/arcVRoom/', '_blank')}
+          >
+            <Icon icon="mdi:cube-outline" className="icon" style={{ marginRight: '6px' }} />
+            3D공간 제작
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -634,18 +616,27 @@ export const ModelImporter = () => {
     return (
       <div className="collapse-panel expanded" style={{ flexShrink: 0, height: "auto", minHeight: 0 }}>
         <div className="collapse-panel-header">
-          <div className="comm-flex-center-10-flex1">
+          <div className="comm-flex-center-10-flex1" style={{ justifyContent: "space-between" }}>
             <span className="comm-flex-center-8-noshrink">
               <span className="comm-icon-primary-lg">
                 <Icon icon="mdi:cube-outline" className="icon comm-icon-md" />
               </span>
               <span className="tree-node-header-text">오브젝트 레이어 ({importedModels.length})</span>
             </span>
+            <button
+              className="comm-icon-btn"
+              onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+              disabled={isLoading}
+              title="Add New Asset"
+              style={{ padding: "4px", display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: isLoading ? "not-allowed" : "pointer" }}
+            >
+              {isLoading ? <span className="spinner-mini" style={{ width: 16, height: 16 }} /> : <Icon icon="material-symbols:add" style={{ fontSize: "20px", color: "var(--text-secondary)" }} />}
+            </button>
           </div>
         </div>
-        <div className="collapse-panel-body" style={{ padding: "8px", overflowY: "auto", maxHeight: "260px" }}>
+        <div className="collapse-panel-body" style={{ overflowY: "auto", maxHeight: "260px" }}>
           {importedModels.length === 0 ? (
-            <div style={{ padding: "24px 0", textAlign: "center", color: "var(--text-disabled)", fontSize: "12px", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+            <div className="mi-layer-empty">
               <Icon icon="mdi:package-variant-closed" style={{ fontSize: "24px", opacity: 0.5 }} />
               <span>Empty Layer</span>
             </div>
@@ -656,78 +647,24 @@ export const ModelImporter = () => {
                 <div
                   key={m.id}
                   onClick={() => selectModel(selectedModelId === m.id ? null : m.id)}
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: "var(--radius-md)",
-                    cursor: "pointer",
-                    background: isSelected ? "var(--selected-bg)" : "transparent",
-                    border: "1px solid",
-                    borderColor: isSelected ? "var(--theme-primary)" : "transparent",
-                    marginBottom: "4px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                    transition: "all 0.15s ease",
-                  }}
+                  className={`mi-layer-item ${isSelected ? "is-selected" : ""}`}
                 >
-                  <div
-                    style={{
-                      width: "8px",
-                      height: "8px",
-                      borderRadius: "50%",
-                      background: isSelected ? "var(--theme-primary)" : "var(--text-disabled)",
-                      flexShrink: 0,
-                    }}
-                  />
-                  <span
-                    style={{
-                      fontSize: "13px",
-                      fontWeight: isSelected ? 600 : 400,
-                      color: isSelected ? "var(--text-primary)" : "var(--text-secondary)",
-                      flex: 1,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
+                  <div className="mi-layer-dot" />
+                  <span className="mi-layer-name">
                     {m.name}
                   </span>
-                  <div className="comm-flex-gap-4">
+                  <div className="mi-layer-actions">
                     <button
-                      style={{
-                        background: m.isMoveEnabled ? "rgba(34, 197, 94, 0.1)" : "rgba(249, 115, 22, 0.08)",
-                        color: m.isMoveEnabled ? "#22c55e" : "#f97316",
-                        border: "1px solid",
-                        borderColor: m.isMoveEnabled ? "rgba(34, 197, 94, 0.2)" : "rgba(249, 115, 22, 0.2)",
-                        borderRadius: "4px",
-                        padding: "4px",
-                        fontSize: "14px",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center"
-                      }}
+                      className={`mi-layer-btn ${m.isMoveEnabled ? "is-unlocked" : "is-locked"}`}
                       title={m.isMoveEnabled ? "잠금 해제됨" : "잠금됨"}
                       onClick={(e) => { e.stopPropagation(); toggleModelMove(m.id); }}
                     >
                       <Icon icon={m.isMoveEnabled ? "mdi:lock-open-outline" : "mdi:lock-outline"} />
                     </button>
                     <button
-                      style={{
-                        background: "transparent",
-                        color: "var(--text-tertiary)",
-                        border: "none",
-                        fontSize: "16px",
-                        padding: "4px",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center"
-                      }}
+                      className="mi-layer-btn is-delete"
                       title="삭제"
                       onClick={(e) => { e.stopPropagation(); deleteModel(m.id); }}
-                      onMouseOver={(e) => (e.currentTarget.style.color = "#ef4444")}
-                      onMouseOut={(e) => (e.currentTarget.style.color = "var(--text-tertiary)")}
                     >
                       <Icon icon="mdi:trash-can-outline" />
                     </button>
@@ -794,7 +731,7 @@ export const ModelImporter = () => {
                 <button
                   className={`sidebar-tab-btn ${floatingPanel === "serverRoomEnv" ? "active" : ""}`}
                   onClick={(e) => toggleFloatingPanel("serverRoomEnv", e)}
-                  title="서버룸 환경"
+                  title="가상 공간"
                 >
                   <Icon icon="mdi:server-network" className="icon" />
                 </button>
@@ -808,7 +745,7 @@ export const ModelImporter = () => {
                 <button
                   className={`sidebar-tab-btn ${floatingPanel === "builtin" ? "active" : ""}`}
                   onClick={(e) => toggleFloatingPanel("builtin", e)}
-                  title="기본 모델 (Built-in)"
+                  title="에셋 라이브러리 (Asset Library)"
                 >
                   <Icon icon="material-symbols:inventory-2" className="icon" />
                 </button>
@@ -833,7 +770,6 @@ export const ModelImporter = () => {
               }}
             >
               <HierarchyTree />
-              <div id={isCollapsed ? "equipment-panel-portal-hidden" : "equipment-panel-portal"} className="sidebar-portal-target" />
             </div>
 
             <div
@@ -916,6 +852,17 @@ export const ModelImporter = () => {
           )}
         </div>
       </div>
+
+      {/* Equipment Panel Portal Target - Sibling of sidebar to avoid backdrop-filter stacking issues */}
+      <div 
+        id={isCollapsed ? "equipment-panel-portal-hidden" : "equipment-panel-portal"} 
+        className="sidebar-portal-target" 
+        style={{ 
+          left: isCollapsed ? 60 : sidebarWidth, 
+          width: 0 
+        }} 
+      />
+
       {/* Properties Section — positioned right next to the left panel */}
       {isEditMode && selectedModel && (
         <div

@@ -877,7 +877,8 @@ const DeviceMesh = ({
   return (
     <group
       position={[0, centerY, -0.41]}
-      onClick={isObstructing ? undefined : (e) => {
+      onClick={(e) => {
+        if (isObstructing) return;
         if (e.delta > 5) return; // Ignore if it was a drag
 
         if (useStore.getState().isGizmoHovered) return;
@@ -894,7 +895,8 @@ const DeviceMesh = ({
         e.stopPropagation();
         onSelect();
       }}
-      onPointerOver={isObstructing ? undefined : (e) => {
+      onPointerOver={(e) => {
+        if (isObstructing) return;
         const state = useStore.getState();
         if (state.isGizmoHovered) return;
         if (state.isEditMode && state.selectedRackId === rackId) return;
@@ -913,7 +915,8 @@ const DeviceMesh = ({
         });
         document.body.style.cursor = "pointer";
       }}
-      onPointerMove={isObstructing ? undefined : (e) => {
+      onPointerMove={(e) => {
+        if (isObstructing) return;
         const state = useStore.getState();
         if (state.isGizmoHovered) return;
         if (state.isEditMode && state.selectedRackId === rackId) return;
@@ -927,7 +930,7 @@ const DeviceMesh = ({
           rackId,
         });
       }}
-      onPointerOut={isObstructing ? undefined : (e) => {
+      onPointerOut={(e) => {
         e.stopPropagation();
         setIsDeviceHovered(false);
         const { hoveredDevice, setHoveredDevice } = useStore.getState();

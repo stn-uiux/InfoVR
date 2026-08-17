@@ -330,6 +330,9 @@ export const Scene = () => {
         if (useStore.getState().isGizmoHovered) return;
         pointerDownPos.current = { x: e.clientX, y: e.clientY };
       }}
+      onPointerLeave={() => {
+        useStore.getState().setHoveredDevice(null);
+      }}
       onPointerMissed={(e) => {
         if (useStore.getState().isGizmoHovered) return;
         if (e.button !== 0) return; // Only process left click for deselection
@@ -398,7 +401,7 @@ export const Scene = () => {
         {isEditMode && (
           <group>
             {/* Server Room Bounds Wireframe */}
-            {(cyberSpaceEnabled || csCustomSpaceSize) && (
+            {cyberSpaceEnabled && (
               <PivotControls
                 visible={csCustomSpaceSize && isRoomSelected}
                 activeAxes={csCustomSpaceSize && isRoomSelected ? [true, false, true] : [false, false, false]}

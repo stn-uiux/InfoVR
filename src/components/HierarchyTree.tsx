@@ -53,6 +53,42 @@ interface TreeNodeItemProps {
   nodeSearch?: string;
 }
 
+import { layoutsEqual } from "../utils/comparison";
+
+const NodeDirtyDot = ({ nodeId }: { nodeId: string }) => {
+  const isDirty = useStore((s) => {
+    // 1. check node itself
+    const baseNode = s.baselineNodes?.find(n => n.nodeId === nodeId);
+    const currNode = s.nodes.find(n => n.nodeId === nodeId);
+    if (!baseNode || JSON.stringify(baseNode) !== JSON.stringify(currNode)) return true;
+
+    // 2. check environment
+    if (JSON.stringify(s.baselineNodeEnvironments?.[nodeId] || {}) !== JSON.stringify(s.nodeEnvironments[nodeId] || {})) return true;
+
+    // 3. check layouts
+    const baseLayout = s.baselineLayouts?.[nodeId];
+    let currLayout = s.layouts[nodeId];
+    if (s.activeSceneNodeId === nodeId) {
+      currLayout = { racks: s.racks, importedModels: s.importedModels };
+    }
+    
+    // If it's a group, layout might be undefined, which is fine
+    if (currLayout) {
+      if (!baseLayout || !layoutsEqual(baseLayout, currLayout)) return true;
+    } else if (baseLayout) {
+      return true; // was present, now undefined
+    }
+
+    return false;
+  });
+
+  if (!isDirty) return null;
+  return <div style={{ 
+    width: 6, height: 6, borderRadius: '50%', backgroundColor: 'var(--severity-critical)', 
+    position: 'absolute', top: -2, right: -2, zIndex: 2 
+  }} />;
+};
+
 const TreeNodeItem = ({
   node,
   depth,
@@ -135,13 +171,13 @@ const TreeNodeItem = ({
   const isMatch = nodeSearch && node.name.toLowerCase().includes(nodeSearch.toLowerCase());
 
   return (
-    <>
+    <div>
       <div
         className={`tree-node ${isSelected ? "selected" : ""} ${isMatch ? "match" : ""} ${draggedNodeId === node.nodeId ? "dragging" : ""
           } ${dropPos === "inside" ? "drop-target" : ""} ${dropPos === "before" ? "drop-before" : ""
           } ${dropPos === "after" ? "drop-after" : ""} ${pinnedNodeId === node.nodeId ? "has-pin" : ""
           }`}
-        style={{ paddingLeft: `${12 + depth * 16}px` }}
+        style={{ paddingLeft: `${4 + depth * 8}px` }}
         onClick={() => {
           if (node.type === "room") {
             onSelect(node.nodeId);
@@ -188,7 +224,8 @@ const TreeNodeItem = ({
         </span>
 
         {/* Icon */}
-        <span className="tree-node-icon">
+        <span className="tree-node-icon" style={{ position: 'relative' }}>
+          {isEditMode && <NodeDirtyDot nodeId={node.nodeId} />}
           {node.type === "root" ? (
             <Icon icon="gis:network" className="icon"
               style={{ color: isSelected ? "var(--theme-primary)" : "var(--text-secondary)" }}
@@ -269,7 +306,7 @@ const TreeNodeItem = ({
           ))}
         </>
       )}
-    </>
+    </div>
   );
 };
 
@@ -451,10 +488,11 @@ export const HierarchyTree = React.memo(() => {
       order: siblings.length,
     });
     setContextMenu(null);
-    toggleNodeExpansion(parentId);
+    expandNodePath(newId);
+    setActiveNode(newId);
     setRenamingId(newId);
     setRenameValue("New Group");
-  }, [contextMenu, nodes, addNode, toggleNodeExpansion]);
+  }, [contextMenu, nodes, addNode, expandNodePath, setActiveNode]);
 
   const handleAddRoom = useCallback(() => {
     if (!contextMenu) return;
@@ -467,10 +505,11 @@ export const HierarchyTree = React.memo(() => {
       order: siblings.length,
     });
     setContextMenu(null);
-    toggleNodeExpansion(parentId);
+    expandNodePath(newId);
+    setActiveNode(newId);
     setRenamingId(newId);
     setRenameValue("New Room");
-  }, [contextMenu, nodes, addNode, toggleNodeExpansion]);
+  }, [contextMenu, nodes, addNode, expandNodePath, setActiveNode]);
 
   const handleRenameStart = useCallback(() => {
     if (!contextMenu) return;
@@ -632,7 +671,7 @@ export const HierarchyTree = React.memo(() => {
             <div className="tree-node-title-row">
               {isEditMode && (
                 <button
-                  className="comm-btn comm-btn-sm comm-btn-secondary"
+                  className="comm-icon-btn"
                   title="최상위 노드 추가"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -647,8 +686,9 @@ export const HierarchyTree = React.memo(() => {
                     setRenameValue("New Root");
                     if (isCollapsed) setIsCollapsed(false);
                   }}
+                  style={{ padding: "4px", display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer" }}
                 >
-                  <Icon icon="material-symbols:add" className="icon" />
+                  <Icon icon="material-symbols:add" style={{ fontSize: "20px", color: "var(--text-secondary)" }} />
                 </button>
               )}
             </div>

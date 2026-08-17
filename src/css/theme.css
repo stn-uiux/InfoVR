@@ -16,7 +16,7 @@
 [data-theme=light] {
   /* Background colors - Tech Light */
   --bg-canvas: #ffffff;
-  --bg-primary: rgba(255, 255, 255, 0.7);
+  --bg-primary: rgba(255, 255, 255, 0.8);
   --bg-secondary: #f4f6f9;
   --bg-tertiary: #e3e8ef;
   /* Text colors */
@@ -37,7 +37,7 @@
   --panel-in-bg: rgba(0, 0, 0, 0.05);
   --panel-shadow: 0 4px 24px rgba(0, 0, 0, 0.06), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
   /* Interactive states */
-  --hover-bg: rgba(var(--theme-primary-rgb), 0.05);
+  --hover-bg: rgba(var(--theme-primary-rgb), 0.1);
   --selected-bg: rgba(var(--theme-primary-rgb), 0.12);
   --active-bg: rgba(var(--theme-primary-rgb), 0.2);
   /* Main Theme Color -> arcVRoom Green */
@@ -161,7 +161,7 @@
   --panel-in-bg: rgba(0, 0, 0, 0.3);
   --panel-shadow: none;
   /* Interactive states */
-  --hover-bg: rgba(var(--theme-primary-rgb), 0.05);
+  --hover-bg: rgba(var(--theme-primary-rgb), 0.1);
   --selected-bg: rgba(var(--theme-primary-rgb), 0.12);
   --active-bg: rgba(var(--theme-primary-rgb), 0.2);
   /* arcVRoom Theme colors */
@@ -455,10 +455,6 @@ body {
 .comm-toolbar {
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-}
-
-[data-theme=dark] .comm-panel {
-  border-radius: 2px;
 }
 
 /* Corner decorations removed to match arcVRoom clean glassmorphism */
@@ -1185,9 +1181,9 @@ body {
 
 .weather-row {
   display: grid;
-  grid-template-columns: 1fr 50px 80px 35px 45px;
+  grid-template-columns: 1fr 50px 70px 24px 35px;
   align-items: center;
-  padding: 10px 0;
+  padding: 10px;
   border-bottom: 1px solid var(--border-weak);
   cursor: pointer;
   transition: all 0.2s ease;

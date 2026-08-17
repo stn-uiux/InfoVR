@@ -3,20 +3,28 @@ import { Icon } from "@iconify/react";
 
 export const CyberSpaceToggle = () => {
   const cyberSpaceEnabled = useStore((s) => s.cyberSpaceEnabled);
-  const toggleCyberSpace = useStore((s) => s.toggleCyberSpace);
+  const csIsVisible = useStore((s) => s.csIsVisible);
+  const toggleCsIsVisible = useStore((s) => s.toggleCsIsVisible);
 
   return (
     <div
-      className={`cyber-space-toggle ${cyberSpaceEnabled ? "active" : ""}`}
-      onClick={toggleCyberSpace}
+      className={`cyber-space-toggle ${csIsVisible ? "active" : ""}`}
+      onClick={() => {
+        if (cyberSpaceEnabled) toggleCsIsVisible();
+      }}
       role="button"
-      tabIndex={0}
-      onKeyDown={(e) => e.key === "Enter" && toggleCyberSpace()}
-      aria-label={`${cyberSpaceEnabled ? "Disable" : "Enable"} server room environment`}
-      title={cyberSpaceEnabled ? "서버룸 환경 OFF" : "서버룸 환경 ON"}
+      tabIndex={cyberSpaceEnabled ? 0 : -1}
+      onKeyDown={(e) => cyberSpaceEnabled && e.key === "Enter" && toggleCsIsVisible()}
+      aria-label={`${csIsVisible ? "Hide" : "Show"} server room environment`}
+      title={cyberSpaceEnabled ? (csIsVisible ? "가상 공간 뷰 끄기" : "가상 공간 뷰 켜기") : "가상 공간 사용 불가 (사이드 패널에서 켜주세요)"}
+      style={{
+        opacity: cyberSpaceEnabled ? 1 : 0.4,
+        pointerEvents: cyberSpaceEnabled ? "auto" : "none",
+        cursor: cyberSpaceEnabled ? "pointer" : "not-allowed"
+      }}
     >
       <div className="cyber-space-toggle-knob">
-        {cyberSpaceEnabled ? (
+        {csIsVisible ? (
           <Icon icon="mdi:server" width="13" height="13" />
         ) : (
           <Icon icon="mdi:server-off" width="13" height="13" />

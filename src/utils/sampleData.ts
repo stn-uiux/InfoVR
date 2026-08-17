@@ -83,9 +83,9 @@ export const sampleRegisteredDevices: RegisteredDevice[] = sampleNodes.flatMap((
   
   let count = 0;
   if (node.nodeId === GANGNAM_ROOM_1_NODE_ID) {
-    count = 800; // Lots of devices for the main server room
+    count = 420; // Lots of devices for the main server room
   } else {
-    count = 400 + (idx % 10) * 20; // 400+ to fill 30+ racks
+    count = 240 + (idx % 10) * 20; // 240 to 420 devices deterministically
   }
   return generateRegisteredDevices(node.nodeId, node.name, count, `10.${idx + 1}.1.1`, idx);
 });

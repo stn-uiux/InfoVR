@@ -307,7 +307,7 @@ export const DashboardWidgets = () => {
         {/* Widget 1: Error Summary - Redesigned Panel */}
         <div className="error-panel">
           <div className="error-panel-header">
-            <h3 className="error-panel-title">장애 관제 현황</h3>
+            <h3 className="error-panel-title">전체 장애 현황</h3>
             <span className="error-panel-total">TOTAL ALARMS</span>
           </div>
 
@@ -382,8 +382,8 @@ export const DashboardWidgets = () => {
                           onClick={() => handleErrorRowClick(err)}
                         >
                           <td>
-                          <div className={`comm-chip ${config.chipClass} comm-chip-center`}>{config.shortLabel}</div>
-                        </td>
+                            <div className={`comm-chip ${config.chipClass} comm-chip-center`}>{config.shortLabel}</div>
+                          </td>
                           <td>
                             <span className="error-list-class-text">
                               {err.errorClass}
@@ -422,7 +422,7 @@ export const DashboardWidgets = () => {
       {/* Widget 2: Global Sensor Overview - Refined Weather Style */}
       <div className="error-panel">
         <div className="error-panel-header">
-          <h3 className="error-panel-title">시스템 환경 개요</h3>
+          <h3 className="error-panel-title">온·습도 현황</h3>
           <span className="error-panel-total">SYSTEM SENSORS</span>
         </div>
         <div className="error-panel-content">

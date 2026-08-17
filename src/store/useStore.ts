@@ -26,6 +26,7 @@ export interface CameraState {
 }
 
 export interface CyberSpaceConfig {
+  cyberSpaceEnabled: boolean;
   csIsLightMode: boolean;
   csFloorMirror: number;
   csFloorRoughness: number;
@@ -47,6 +48,7 @@ export interface CyberSpaceConfig {
 }
 
 export const DEFAULT_CYBER_SPACE_CONFIG: CyberSpaceConfig = {
+  cyberSpaceEnabled: true,
   csIsLightMode: false,
   csFloorMirror: 0.5,
   csFloorRoughness: 0.7,
@@ -57,18 +59,19 @@ export const DEFAULT_CYBER_SPACE_CONFIG: CyberSpaceConfig = {
   csAoIntensity: 1.5,
   csNeonIntensity: 4.5,
   csCustomSpaceSize: false,
-  csRoomWidthCm: 400,
-  csRoomLengthCm: 600,
+  csRoomWidthCm: 600,
+  csRoomLengthCm: 800,
   csOffsetXCm: 0,
   csOffsetZCm: 0,
   csWallColor: "#859cba",
-  csCeilingColor: '#1d284a',
+  csCeilingColor: '#859cba',
   csFloorColor: '#373942',
   csFogColor: '#0a1324',
 };
 
 export const LIGHT_THEME_CYBER_SPACE_CONFIG: CyberSpaceConfig = {
   ...DEFAULT_CYBER_SPACE_CONFIG,
+  cyberSpaceEnabled: true,
   csIsLightMode: true,
   csWallColor: '#eef2ff',
   csCeilingColor: '#eef2ff',
@@ -158,9 +161,12 @@ export interface AppState {
   setCanvasReady: (ready: boolean) => void;
   setCyberSpaceEnabled: (enabled: boolean) => void;
   toggleCyberSpace: () => void;
-  setCyberSpaceConfig: (config: Partial<AppState>) => void;
+  setCyberSpaceConfig: (config: Partial<CyberSpaceConfig>) => void;
   toggleCyberSpaceTheme: () => void;
   setCyberSpaceTheme: (isLight: boolean) => void;
+  csIsVisible: boolean;
+  setCsIsVisible: (visible: boolean) => void;
+  toggleCsIsVisible: () => void;
 
   // Custom Equipment Models & Cards
   customModels: CustomEquipmentModel[];
@@ -188,6 +194,9 @@ export interface AppState {
   baselineNodes: HierarchyNode[] | null;
   baselineRegisteredDevices: RegisteredDevice[] | null;
   baselineNodeEnvironments: Record<string, Partial<CyberSpaceConfig>> | null;
+  baselineLayouts: Record<string, { racks: Rack[]; importedModels: ImportedModel[] }> | null;
+  baselineActiveNodeId: string | null;
+  baselineActiveSceneNodeId: string | null;
   undoStack: {
     racks: Rack[];
     importedModels: ImportedModel[];
@@ -210,9 +219,6 @@ export interface AppState {
   // Camera Trigger
   triggerFitToScene: number;
   fitToScene: () => void;
-
-  // Editor Transform State
-
 
   // Actions
   reparentNode: (nodeId: string, newParentId: string | null) => void;
@@ -361,6 +367,8 @@ export interface AppState {
   discardChanges: () => void;
   cancelConfirmation: () => void;
   getIsDirty: () => boolean;
+  getDirtyNodeIds: () => Set<string>;
+  resetAllData: () => void;
 }
 
 // Helper to check collision using AABB (Axis-Aligned Bounding Box)
@@ -518,14 +526,13 @@ export const useStore = create<AppState>()(
 
       isGizmoHovered: false,
 
-      cyberSpaceEnabled: false,
       ...DEFAULT_CYBER_SPACE_CONFIG,
 
       nodeEnvironments: {},
 
       setCanvasReady: (ready: boolean) => set({ isCanvasReady: ready }),
-      setCyberSpaceEnabled: (enabled) => set({ cyberSpaceEnabled: enabled }),
-      toggleCyberSpace: () => set((state) => ({ cyberSpaceEnabled: !state.cyberSpaceEnabled })),
+      setCyberSpaceEnabled: (enabled) => get().setCyberSpaceConfig({ cyberSpaceEnabled: enabled }),
+      toggleCyberSpace: () => get().setCyberSpaceConfig({ cyberSpaceEnabled: !get().cyberSpaceEnabled }),
       setCyberSpaceConfig: (config) => set((state) => {
         const activeNodeId = state.activeNodeId;
         const newNodeEnvs = activeNodeId ? {
@@ -544,6 +551,7 @@ export const useStore = create<AppState>()(
 
         // Preserve custom size values when swapping theme
         const sizeConfig = {
+          cyberSpaceEnabled: state.cyberSpaceEnabled,
           csCustomSpaceSize: state.csCustomSpaceSize,
           csRoomWidthCm: state.csRoomWidthCm,
           csRoomLengthCm: state.csRoomLengthCm,
@@ -559,6 +567,10 @@ export const useStore = create<AppState>()(
         const state = get();
         state.setCyberSpaceTheme(!state.csIsLightMode);
       },
+
+      csIsVisible: true,
+      setCsIsVisible: (visible) => set({ csIsVisible: visible }),
+      toggleCsIsVisible: () => set((state) => ({ csIsVisible: !state.csIsVisible })),
 
       _cameraRef: null,
       _controlsRef: null,
@@ -589,6 +601,9 @@ export const useStore = create<AppState>()(
       baselineNodes: null,
       baselineRegisteredDevices: null,
       baselineNodeEnvironments: null,
+      baselineLayouts: null,
+      baselineActiveNodeId: null,
+      baselineActiveSceneNodeId: null,
       undoStack: [],
       redoStack: [],
       showUnsavedDialog: false,
@@ -607,8 +622,6 @@ export const useStore = create<AppState>()(
           preFocusCameraState: null,
         })),
 
-
-
       getIsDirty: () => {
         const {
           racks,
@@ -622,25 +635,121 @@ export const useStore = create<AppState>()(
           nodeEnvironments,
           baselineNodeEnvironments,
           _importDirty,
+          layouts,
         } = get();
         if (_importDirty) return true;
 
-        // Use current state as fallback if baselines are null/undefined (e.g. legacy state before persistence fix).
-        // This prevents false dirty flags upon page refresh.
         const baseRacks = baselineRacks || racks;
         const baseModels = baselineModels || importedModels;
         const baseNodes = baselineNodes || nodes;
         const baseRegDevices = baselineRegisteredDevices || registeredDevices;
         const baseNodeEnvs = baselineNodeEnvironments || nodeEnvironments;
+        const baseLayouts = get().baselineLayouts || layouts;
 
-        // Robust field-by-field comparison with epsilon tolerance
-        return (
-          !layoutsEqual(racks, baseRacks) ||
-          !layoutsEqual(importedModels, baseModels) ||
-          !layoutsEqual(nodes, baseNodes) ||
-          !layoutsEqual(registeredDevices, baseRegDevices) ||
-          !layoutsEqual(nodeEnvironments, baseNodeEnvs)
-        );
+        // Current room's active state might not be synced to `layouts` yet, so we merge it for comparison
+        const currentLayouts = { ...layouts };
+        if (get().activeSceneNodeId) {
+          currentLayouts[get().activeSceneNodeId!] = { racks, importedModels };
+        }
+
+        const isDirty =
+          JSON.stringify(nodes) !== JSON.stringify(baseNodes) ||
+          JSON.stringify(registeredDevices) !== JSON.stringify(baseRegDevices) ||
+          JSON.stringify(nodeEnvironments) !== JSON.stringify(baseNodeEnvs) ||
+          !layoutsEqual(currentLayouts, baseLayouts);
+
+        return isDirty;
+      },
+
+      getDirtyNodeIds: () => {
+        const dirtyIds = new Set<string>();
+        const {
+          racks, importedModels, nodes, nodeEnvironments, layouts, activeSceneNodeId,
+          baselineNodes, baselineNodeEnvironments, baselineLayouts
+        } = get();
+
+        const baseNodes = baselineNodes || nodes;
+        const baseNodeEnvs = baselineNodeEnvironments || nodeEnvironments;
+        const baseLayouts = baselineLayouts || layouts;
+
+        // 1. Check for node hierarchy/name changes or new nodes
+        const baseNodesMap = new Map(baseNodes.map(n => [n.nodeId, n]));
+        nodes.forEach(n => {
+          const base = baseNodesMap.get(n.nodeId);
+          if (!base || JSON.stringify(n) !== JSON.stringify(base)) {
+            dirtyIds.add(n.nodeId);
+          }
+        });
+
+        // 2. Check for environment changes
+        Object.keys(nodeEnvironments).forEach(nodeId => {
+          if (JSON.stringify(nodeEnvironments[nodeId]) !== JSON.stringify(baseNodeEnvs[nodeId] || {})) {
+            dirtyIds.add(nodeId);
+          }
+        });
+
+        // 3. Check for layout changes
+        const currentLayouts = { ...layouts };
+        if (activeSceneNodeId) {
+          currentLayouts[activeSceneNodeId] = { racks, importedModels };
+        }
+
+        Object.keys(currentLayouts).forEach(nodeId => {
+          if (!baseLayouts[nodeId] || !layoutsEqual(currentLayouts[nodeId], baseLayouts[nodeId])) {
+            dirtyIds.add(nodeId);
+          }
+        });
+
+        return dirtyIds;
+      },
+
+      resetAllData: () => {
+        set({
+          racks: [],
+          importedModels: [],
+          nodes: [],
+          layouts: {},
+          nodeEnvironments: {},
+          registeredDevices: [],
+          customModels: [],
+          customCards: [],
+          deletedDefaultTemplates: [],
+          activeNodeId: null,
+          activeSceneNodeId: null,
+          pinnedNodeId: null,
+          focusedRackId: null,
+          selectedRackId: null,
+          selectedDeviceId: null,
+          selectedModelId: null,
+          undoStack: [],
+          redoStack: [],
+          _importDirty: true, // Mark dirty so it can be saved if desired
+        });
+      },
+
+      loadState: (racks, models = [], registeredDevices = [], nodes = []) => {
+        const newLayouts: Record<string, { racks: Rack[]; importedModels: ImportedModel[] }> = {};
+        
+        // Group racks by room (mapId)
+        const roomNodes = nodes.filter((n) => n.type === "room" || n.type === "root");
+        for (const room of roomNodes) {
+          newLayouts[room.nodeId] = {
+            racks: racks.filter((r) => r.mapId === room.nodeId),
+            importedModels: [], // Sample models are not provided per room
+          };
+        }
+
+        const activeSceneNodeId = get().activeSceneNodeId;
+        const currentRacks = activeSceneNodeId ? (newLayouts[activeSceneNodeId]?.racks || []) : racks;
+
+        set({ 
+          layouts: newLayouts,
+          racks: currentRacks, 
+          importedModels: models, 
+          registeredDevices, 
+          nodes,
+          _importDirty: true
+        });
       },
 
       pushUndoState: () => {
@@ -717,7 +826,7 @@ export const useStore = create<AppState>()(
 
         // Phase 3-A: 단일 structuredClone으로 baseline 스냅샷
         const { nodes: currentNodes } = get();
-        const snapshot = structuredClone({ racks, importedModels, nodes: currentNodes, registeredDevices: get().registeredDevices, nodeEnvironments: get().nodeEnvironments });
+        const snapshot = structuredClone({ racks, importedModels, nodes: currentNodes, registeredDevices: get().registeredDevices, nodeEnvironments: get().nodeEnvironments, layouts: updatedLayouts });
         set({
           layouts: updatedLayouts,
           baselineRacks: snapshot.racks,
@@ -725,6 +834,9 @@ export const useStore = create<AppState>()(
           baselineNodes: snapshot.nodes,
           baselineRegisteredDevices: snapshot.registeredDevices,
           baselineNodeEnvironments: snapshot.nodeEnvironments,
+          baselineLayouts: snapshot.layouts,
+          baselineActiveNodeId: get().activeNodeId,
+          baselineActiveSceneNodeId: get().activeSceneNodeId,
           undoStack: [],
           redoStack: [],
           showUnsavedDialog: false,
@@ -755,8 +867,8 @@ export const useStore = create<AppState>()(
             });
 
             const nodeEnv = (targetNodeId && get().nodeEnvironments[targetNodeId]) || {};
-            const cyberSpaceConfig = { 
-              ...(get().csIsLightMode ? LIGHT_THEME_CYBER_SPACE_CONFIG : DEFAULT_CYBER_SPACE_CONFIG), 
+            const cyberSpaceConfig = {
+              ...(get().csIsLightMode ? LIGHT_THEME_CYBER_SPACE_CONFIG : DEFAULT_CYBER_SPACE_CONFIG),
               ...nodeEnv,
               csIsLightMode: get().csIsLightMode
             };
@@ -771,6 +883,8 @@ export const useStore = create<AppState>()(
               baselineModels: newSnap.importedModels,
               baselineNodes: newSnap.nodes,
               baselineRegisteredDevices: newSnap.registeredDevices,
+              baselineActiveNodeId: targetNodeId,
+              baselineActiveSceneNodeId: isRoom ? targetNodeId : get().activeSceneNodeId,
               undoStack: [],
               redoStack: [],
               selectedRackId: null,
@@ -798,9 +912,11 @@ export const useStore = create<AppState>()(
           baselineRacks,
           baselineModels,
           baselineNodes,
-          activeNodeId,
           baselineRegisteredDevices,
           baselineNodeEnvironments,
+          baselineLayouts,
+          baselineActiveNodeId,
+          baselineActiveSceneNodeId,
         } = get();
 
         if (baselineRacks && baselineModels && baselineNodes && baselineRegisteredDevices) {
@@ -813,22 +929,27 @@ export const useStore = create<AppState>()(
             registeredDevices: baselineRegisteredDevices
           });
           const restoredNodeEnvs = baselineNodeEnvironments ? structuredClone(baselineNodeEnvironments) : get().nodeEnvironments;
+          const restoredLayouts = baselineLayouts ? structuredClone(baselineLayouts) : get().layouts;
 
           // Re-apply the active node's CyberSpace config from restored environments
-          const nodeEnv = (activeNodeId && restoredNodeEnvs[activeNodeId]) || {};
-          const cyberSpaceConfig = { 
-            ...(get().csIsLightMode ? LIGHT_THEME_CYBER_SPACE_CONFIG : DEFAULT_CYBER_SPACE_CONFIG), 
+          const restoredActiveNodeId = baselineActiveNodeId || get().pinnedNodeId || (restored.nodes[0] ? restored.nodes[0].nodeId : null);
+          const nodeEnv = (restoredActiveNodeId && restoredNodeEnvs[restoredActiveNodeId]) || {};
+          const cyberSpaceConfig = {
+            ...(get().csIsLightMode ? LIGHT_THEME_CYBER_SPACE_CONFIG : DEFAULT_CYBER_SPACE_CONFIG),
             ...nodeEnv,
             csIsLightMode: get().csIsLightMode
           };
 
           set({
             ...cyberSpaceConfig,
+            activeNodeId: restoredActiveNodeId,
+            activeSceneNodeId: baselineActiveSceneNodeId || restoredActiveNodeId,
             racks: restored.racks,
             importedModels: restored.importedModels,
             nodes: restored.nodes,
             registeredDevices: restored.registeredDevices,
             nodeEnvironments: restoredNodeEnvs,
+            layouts: restoredLayouts,
             undoStack: [],
             redoStack: [],
             showUnsavedDialog: false,
@@ -877,8 +998,8 @@ export const useStore = create<AppState>()(
             });
 
             const nodeEnv = (targetNodeId && get().nodeEnvironments[targetNodeId]) || {};
-            const cyberSpaceConfig = { 
-              ...(get().csIsLightMode ? LIGHT_THEME_CYBER_SPACE_CONFIG : DEFAULT_CYBER_SPACE_CONFIG), 
+            const cyberSpaceConfig = {
+              ...(get().csIsLightMode ? LIGHT_THEME_CYBER_SPACE_CONFIG : DEFAULT_CYBER_SPACE_CONFIG),
               ...nodeEnv,
               csIsLightMode: get().csIsLightMode
             };
@@ -921,14 +1042,12 @@ export const useStore = create<AppState>()(
         set({ _cameraRef: camera, _controlsRef: controls }),
       setHoveredRack: (id) => set({ hoveredRackId: id }),
       setActiveNode: (nodeId) => {
-        const { isEditMode, getIsDirty, expandNodePath, layouts, nodes, racks, importedModels, activeSceneNodeId } = get();
+        const { isEditMode, expandNodePath, layouts, nodes, racks, importedModels, activeSceneNodeId } = get();
 
-        if (isEditMode && getIsDirty() && nodeId !== get().activeNodeId) {
-          set({
-            showUnsavedDialog: true,
-            pendingAction: { type: "node", value: nodeId },
-          });
-          return;
+        // 1. Update the current node's layout in the central layouts object BEFORE switching
+        const updatedLayouts = { ...layouts };
+        if (activeSceneNodeId) {
+          updatedLayouts[activeSceneNodeId] = { racks, importedModels };
         }
 
         expandNodePath(nodeId);
@@ -938,46 +1057,26 @@ export const useStore = create<AppState>()(
 
         // Switch Layout ONLY if it's a room/root
         const newNodeLayout = isRoom
-          ? (nodeId ? layouts[nodeId] || { racks: [], importedModels: [] } : { racks: [], importedModels: [] })
+          ? (nodeId ? updatedLayouts[nodeId] || { racks: [], importedModels: [] } : { racks: [], importedModels: [] })
           : { racks, importedModels }; // Keep current layout for groups
 
         // Fetch Node-specific CyberSpace Environment or Default
         const nodeEnv = (nodeId && get().nodeEnvironments[nodeId]) || {};
-        const cyberSpaceConfig = { 
-          ...(get().csIsLightMode ? LIGHT_THEME_CYBER_SPACE_CONFIG : DEFAULT_CYBER_SPACE_CONFIG), 
+        const cyberSpaceConfig = {
+          ...(get().csIsLightMode ? LIGHT_THEME_CYBER_SPACE_CONFIG : DEFAULT_CYBER_SPACE_CONFIG),
           ...nodeEnv,
           csIsLightMode: get().csIsLightMode
         };
 
         set({
           ...cyberSpaceConfig,
+          layouts: updatedLayouts,
           activeNodeId: nodeId,
           activeSceneNodeId: isRoom ? nodeId : activeSceneNodeId,
           racks: newNodeLayout.racks,
           importedModels: newNodeLayout.importedModels,
-          // If in edit mode, the new node's layout becomes the new baseline for dirty checks
-          // Phase 3-A: isEditMode 시 단일 structuredClone으로 통합
-          ...(isEditMode
-            ? (() => {
-              const snap = structuredClone({
-                racks: newNodeLayout.racks,
-                importedModels: newNodeLayout.importedModels,
-                nodes: get().nodes,
-                registeredDevices: get().registeredDevices,
-              });
-              return {
-                baselineRacks: snap.racks,
-                baselineModels: snap.importedModels,
-                baselineNodes: snap.nodes,
-                baselineRegisteredDevices: snap.registeredDevices,
-              };
-            })()
-            : {
-              baselineRacks: get().baselineRacks,
-              baselineModels: get().baselineModels,
-              baselineNodes: get().baselineNodes,
-              baselineRegisteredDevices: get().baselineRegisteredDevices,
-            }),
+          // We NO LONGER update baselines here because editing is now project-wide.
+          // Baselines are only updated when the user explicitly clicks "Save".
 
           undoStack: [], // Clear undo stack on node switch to prevent mixing node states
           redoStack: [], // Clear redo stack on node switch
@@ -1297,7 +1396,7 @@ export const useStore = create<AppState>()(
 
         const { activeNodeId } = get();
         if (!activeNodeId) {
-          get().showToast("노드를 먼저 선택하거나 생성해주세요.", "error");
+          get().showToast("전산실을 선택하거나 생성해주세요.", "error");
           return;
         }
         const nodeRacks = racks.filter((r) => r.mapId === activeNodeId);
@@ -1494,10 +1593,11 @@ export const useStore = create<AppState>()(
           obstructingRackIds: [],
           selectedDeviceId: null,
           selectedModelId: id ? null : state.selectedModelId,
+          hoveredDevice: null,
         });
       },
       selectDevice: (id, portId = null) =>
-        set({ selectedDeviceId: id, highlightedPortId: portId }),
+        set({ selectedDeviceId: id, highlightedPortId: portId, hoveredDevice: null }),
       focusRack: (id) => {
         const { _cameraRef, _controlsRef, preFocusCameraState } = get();
 
@@ -1713,12 +1813,23 @@ export const useStore = create<AppState>()(
         if (enabled) {
           // Entering Edit Mode: Snapshot current state as baseline
           // Phase 3-A: 단일 structuredClone으로 통합
-          const editSnap = structuredClone({ racks, importedModels, nodes: get().nodes, nodeEnvironments: get().nodeEnvironments });
+          const editSnap = structuredClone({ 
+            racks, 
+            importedModels, 
+            nodes: get().nodes, 
+            nodeEnvironments: get().nodeEnvironments,
+            layouts: get().layouts,
+            registeredDevices: get().registeredDevices
+          });
           set({
             baselineRacks: editSnap.racks,
             baselineModels: editSnap.importedModels,
             baselineNodes: editSnap.nodes,
             baselineNodeEnvironments: editSnap.nodeEnvironments,
+            baselineLayouts: editSnap.layouts,
+            baselineRegisteredDevices: editSnap.registeredDevices,
+            baselineActiveNodeId: get().activeNodeId,
+            baselineActiveSceneNodeId: get().activeSceneNodeId,
             undoStack: [],
             redoStack: [],
             isEditMode: true,
@@ -1748,7 +1859,12 @@ export const useStore = create<AppState>()(
           isEditMode: false,
           baselineRacks: null,
           baselineModels: null,
+          baselineNodes: null,
           baselineNodeEnvironments: null,
+          baselineLayouts: null,
+          baselineRegisteredDevices: null,
+          baselineActiveNodeId: null,
+          baselineActiveSceneNodeId: null,
           undoStack: [],
           redoStack: [],
           selectedRackId: null,
@@ -1971,8 +2087,8 @@ export const useStore = create<AppState>()(
 
         // Fetch Node-specific CyberSpace Environment or Default
         const nodeEnv = (activeNodeId && get().nodeEnvironments[activeNodeId]) || {};
-        const cyberSpaceConfig = { 
-          ...(get().csIsLightMode ? LIGHT_THEME_CYBER_SPACE_CONFIG : DEFAULT_CYBER_SPACE_CONFIG), 
+        const cyberSpaceConfig = {
+          ...(get().csIsLightMode ? LIGHT_THEME_CYBER_SPACE_CONFIG : DEFAULT_CYBER_SPACE_CONFIG),
           ...nodeEnv,
           csIsLightMode: get().csIsLightMode
         };
@@ -2438,9 +2554,10 @@ export const useStore = create<AppState>()(
       selectModel: (id) =>
         set({
           selectedModelId: id,
-          selectedRackId: id ? null : undefined,
+          selectedRackId: null,
           focusedRackId: null,
           selectedDeviceId: null,
+          hoveredDevice: null,
         }),
 
       deleteModel: (id) => {
@@ -2667,23 +2784,25 @@ export const useStore = create<AppState>()(
           preFocusCameraState,
           isEditMode,
           isCanvasReady,
-          racks,
-          importedModels,
-          nodes,
           _importDirty,
           ...rest
         } = state;
         return rest;
       },
-      onRehydrateStorage: () => (state) => {
-        if (state) {
-          state.isEditMode = false;
-          state.isCanvasReady = false;
-          state.racks = state.baselineRacks ? [...state.baselineRacks] : [];
-          state.importedModels = state.baselineModels ? [...state.baselineModels] : [];
-          state.nodes = state.baselineNodes ? [...state.baselineNodes] : [];
-          state._importDirty = false;
-        }
+      merge: (persistedState: any, currentState: AppState) => {
+        return {
+          ...currentState,
+          ...persistedState,
+          isEditMode: false,
+          isCanvasReady: false,
+          racks: persistedState.baselineRacks ? structuredClone(persistedState.baselineRacks) : (persistedState.racks ? structuredClone(persistedState.racks) : []),
+          importedModels: persistedState.baselineModels ? structuredClone(persistedState.baselineModels) : (persistedState.importedModels ? structuredClone(persistedState.importedModels) : []),
+          nodes: persistedState.baselineNodes ? structuredClone(persistedState.baselineNodes) : (persistedState.nodes ? structuredClone(persistedState.nodes) : []),
+          registeredDevices: persistedState.baselineRegisteredDevices ? structuredClone(persistedState.baselineRegisteredDevices) : (persistedState.registeredDevices ? structuredClone(persistedState.registeredDevices) : []),
+          nodeEnvironments: persistedState.baselineNodeEnvironments ? structuredClone(persistedState.baselineNodeEnvironments) : (persistedState.nodeEnvironments ? structuredClone(persistedState.nodeEnvironments) : {}),
+          layouts: persistedState.baselineLayouts ? structuredClone(persistedState.baselineLayouts) : (persistedState.layouts ? structuredClone(persistedState.layouts) : {}),
+          _importDirty: false,
+        };
       },
       storage: createJSONStorage(() => idbStorage),
     }
