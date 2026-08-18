@@ -2391,6 +2391,17 @@
   height: 16px;
 }
 
+.tree-node-dirty-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--severity-critical);
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  z-index: 2;
+}
+
 .tree-node-name {
   flex: 1;
   overflow: hidden;
@@ -3043,7 +3054,7 @@ input:checked+.slider:before {
 }
 
 .mrm-modal {
-  background: var(--modal-bg, #1a1c23);
+  background: var(--bg-primary);
   border: 1px solid var(--border-medium, #2a2d35);
   border-radius: 20px;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);

@@ -136,7 +136,8 @@ export const SharedTreeNodeItem = React.memo(({
     } else if (relativeY > height * 0.75) {
       position = "after";
     } else {
-      position = "inside";
+      // Prevent dropping "inside" a server room
+      position = node.type === "room" ? "after" : "inside";
     }
 
     setDropPos(position);

@@ -20,6 +20,7 @@ export const PortErrorSynchronizer = () => {
   const layouts = useStore((s) => s.layouts);
   const activeNodeId = useStore((s) => s.activeNodeId);
   const updateDevicePortStates = useStore((s) => s.updateDevicePortStates);
+  const setIsSyncingPorts = useStore((s) => s.setIsSyncingPorts);
   const processedRef = useRef<Set<string>>(new Set());
   const isSyncingRef = useRef(false);
   const pendingSyncRef = useRef(false);
@@ -55,6 +56,7 @@ export const PortErrorSynchronizer = () => {
       }
       isSyncingRef.current = true;
       pendingSyncRef.current = false;
+      setIsSyncingPorts(true);
 
       try {
         const allRacks = [...racks];
@@ -151,6 +153,7 @@ export const PortErrorSynchronizer = () => {
       }
       } finally {
         isSyncingRef.current = false;
+        setIsSyncingPorts(false);
         if (pendingSyncRef.current) {
           setTimeout(synchronizePorts, 0);
         }
@@ -166,7 +169,7 @@ export const PortErrorSynchronizer = () => {
         clearTimeout(debounceTimer);
       }
     };
-  }, [deviceFingerprint, racks, layouts, activeNodeId, updateDevicePortStates]);
+  }, [deviceFingerprint, racks, layouts, activeNodeId, updateDevicePortStates, setIsSyncingPorts]);
 
   return null;
 };

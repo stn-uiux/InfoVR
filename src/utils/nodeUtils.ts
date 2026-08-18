@@ -67,7 +67,13 @@ export const getChildren = (
 ): HierarchyNode[] =>
   nodes
     .filter((n) => n.parentId === parentId)
-    .sort((a, b) => a.order - b.order);
+    .sort((a, b) => {
+      const aIsGroup = a.type !== 'room';
+      const bIsGroup = b.type !== 'room';
+      if (aIsGroup && !bIsGroup) return -1;
+      if (!aIsGroup && bIsGroup) return 1;
+      return a.order - b.order;
+    });
 
 /** 지정 노드 + 하위 전체 nodeId 집합 반환 (자기 포함) */
 export const getSubtreeNodeIds = (

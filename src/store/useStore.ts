@@ -107,6 +107,8 @@ export interface AppState {
   importExportModalRackId: string | null;
   deviceRegistrationModalOpen: boolean;
   modelRegistrationModalOpen: boolean;
+  isSyncingPorts: boolean;
+  setIsSyncingPorts: (val: boolean) => void;
   deviceDeleteConfirm: { id: string; title: string; rackName?: string } | null;
   setDeviceDeleteConfirm: (
     confirm: { id: string; title: string; rackName?: string } | null,
@@ -516,8 +518,10 @@ export const useStore = create<AppState>()(
       layouts: {},
       importExportModalRackId: null,
       deviceRegistrationModalOpen: false,
-      modelRegistrationModalOpen: false,
-      deviceDeleteConfirm: null,
+  modelRegistrationModalOpen: false,
+  isSyncingPorts: false,
+  setIsSyncingPorts: (val) => set({ isSyncingPorts: val }),
+  deviceDeleteConfirm: null,
       setDeviceDeleteConfirm: (confirm) => set({ deviceDeleteConfirm: confirm }),
       highlightedDeviceId: null,
       blinkTimeoutId: null,
@@ -624,6 +628,10 @@ export const useStore = create<AppState>()(
         })),
 
       getIsDirty: () => {
+        const isSyncing = get().isSyncingPorts;
+        const impDirty = get()._importDirty;
+        if (isSyncing) return false;
+        
         const {
           racks,
           importedModels,
@@ -671,10 +679,28 @@ export const useStore = create<AppState>()(
 
         // 1. Check for node hierarchy/name changes or new nodes
         const baseNodesMap = new Map(baseNodes.map(n => [n.nodeId, n]));
+        const currentNodesMap = new Map(nodes.map(n => [n.nodeId, n]));
+        
         nodes.forEach(n => {
           const base = baseNodesMap.get(n.nodeId);
           if (!base || JSON.stringify(n) !== JSON.stringify(base)) {
-            dirtyIds.add(n.nodeId);
+            dirtyIds.add(n.nodeId); // Mark the node itself as dirty
+            
+            // If it's a new node or moved node, mark the affected parents as dirty
+            if (!base) {
+              if (n.parentId) dirtyIds.add(n.parentId);
+            } else if (base.parentId !== n.parentId) {
+              if (base.parentId) dirtyIds.add(base.parentId);
+              if (n.parentId) dirtyIds.add(n.parentId);
+            }
+          }
+        });
+
+        // Check for deleted nodes
+        baseNodes.forEach(base => {
+          if (!currentNodesMap.has(base.nodeId)) {
+            // Node was deleted, mark its parent as dirty
+            if (base.parentId) dirtyIds.add(base.parentId);
           }
         });
 
@@ -696,6 +722,7 @@ export const useStore = create<AppState>()(
             dirtyIds.add(nodeId);
           }
         });
+
 
         return dirtyIds;
       },

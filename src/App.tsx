@@ -181,6 +181,8 @@ function App() {
   const baselineModels = useStore((s) => s.baselineModels);
   const baselineNodes = useStore((s) => s.baselineNodes);
   const nodeEnvironments = useStore((s) => s.nodeEnvironments);
+  const isSyncingPorts = useStore((s) => s.isSyncingPorts);
+
   const isDirty = useMemo(() => {
     // Keep these store slices as render triggers for getIsDirty().
     void racks;
@@ -190,9 +192,10 @@ function App() {
     void baselineModels;
     void baselineNodes;
     void nodeEnvironments;
+    void isSyncingPorts;
     if (!isEditMode && !_importDirty) return false;
     return useStore.getState().getIsDirty();
-  }, [isEditMode, _importDirty, racks, importedModels, nodes, baselineRacks, baselineModels, baselineNodes, nodeEnvironments]);
+  }, [isEditMode, _importDirty, racks, importedModels, nodes, baselineRacks, baselineModels, baselineNodes, nodeEnvironments, isSyncingPorts]);
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -421,7 +424,7 @@ function App() {
               <button
                 className={`comm-btn comm-btn-md ${isDirty ? "comm-btn-primary" : "comm-btn-secondary"}`}
                 onClick={saveChanges}
-                disabled={!isDirty}
+                disabled={!isDirty || isSyncingPorts}
                 title={isDirty ? "Save Unsaved Changes" : "No Changes to Save"}
                 style={{
                   opacity: isDirty ? 1 : 0.5,
@@ -429,8 +432,17 @@ function App() {
                   transition: "all 0.2s ease",
                 }}
               >
-                <Icon icon="material-symbols:save" className="icon" />
-                저장
+                {isSyncingPorts ? (
+                  <>
+                    <Icon icon="line-md:loading-twotone-loop" className="icon" />
+                    배치 중...
+                  </>
+                ) : (
+                  <>
+                    <Icon icon="material-symbols:save" className="icon" />
+                    저장
+                  </>
+                )}
               </button>
 
               <button

@@ -55,262 +55,7 @@ interface TreeNodeItemProps {
 
 import { layoutsEqual } from "../utils/comparison";
 
-const NodeDirtyDot = ({ nodeId }: { nodeId: string }) => {
-  const isDirty = useStore((s) => {
-    // 1. check node itself
-    const baseNode = s.baselineNodes?.find(n => n.nodeId === nodeId);
-    const currNode = s.nodes.find(n => n.nodeId === nodeId);
-    if (!baseNode || JSON.stringify(baseNode) !== JSON.stringify(currNode)) return true;
 
-    // 2. check environment
-    if (JSON.stringify(s.baselineNodeEnvironments?.[nodeId] || {}) !== JSON.stringify(s.nodeEnvironments[nodeId] || {})) return true;
-
-    // 3. check layouts
-    const baseLayout = s.baselineLayouts?.[nodeId];
-    let currLayout = s.layouts[nodeId];
-    if (s.activeSceneNodeId === nodeId) {
-      currLayout = { racks: s.racks, importedModels: s.importedModels };
-    }
-    
-    // If it's a group, layout might be undefined, which is fine
-    if (currLayout) {
-      if (!baseLayout || !layoutsEqual(baseLayout, currLayout)) return true;
-    } else if (baseLayout) {
-      return true; // was present, now undefined
-    }
-
-    return false;
-  });
-
-  if (!isDirty) return null;
-  return <div style={{ 
-    width: 6, height: 6, borderRadius: '50%', backgroundColor: 'var(--severity-critical)', 
-    position: 'absolute', top: -2, right: -2, zIndex: 2 
-  }} />;
-};
-
-const TreeNodeItem = ({
-  node,
-  depth,
-  nodes,
-  activeNodeId,
-  collapsedIds,
-  equipmentCounts,
-  isEditMode,
-  showEquipment,
-  highlightedDeviceId,
-  onToggle,
-  onSelect,
-  onContextMenu,
-  draggedNodeId,
-  dragOverNodeId,
-  onDragStart,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-  nodeSearch,
-}: TreeNodeItemProps) => {
-  const pinnedNodeId = useStore((s) => s.pinnedNodeId);
-  const setPinnedNode = useStore((s) => s.setPinnedNode);
-
-  const children = getChildren(nodes, node.nodeId);
-  const hasChildren = children.length > 0;
-  const isExpanded = !collapsedIds.has(node.nodeId);
-  const isSelected = activeNodeId === node.nodeId;
-  const count = equipmentCounts.get(node.nodeId) || 0;
-
-  const [dropPos, setDropPos] = useState<"before" | "after" | "inside" | null>(
-    null,
-  );
-
-  const handleDragOver = (e: React.DragEvent) => {
-    if (!isEditMode || draggedNodeId === node.nodeId) return;
-    e.preventDefault();
-
-    // Safety: Cannot drop on own children
-    const getDescendantIds = (id: string): string[] => {
-      const children = nodes.filter((n) => n.parentId === id);
-      return [id, ...children.flatMap((c) => getDescendantIds(c.nodeId))];
-    };
-    if (
-      draggedNodeId &&
-      getDescendantIds(draggedNodeId).includes(node.nodeId)
-    ) {
-      setDropPos(null);
-      return;
-    }
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    const relativeY = e.clientY - rect.top;
-    const height = rect.height;
-
-    let position: "before" | "after" | "inside";
-    if (node.parentId === null) {
-      // Root node only allows "inside"
-      position = "inside";
-    } else if (relativeY < height * 0.25) {
-      position = "before";
-    } else if (relativeY > height * 0.75) {
-      position = "after";
-    } else {
-      position = "inside";
-    }
-
-    setDropPos(position);
-    onDragOver(e, node.nodeId, position);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    if (!isEditMode || !dropPos) return;
-    e.preventDefault();
-    e.stopPropagation();
-    onDrop(e, node.nodeId, dropPos);
-    setDropPos(null);
-  };
-
-  const isMatch = nodeSearch && node.name.toLowerCase().includes(nodeSearch.toLowerCase());
-
-  return (
-    <div>
-      <div
-        className={`tree-node ${isSelected ? "selected" : ""} ${isMatch ? "match" : ""} ${draggedNodeId === node.nodeId ? "dragging" : ""
-          } ${dropPos === "inside" ? "drop-target" : ""} ${dropPos === "before" ? "drop-before" : ""
-          } ${dropPos === "after" ? "drop-after" : ""} ${pinnedNodeId === node.nodeId ? "has-pin" : ""
-          }`}
-        style={{ paddingLeft: `${4 + depth * 8}px` }}
-        onClick={() => {
-          if (node.type === "room") {
-            onSelect(node.nodeId);
-          } else {
-            if (hasChildren) onToggle(node.nodeId);
-          }
-        }}
-        onContextMenu={(e) => isEditMode && onContextMenu(e, node.nodeId)}
-        // Drag and drop handlers
-        draggable={isEditMode && node.parentId !== null}
-        onDragStart={(e) => {
-          if (!isEditMode) return;
-          onDragStart(node.nodeId);
-          e.dataTransfer.effectAllowed = "move";
-        }}
-        onDragOver={handleDragOver}
-        onDragLeave={() => {
-          setDropPos(null);
-          onDragLeave();
-        }}
-        onDrop={handleDrop}
-      >
-        {/* Toggle arrow */}
-        <span
-          className={`tree-node-toggle ${isExpanded ? "expanded" : ""}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (hasChildren) onToggle(node.nodeId);
-          }}
-          style={{ visibility: hasChildren ? "visible" : "hidden" }}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            width="10"
-            height="10"
-            stroke="currentColor"
-            strokeWidth="3"
-            fill="none"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </span>
-
-        {/* Icon */}
-        <span className="tree-node-icon" style={{ position: 'relative' }}>
-          {isEditMode && <NodeDirtyDot nodeId={node.nodeId} />}
-          {node.type === "root" ? (
-            <Icon icon="gis:network" className="icon"
-              style={{ color: isSelected ? "var(--theme-primary)" : "var(--text-secondary)" }}
-            />
-          ) : node.type === "room" ? (
-            <Icon icon="mdi:server" className="icon"
-              style={{ color: isSelected ? "var(--theme-primary)" : "var(--text-secondary)" }}
-            />
-          ) : (
-            <Icon icon="material-symbols:folder" className="icon"
-              style={{ color: isSelected ? "var(--theme-primary)" : "var(--text-secondary)" }}
-            />
-          )}
-        </span>
-
-        {/* Name */}
-        <span className="tree-node-name">
-          {(() => {
-            if (!nodeSearch) return node.name;
-            const idx = node.name.toLowerCase().indexOf(nodeSearch.toLowerCase());
-            if (idx === -1) return node.name;
-            return (
-              <>
-                {node.name.slice(0, idx)}
-                <mark className="search-highlight">
-                  {node.name.slice(idx, idx + nodeSearch.length)}
-                </mark>
-                {node.name.slice(idx + nodeSearch.length)}
-              </>
-            );
-          })()}
-        </span>
-
-        {/* Rack count badge */}
-        {count > 0 && <span className="tree-node-count">{count}</span>}
-        {/* Pin button (only for rooms) */}
-        {node.type === "room" && (
-          <button
-            className={`tree-node-pin ${pinnedNodeId === node.nodeId ? "pinned" : ""}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (pinnedNodeId === node.nodeId) setPinnedNode(null);
-              else setPinnedNode(node.nodeId);
-            }}
-            title={pinnedNodeId === node.nodeId ? "고정 해제" : "메인 전산실로 고정"}
-          >
-            <Icon icon="mynaui:pin-solid" className="icon icon comm-icon-sm" style={{ color: pinnedNodeId === node.nodeId ? "var(--theme-primary)" : "var(--text-tertiary)" }} />
-          </button>
-        )}
-      </div>
-
-      {/* Children */}
-      {isExpanded && (
-        <>
-          {children.map((child) => (
-            <TreeNodeItem
-              key={child.nodeId}
-              node={child}
-              depth={depth + 1}
-              nodes={nodes}
-              activeNodeId={activeNodeId}
-              collapsedIds={collapsedIds}
-              equipmentCounts={equipmentCounts}
-              isEditMode={isEditMode}
-              showEquipment={showEquipment}
-              highlightedDeviceId={highlightedDeviceId}
-              onToggle={onToggle}
-              onSelect={onSelect}
-              onContextMenu={onContextMenu}
-              draggedNodeId={draggedNodeId}
-              dragOverNodeId={dragOverNodeId}
-              onDragStart={onDragStart}
-              onDragOver={onDragOver}
-              onDragLeave={onDragLeave}
-              onDrop={onDrop}
-              nodeSearch={nodeSearch}
-            />
-          ))}
-        </>
-      )}
-    </div>
-  );
-};
-
-// ─── Main HierarchyTree Component ────────────────────────────────────────────
 
 export const HierarchyTree = React.memo(() => {
   const nodes = useStore((s) => s.nodes);
@@ -460,7 +205,7 @@ export const HierarchyTree = React.memo(() => {
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, nodeId: string) => {
-      console.log("handleContextMenu triggered for node:", nodeId, "isEditMode:", isEditMode);
+      if (!isEditMode) return;
       e.preventDefault();
       e.stopPropagation();
       setContextMenu({ x: e.clientX, y: e.clientY, nodeId });
@@ -576,10 +321,19 @@ export const HierarchyTree = React.memo(() => {
       setDragOverNodeId(null);
 
       if (sourceId && sourceId !== targetNodeId) {
-        reorderNode(sourceId, targetNodeId, position);
+        let finalPosition = position;
+        if (position === "after") {
+          const isExpanded = !collapsedNodeIds.has(targetNodeId);
+          const hasChildren = nodes.some((n) => n.parentId === targetNodeId);
+          const targetNode = nodes.find(n => n.nodeId === targetNodeId);
+          if (isExpanded && hasChildren && targetNode?.type !== "room") {
+            finalPosition = "inside";
+          }
+        }
+        reorderNode(sourceId, targetNodeId, finalPosition);
       }
     },
-    [draggedNodeId, reorderNode],
+    [draggedNodeId, reorderNode, collapsedNodeIds, nodes],
   );
 
   // Auto-expand tree when activeNodeId changes from external sources (breadcrumb, search, etc.)
@@ -640,7 +394,7 @@ export const HierarchyTree = React.memo(() => {
         key={node.nodeId}
         node={node}
         depth={depth}
-        childNodes={nodes.filter(n => n.parentId === node.nodeId).sort((a,b) => a.order - b.order)}
+        childNodes={getChildren(nodes, node.nodeId)}
         getAllChildren={(id) => nodes.filter(n => n.parentId === id)}
         isSelected={activeNodeId === node.nodeId}
         onSelect={handleSelect}
@@ -650,7 +404,7 @@ export const HierarchyTree = React.memo(() => {
         count={count}
         isPinned={isPinned}
         onPinToggle={setPinnedNode}
-        isDirty={isDirty}
+        isDirty={isEditMode && isDirty}
         isDraggable={isEditMode}
         draggedNodeId={draggedNodeId}
         onDragStart={handleDragStart}
@@ -876,12 +630,16 @@ export const HierarchyTree = React.memo(() => {
             style={{ top: contextMenu.y, left: contextMenu.x }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="tree-context-item" onClick={handleAddGroup}>
-              <Icon icon="material-symbols:create-new-folder" className="icon comm-icon-mr8" /> 그룹 추가
-            </div>
-            <div className="tree-context-item" onClick={handleAddRoom}>
-              <Icon icon="mdi:server" className="icon comm-icon-mr8" /> 전산실 추가
-            </div>
+            {nodes.find((n) => n.nodeId === contextMenu.nodeId)?.type !== "room" && (
+              <>
+                <div className="tree-context-item" onClick={handleAddGroup}>
+                  <Icon icon="material-symbols:create-new-folder" className="icon comm-icon-mr8" /> 그룹 추가
+                </div>
+                <div className="tree-context-item" onClick={handleAddRoom}>
+                  <Icon icon="mdi:server" className="icon comm-icon-mr8" /> 전산실 추가
+                </div>
+              </>
+            )}
             <div className="tree-context-item" onClick={handleRenameStart}>
               <Icon icon="material-symbols:edit" className="icon comm-icon-mr8" />{" "}
               이름 변경
