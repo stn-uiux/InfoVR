@@ -43,6 +43,7 @@ export const DeviceRegistrationModal = () => {
   const setDeviceDeleteConfirm = useStore((s) => s.setDeviceDeleteConfirm);
   const findExistingMount = useStore((s) => s.findExistingMount);
   const racks = useStore((s) => s.racks);
+  const layouts = useStore((s) => s.layouts);
 
   // Table state
   const [search, setSearch] = useState("");
@@ -96,6 +97,7 @@ export const DeviceRegistrationModal = () => {
 
   // Scope Filtering States
   const [directNodeOnly, setDirectNodeOnly] = useState(false);
+  const [showUnmountedOnly, setShowUnmountedOnly] = useState(false);
   const [selectedChildNodeIds, setSelectedChildNodeIds] = useState<Set<string>>(
     new Set(),
   );
@@ -111,7 +113,7 @@ export const DeviceRegistrationModal = () => {
     if (tableContentRef.current) {
       tableContentRef.current.scrollTop = 0;
     }
-  }, [search, nodeFilter, directNodeOnly, selectedChildNodeIds]);
+  }, [search, nodeFilter, directNodeOnly, showUnmountedOnly, selectedChildNodeIds]);
 
   const handleTableScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
@@ -347,6 +349,10 @@ export const DeviceRegistrationModal = () => {
   const filteredDevices = useMemo(() => {
     let list = registeredDevices;
 
+    if (showUnmountedOnly) {
+      list = list.filter((d) => !findExistingMount(d.deviceId));
+    }
+
     if (nodeFilter !== "all" && nodeFilter !== "") {
       if (directNodeOnly) {
         // Mode 1: Show only equipment directly in this node
@@ -380,6 +386,10 @@ export const DeviceRegistrationModal = () => {
     nodeFilter,
     search,
     directNodeOnly,
+    showUnmountedOnly,
+    findExistingMount,
+    racks,
+    layouts,
     selectedChildNodeIds,
     nodes,
   ]);
@@ -398,34 +408,16 @@ export const DeviceRegistrationModal = () => {
     return map;
   }, [registeredDevices]);
 
-  // Device status lookup: deviceId → { instance, highestError }
+  // Device status lookup: deviceId → { placed: boolean }
   const deviceStatusMap = useMemo(() => {
-    const map = new Map<
-      string,
-      { placed: boolean; highestError: ReturnType<typeof getHighestError> }
-    >();
-    // Build a flat index: deviceId → rack device instance
-    const deviceToInstance = new Map<string, Device>();
-    for (const r of racks) {
-      for (const d of r.devices) {
-        if (d.deviceId) {
-          deviceToInstance.set(d.deviceId, d);
-        }
-      }
-    }
+    const map = new Map<string, { placed: boolean }>();
     for (const rd of registeredDevices) {
-      const instance = deviceToInstance.get(rd.deviceId);
-      if (instance) {
-        map.set(rd.deviceId, {
-          placed: true,
-          highestError: getHighestError(instance.portStates),
-        });
-      } else {
-        map.set(rd.deviceId, { placed: false, highestError: null });
-      }
+      map.set(rd.deviceId, {
+        placed: !!findExistingMount(rd.deviceId),
+      });
     }
     return map;
-  }, [racks, registeredDevices]);
+  }, [registeredDevices, findExistingMount, racks, layouts]);
 
   // Node name lookup: nodeId → name string
   const nodeNameMap = useMemo(() => {
@@ -444,17 +436,22 @@ export const DeviceRegistrationModal = () => {
     [nodeNameMap, nodes],
   );
 
-  // Memoized header badge values
   const headerBadgeText = useMemo(() => {
     const name = getNodeNameFast(nodeFilter);
-    const directCount = equipCountMap.get(nodeFilter) || 0;
-    const subtreeCount = getSubtreeEquipmentCount(
-      nodes,
-      registeredDevices,
-      nodeFilter,
+    // Get subtree devices for the selected node filter
+    const descendantIds = getSubtreeNodeIds(nodes, nodeFilter);
+    const subtreeDevices = registeredDevices.filter((d) =>
+      descendantIds.has(d.deviceGroupId || ""),
     );
-    return `${name} (직속: ${directCount}건 / 전체: ${subtreeCount}건)`;
-  }, [nodeFilter, equipCountMap, nodes, registeredDevices, getNodeNameFast]);
+    const totalCount = subtreeDevices.length;
+    let mountedCount = 0;
+    for (const d of subtreeDevices) {
+      const status = deviceStatusMap.get(d.deviceId);
+      if (status?.placed) mountedCount++;
+    }
+    const unmountedCount = totalCount - mountedCount;
+    return `${name} (전체: ${totalCount}대 / 실장: ${mountedCount}대 / 미실장: ${unmountedCount}대)`;
+  }, [nodeFilter, nodes, registeredDevices, deviceStatusMap, getNodeNameFast]);
 
   const handleEditClick = useCallback(
     (device: RegisteredDevice) => {
@@ -694,7 +691,7 @@ export const DeviceRegistrationModal = () => {
                             key={node.nodeId}
                             node={node}
                             depth={depth}
-                            childNodes={nodes.filter(n => n.parentId === node.nodeId).sort((a,b) => a.order - b.order)}
+                            childNodes={nodes.filter(n => n.parentId === node.nodeId).sort((a, b) => a.order - b.order)}
                             getAllChildren={(id) => nodes.filter(n => n.parentId === id)}
                             isSelected={isSelected}
                             onSelect={(id) => {
@@ -732,7 +729,7 @@ export const DeviceRegistrationModal = () => {
                           />
                         );
                       };
-                      
+
                       return nodes
                         .filter((n) => n.parentId === null)
                         .map((root) => renderSharedTree(root, 0));
@@ -742,82 +739,82 @@ export const DeviceRegistrationModal = () => {
 
                 {contextMenu &&
                   createPortal(
+                    <div
+                      className="tree-context-menu"
+                      style={{ top: contextMenu.y, left: contextMenu.x }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <div
-                        className="tree-context-menu"
-                        style={{ top: contextMenu.y, left: contextMenu.x }}
-                        onClick={(e) => e.stopPropagation()}
+                        className="tree-context-item"
+                        onClick={() => {
+                          handleAddGroup(contextMenu.nodeId);
+                          setContextMenu(null);
+                        }}
                       >
-                        <div
-                          className="tree-context-item"
-                          onClick={() => {
-                            handleAddGroup(contextMenu.nodeId);
-                            setContextMenu(null);
-                          }}
-                        >
-                          <Icon icon="material-symbols:create-new-folder" className="icon comm-icon-mr8" /> 그룹 추가
-                        </div>
-                        <div
-                          className="tree-context-item"
-                          onClick={() => {
-                            handleAddRoom(contextMenu.nodeId);
-                            setContextMenu(null);
-                          }}
-                        >
-                          <Icon icon="mdi:server" className="icon comm-icon-mr8" /> 전산실 추가
-                        </div>
-                        <div
-                          className="tree-context-item"
-                          onClick={() => {
-                            setRenamingId(contextMenu.nodeId);
-                            setContextMenu(null);
-                          }}
-                        >
-                          <Icon icon="material-symbols:edit" className="icon comm-icon-mr8" /> 이름 변경
-                        </div>
-                        {nodes.find((n) => n.nodeId === contextMenu.nodeId)
-                          ?.parentId !== null && (
-                            <div
-                              className="tree-context-item danger"
-                              onClick={() => {
-                                const node = nodes.find(
-                                  (n) => n.nodeId === contextMenu.nodeId,
+                        <Icon icon="material-symbols:create-new-folder" className="icon comm-icon-mr8" /> 그룹 추가
+                      </div>
+                      <div
+                        className="tree-context-item"
+                        onClick={() => {
+                          handleAddRoom(contextMenu.nodeId);
+                          setContextMenu(null);
+                        }}
+                      >
+                        <Icon icon="mdi:server" className="icon comm-icon-mr8" /> 전산실 추가
+                      </div>
+                      <div
+                        className="tree-context-item"
+                        onClick={() => {
+                          setRenamingId(contextMenu.nodeId);
+                          setContextMenu(null);
+                        }}
+                      >
+                        <Icon icon="material-symbols:edit" className="icon comm-icon-mr8" /> 이름 변경
+                      </div>
+                      {nodes.find((n) => n.nodeId === contextMenu.nodeId)
+                        ?.parentId !== null && (
+                          <div
+                            className="tree-context-item danger"
+                            onClick={() => {
+                              const node = nodes.find(
+                                (n) => n.nodeId === contextMenu.nodeId,
+                              );
+                              if (node) {
+                                const hasChildren = nodes.some((n) => n.parentId === node.nodeId);
+                                const count = getSubtreeEquipmentCount(
+                                  nodes,
+                                  registeredDevices,
+                                  node.nodeId,
                                 );
-                                if (node) {
-                                  const hasChildren = nodes.some((n) => n.parentId === node.nodeId);
-                                  const count = getSubtreeEquipmentCount(
-                                    nodes,
-                                    registeredDevices,
-                                    node.nodeId,
+                                if (hasChildren || count > 0) {
+                                  showToast(
+                                    "하위 노드가 있거나 등록된 장비가 있어 삭제할 수 없습니다.",
+                                    "error",
                                   );
-                                  if (hasChildren || count > 0) {
-                                    showToast(
-                                      "하위 노드가 있거나 등록된 장비가 있어 삭제할 수 없습니다.",
-                                      "error",
-                                    );
-                                  } else {
-                                    // Find the element for rect
-                                    const target = document.querySelector(
-                                      `.tree-node`
-                                    );
-                                    const rect =
-                                      target?.getBoundingClientRect() ||
-                                      ({
-                                        left: contextMenu.x,
-                                        bottom: contextMenu.y,
-                                      } as DOMRect);
-                                    setNodeDeleteConfirm({
-                                      node,
-                                      rect: rect as DOMRect,
-                                    });
-                                  }
+                                } else {
+                                  // Find the element for rect
+                                  const target = document.querySelector(
+                                    `.tree-node`
+                                  );
+                                  const rect =
+                                    target?.getBoundingClientRect() ||
+                                    ({
+                                      left: contextMenu.x,
+                                      bottom: contextMenu.y,
+                                    } as DOMRect);
+                                  setNodeDeleteConfirm({
+                                    node,
+                                    rect: rect as DOMRect,
+                                  });
                                 }
-                                setContextMenu(null);
-                              }}
-                            >
-                              <Icon icon="material-symbols:delete" className="icon comm-icon-mr8" /> 삭제
-                            </div>
-                          )}
-                      </div>,
+                              }
+                              setContextMenu(null);
+                            }}
+                          >
+                            <Icon icon="material-symbols:delete" className="icon comm-icon-mr8" /> 삭제
+                          </div>
+                        )}
+                    </div>,
                     document.body,
                   )}
 
@@ -911,42 +908,55 @@ export const DeviceRegistrationModal = () => {
                             <input
                               className="drm-search-input"
                               type="text"
-                              placeholder="목록에서 검색 (장비명, 모델명, IP, MAC, 벤더)"
+                              placeholder="목록에서 검색 (장비명, 모델명, IP, MAC, 제조사)"
                               value={search}
                               onChange={(e) => setSearch(e.target.value)}
                             />
                           </div>
 
                           {/* Scope Filtering Controls */}
-                          {hasDescendants && (
-                            <div className="drm-filter-controls">
-                              <label className="drm-checkbox-label">
-                                <input
-                                  type="checkbox"
-                                  checked={directNodeOnly}
-                                  onChange={(e) =>
-                                    setDirectNodeOnly(e.target.checked)
-                                  }
-                                />
-                                현재 노드 장비만 보기
-                              </label>
+                          <div className="drm-filter-controls" style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                            <label className="drm-checkbox-label">
+                              <input
+                                type="checkbox"
+                                checked={showUnmountedOnly}
+                                onChange={(e) =>
+                                  setShowUnmountedOnly(e.target.checked)
+                                }
+                              />
+                              미실장 장비만 보기
+                            </label>
 
-                              {!directNodeOnly && (
-                                <ChildMultiPicker
-                                  options={descendantsOfFilter}
-                                  selectedIds={selectedChildNodeIds}
-                                  onToggle={(id) => {
-                                    setSelectedChildNodeIds((prev) => {
-                                      const next = new Set(prev);
-                                      if (next.has(id)) next.delete(id);
-                                      else next.add(id);
-                                      return next;
-                                    });
-                                  }}
-                                />
-                              )}
-                            </div>
-                          )}
+                            {hasDescendants && (
+                              <>
+                                <label className="drm-checkbox-label">
+                                  <input
+                                    type="checkbox"
+                                    checked={directNodeOnly}
+                                    onChange={(e) =>
+                                      setDirectNodeOnly(e.target.checked)
+                                    }
+                                  />
+                                  현재 노드 장비만 보기
+                                </label>
+
+                                {!directNodeOnly && (
+                                  <ChildMultiPicker
+                                    options={descendantsOfFilter}
+                                    selectedIds={selectedChildNodeIds}
+                                    onToggle={(id) => {
+                                      setSelectedChildNodeIds((prev) => {
+                                        const next = new Set(prev);
+                                        if (next.has(id)) next.delete(id);
+                                        else next.add(id);
+                                        return next;
+                                      });
+                                    }}
+                                  />
+                                )}
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -997,15 +1007,13 @@ export const DeviceRegistrationModal = () => {
                                   />
                                 </div>
                               </th>
-                              <th className="col-group">그룹</th>
                               <th className="col-name">장비명</th>
                               <th className="col-model">모델명</th>
                               <th className="col-IPAddr">IP 주소</th>
                               <th className="col-macAddr">MAC 주소</th>
-                              <th className="col-vendor">벤더</th>
+                              <th className="col-vendor">제조사</th>
                               <th className="col-status">상태</th>
-                              <th className="col-actions">수정</th>
-                              <th className="col-actions">삭제</th>
+                              <th className="col-actions">관리</th>
                             </tr>
                           </thead>
                           <tbody>

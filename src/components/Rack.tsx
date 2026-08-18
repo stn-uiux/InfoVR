@@ -860,18 +860,7 @@ const DeviceMesh = ({
     [device.dashboardThumbnailUrl, device.defaultViewSide, device.modelName],
   );
 
-  const resolvedUrl = useMemo(
-    () => {
-      // LOD Optimization: Use thumbnail if not focused, otherwise use full image.
-      if (!isRackFocused) return thumbUrl;
-      
-      return (device.defaultViewSide !== "rear" && isUsableDashboardThumbnail(device.dashboardThumbnailUrl)
-        ? device.dashboardThumbnailUrl
-        : "") ||
-        resolveDeviceImage(device.modelName, device.defaultViewSide || "front", false)
-    },
-    [device.dashboardThumbnailUrl, device.defaultViewSide, device.modelName, isRackFocused, thumbUrl],
-  );
+  const resolvedUrl = thumbUrl;
 
   return (
     <group

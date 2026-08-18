@@ -1,4 +1,4 @@
-import type { HierarchyNode, PortState, RegisteredDevice, Rack } from "../types";
+import type { HierarchyNode, NodeType, PortState, RegisteredDevice, Rack } from "../types";
 
 // ─── Default Node IDs (고정 상수) ──────────────────────────────────────────────
 
@@ -274,6 +274,7 @@ export const resolvePathToNodeId = (
   nodes: HierarchyNode[],
   pathStr: string,
   existingNewNodes: HierarchyNode[] = [],
+  nodeTypeHint?: string,
 ): { nodeId: string; newNodes: HierarchyNode[] } => {
   const parts = pathStr.split(">").map((s) => s.trim());
   const allNodes = [...nodes, ...existingNewNodes];
@@ -294,12 +295,13 @@ export const resolvePathToNodeId = (
       lastNodeId = found.nodeId;
     } else {
       // 노드 생성
+      const isLeaf = i === parts.length - 1;
       const newNodeId = `node-${Math.random().toString(36).substring(2, 9)}`;
       const newNode: HierarchyNode = {
         nodeId: newNodeId,
         parentId: currentParentId,
         name: partName,
-        type: i === 0 ? "root" : "group",
+        type: i === 0 ? "root" : (isLeaf && nodeTypeHint ? nodeTypeHint as NodeType : "group"),
         order: 99, // 신규 생성 노드는 우선 뒤로 배치
       };
       createdNodes.push(newNode);

@@ -10,17 +10,7 @@ import { getEffectiveTemplates } from "../../utils/deviceTemplates";
 import { getDeviceViewSides, hasDeviceSvgAsset } from "../../utils/deviceAssets";
 import type { VendorName, HierarchyNode, RegisteredDevice } from "../../types";
 
-const VENDORS: VendorName[] = [
-  "코위버PTN",
-  "CISCO",
-  "Huawei",
-  "Nokia",
-  "유비쿼스",
-  "AXGATE",
-  "Dell",
-  "Edgecore",
-  "Supermicro",
-];
+
 
 // Simple IP format validation (X.X.X.X)
 const isValidIP = (IPAddr: string) =>
@@ -231,9 +221,9 @@ export const RegistrationFormModal = ({
                     label: `[${t.uSize}U] ${t.modelName}${t.isCustom ? ' ★' : ''}`,
                     value: i,
                   }))}
-	                  value={selectedModelIdx}
-	                  onChange={(val) => {
-	                    setSelectedModelIdx(Number(val));
+                  value={selectedModelIdx}
+                  onChange={(val) => {
+                    setSelectedModelIdx(Number(val));
                     setInsertedCards([]);
                     setInsertedModules([]);
                     setDashboardThumbnailUrl("");
@@ -307,11 +297,17 @@ export const RegistrationFormModal = ({
           </div>
 
           <div className="drm-field">
-            <label>벤더</label>
-            <FormSelect
-	              options={VENDORS.map((v) => ({ label: v, value: v }))}
-	              value={vendor}
-	              onChange={(val) => setVendor(val as VendorName)}
+            <label>제조사</label>
+            <input
+              type="text"
+              className="comm-input"
+              value={vendor}
+              disabled
+              style={{
+                backgroundColor: "rgba(255, 255, 255, 0.05)",
+                color: "var(--text-secondary)",
+                cursor: "not-allowed"
+              }}
             />
           </div>
 

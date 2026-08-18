@@ -1,13 +1,13 @@
 import { Icon } from "@iconify/react";
 import React from "react";
-import { getHighestError } from "../../utils/errorHelpers";
+
 import type { RegisteredDevice } from "../../types";
 
 export interface DeviceRowProps {
   device: RegisteredDevice;
   isSelected: boolean;
   groupName: string;
-  statusInfo?: { placed: boolean; highestError: ReturnType<typeof getHighestError> };
+  statusInfo?: { placed: boolean };
   onLocate: (device: RegisteredDevice) => void;
   onSelect: (id: string, checked: boolean) => void;
   onEdit: (device: RegisteredDevice) => void;
@@ -47,11 +47,6 @@ export const DeviceRow = React.memo(({
         </div>
       </td>
       <td>
-        <span className="drm-group-tag group-gwacheon">
-          {groupName}
-        </span>
-      </td>
-      <td>
         <div className="drm-device-name">
           {device.title || device.modelName}
         </div>
@@ -77,74 +72,48 @@ export const DeviceRow = React.memo(({
         <span className="drm-vendor-tag">{device.vendor}</span>
       </td>
       <td>
-        {(() => {
-          if (!statusInfo || !statusInfo.placed) {
-            return (
-              <span
-                className="drm-badge"
-                style={{ opacity: 0.5, fontSize: "10px" }}
-              >
-                미배치
-              </span>
-            );
-          }
-          if (!statusInfo.highestError) {
-            return (
-              <span
-                className="drm-badge"
-                style={{
-                  color: "#4ade80",
-                  borderColor: "rgba(74, 222, 128, 0.3)",
-                  background: "rgba(74, 222, 128, 0.1)",
-                }}
-              >
-                정상
-              </span>
-            );
-          }
-          const he = statusInfo.highestError;
-          return (
-            <span
-              className="drm-badge"
-              style={{
-                color: he.color,
-                borderColor: `${he.color}44`,
-                background: `${he.color}11`,
-              }}
-              title={he.level}
-            >
-              {he.level === "critical"
-                ? "심각"
-                : he.level === "major"
-                  ? "경고"
-                  : he.level === "minor"
-                    ? "주의"
-                    : "알림"}
-            </span>
-          );
-        })()}
+        {(!statusInfo || !statusInfo.placed) ? (
+          <span
+            className="drm-badge"
+            style={{ opacity: 0.5, fontSize: "11px" }}
+          >
+            미실장
+          </span>
+        ) : (
+          <span
+            className="drm-badge"
+            style={{
+              color: "#38bdf8",
+              borderColor: "rgba(56, 189, 248, 0.3)",
+              background: "rgba(56, 189, 248, 0.1)",
+              fontSize: "11px"
+            }}
+          >
+            실장
+          </span>
+        )}
       </td>
       <td style={{ textAlign: "center" }}>
-        <button
-          className="comm-btn comm-btn-sm comm-btn-tertiary"
-          title="수정"
-          onClick={(e) => {
-            e.stopPropagation();
-            onEdit(device);
-          }}
-        >
-          <Icon icon="material-symbols:edit" className="icon" />
-        </button>
-      </td>
-      <td style={{ textAlign: "center" }}>
-        <button
-          className="comm-btn comm-btn-sm comm-btn-tertiary"
-          style={{ color: "var(--severity-critical)" }}
-          title="삭제"
-          onClick={(e) => onDelete(e, device)}
-        >
-          <Icon icon="material-symbols:delete" className="icon" />
-        </button>
+        <div style={{ display: "flex", gap: "4px", justifyContent: "center" }}>
+          <button
+            className="comm-btn comm-btn-sm comm-btn-tertiary"
+            title="수정"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(device);
+            }}
+          >
+            <Icon icon="material-symbols:edit" className="icon" />
+          </button>
+          <button
+            className="comm-btn comm-btn-sm comm-btn-tertiary"
+            style={{ color: "var(--severity-critical)" }}
+            title="삭제"
+            onClick={(e) => onDelete(e, device)}
+          >
+            <Icon icon="material-symbols:delete" className="icon" />
+          </button>
+        </div>
       </td>
     </tr>
   );

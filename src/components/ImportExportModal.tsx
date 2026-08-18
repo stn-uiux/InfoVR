@@ -75,7 +75,7 @@ export const ImportExportModal = () => {
   }, [nodes]);
 
   const [isExporting, setIsExporting] = useState(false);
-  const [, setImportStatus] = useState<string | null>(null);
+  const [importStatus, setImportStatus] = useState<string | null>(null);
   const [overwriteNodes] = useState(true);
   const [importPreview, setImportPreview] = useState<{
     fileName: string;
@@ -453,6 +453,155 @@ export const ImportExportModal = () => {
     );
   };
 
+  const isImportMode = !!(importPreview || importStatus);
+
+  const renderImportContent = () => {
+    return (
+      <div className="options-group">
+        <div className="group-header">
+          <div className="group-title">
+            <span>📥</span> 데이터 가져오기 (Import)
+          </div>
+        </div>
+
+        <div className="import-helper-text" style={{ marginBottom: "12px", fontSize: "12px", color: "var(--text-secondary)" }}>
+          <span style={{ fontSize: "14px", flexShrink: 0 }}>ℹ️</span>
+          <span>
+            노드 내 데이터(Rack/Device/Port)는 파일 기준으로 반영되며, 다른
+            노드에는 영향이 없습니다.
+          </span>
+        </div>
+
+        {importPreview ? (
+          <div
+            style={{
+              background: "var(--selected-bg)",
+              border: "1px solid var(--theme-primary)",
+              borderRadius: "4px",
+              padding: "10px",
+              marginBottom: "12px",
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 600,
+                fontSize: "12px",
+                marginBottom: "8px",
+                color: "var(--theme-primary)",
+              }}
+            >
+              📊 파일 분석 결과: {importPreview.fileName}
+            </div>
+
+            <div
+              style={{
+                marginBottom: "10px",
+                padding: "8px",
+                background: "rgba(0,0,0,0.2)",
+                borderRadius: "4px",
+                fontSize: "12px",
+              }}
+            >
+              <div
+                style={{ color: "var(--text-tertiary)", marginBottom: "4px" }}
+              >
+                대상 범위 (Export Scope):
+              </div>
+              <div style={{ fontWeight: 600, color: "white" }}>
+                {importPreview.exportScope.type === "ALL"
+                  ? "🌐 전체 (ALL)"
+                  : `📍 ${nodes.find(n => n.nodeId === importPreview.exportScope.nodeId)?.name || ""} 전용`}
+              </div>
+            </div>
+
+            <div
+              style={{
+                maxHeight: "150px",
+                overflowY: "auto",
+                fontSize: "11px",
+              }}
+            >
+              {Object.entries(importPreview.dataByNode).map(([nid, data]) => {
+                const nodeName = importPreview.nodes.find(n => n.nodeId === nid)?.name || nid;
+                return (
+                  <div
+                    key={nid}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: "4px",
+                      padding: "4px",
+                      background: "rgba(0,0,0,0.1)",
+                    }}
+                  >
+                    <span>📍 {nodeName}</span>
+                    <span style={{ fontWeight: 600 }}>
+                      Racks: {data.racks.length} | RegDevs: {data.registeredDevices.length}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {importPreview.ignoredCount > 0 && (
+              <div
+                style={{
+                  marginTop: "10px",
+                  color: "#ffa940",
+                  fontSize: "11px",
+                  display: "flex",
+                  gap: "4px",
+                }}
+              >
+                <span>⚠️</span>
+                <span>
+                  파일 내 범위 밖 데이터 {importPreview.ignoredCount}건은
+                  무시되었습니다.
+                </span>
+              </div>
+            )}
+            <div style={{ marginTop: "12px", display: "flex", gap: "8px" }}>
+              <button
+                className="comm-btn comm-btn-md comm-btn-primary"
+                style={{ flex: 1 }}
+                onClick={handleApplyImport}
+              >
+                🚀 Confirm & REPLACE
+              </button>
+              <button
+                className="comm-btn comm-btn-md comm-btn-secondary"
+                onClick={() => {
+                  setImportPreview(null);
+                  setImportExportModalRackId(null);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {importStatus && (
+          <div
+            style={{
+              marginTop: "12px",
+              padding: "10px",
+              borderRadius: "6px",
+              fontSize: "13px",
+              background: importStatus.startsWith("✅")
+                ? "rgba(34,197,94,0.12)"
+                : "rgba(59,130,246,0.12)",
+              color: importStatus.startsWith("✅") ? "#22c55e" : "#3b82f6",
+              border: `1px solid ${importStatus.startsWith("✅") ? "#22c55e44" : "#3b82f644"}`,
+            }}
+          >
+            {importStatus}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (!importExportModalRackId) return null;
   
   if (typeof document === "undefined") return null;
@@ -476,9 +625,9 @@ export const ImportExportModal = () => {
       >
         <div className="comm-modal-header">
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <span style={{ fontSize: "20px" }}>💾</span>
+            <span style={{ fontSize: "20px" }}>{isImportMode ? "📥" : "💾"}</span>
             <h2 className="comm-modal-title">
-              데이터 내보내기
+              {isImportMode ? "데이터 가져오기" : "데이터 내보내기"}
             </h2>
           </div>
           <button
@@ -489,7 +638,7 @@ export const ImportExportModal = () => {
           </button>
         </div>
         <div className="comm-modal-content">
-          {renderGlobalGroupContent()}
+          {isImportMode ? renderImportContent() : renderGlobalGroupContent()}
         </div>
       </div>
     </div>,

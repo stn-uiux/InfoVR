@@ -292,6 +292,7 @@ export const ModelRegistrationModal: React.FC = () => {
 
   // Form state
   const [modelName, setModelName] = useState("");
+  const [vendor, setVendor] = useState("Cisco (시스코)");
   const [unit, setUnit] = useState<number>(1);
   const [modelType, setModelType] = useState<CustomModelType>("normal");
   const [modelSvgRaw, setModelSvgRaw] = useState<string | null>(null);
@@ -435,6 +436,7 @@ export const ModelRegistrationModal: React.FC = () => {
     if (!model) return;
     setEditingModelId(modelId);
     setModelName(model.modelName);
+    setVendor(model.vendor || "Cisco (시스코)");
     setUnit(model.unit);
     setModelType(model.modelType);
     setModelSvgRaw(model.modelSvgRaw);
@@ -606,6 +608,7 @@ export const ModelRegistrationModal: React.FC = () => {
 
     const payload: Omit<import("../../types/equipment").CustomEquipmentModel, "modelId"> = {
       modelName: modelName.trim(),
+      vendor: vendor,
       unit,
       displayName: `[${unit}U] ${modelName.trim()}`,
       modelSvgRaw: modelSvgRaw!,
@@ -642,6 +645,7 @@ export const ModelRegistrationModal: React.FC = () => {
     resetForm();
   }, [
     modelName,
+    vendor,
     unit,
     modelSvgRaw,
     useDualView,
@@ -739,7 +743,7 @@ export const ModelRegistrationModal: React.FC = () => {
                   <span className="badge">필수</span>
                 </div>
 
-                <div className="mrm-form-grid" style={{ gridTemplateColumns: "1.5fr 1fr" }}>
+                <div className="mrm-form-grid" style={{ gridTemplateColumns: "1.5fr 1fr 1fr" }}>
                   <div className="mrm-field">
                     <label>
                       모델명<span className="required">*</span>
@@ -769,6 +773,33 @@ export const ModelRegistrationModal: React.FC = () => {
                     {errors.unit && (
                       <span className="error-hint">{errors.unit}</span>
                     )}
+                  </div>
+
+                  <div className="mrm-field" style={{ flex: 1 }}>
+                    <label>
+                      제조사<span className="mrm-required">*</span>
+                    </label>
+                    <select
+                      className="comm-input"
+                      value={vendor}
+                      onChange={(e) => setVendor(e.target.value)}
+                    >
+                      <option value="" disabled>제조사를 선택하세요</option>
+                      {[
+                        "Cisco (시스코)",
+                        "Ciena (시에나)",
+                        "Coweaver (코위버)",
+                        "Dasan (다산네트웍스)",
+                        "Dell (델)",
+                        "Juniper (주니퍼)",
+                        "Nokia (노키아)",
+                        "Rebellions (리벨리온)",
+                        "Ubiquoss (유비쿼스)",
+                        "Woorinet (우리넷)"
+                      ].map(v => (
+                        <option key={v} value={v}>{v}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="mrm-field full-width" style={{ marginTop: 4 }}>

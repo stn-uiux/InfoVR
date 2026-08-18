@@ -50,6 +50,7 @@ const flattenRacks = (racks: Rack[], nodes?: HierarchyNode[]) =>
       groupName: getNodeName(nodes, r.mapId),
       depth: getNodeDepth(nodes, r.mapId),
       nodePath: getFullPath(nodes, r.mapId),
+      nodeType: nodes.find(n => n.nodeId === r.mapId)?.type || 'group',
     }),
     rackSize: r.rackSize,
     width: r.width,
@@ -74,6 +75,7 @@ const flattenDevices = (racks: Rack[], nodes?: HierarchyNode[], registeredDevice
           groupName: getNodeName(nodes, r.mapId),
           depth: getNodeDepth(nodes, r.mapId),
           nodePath: getFullPath(nodes, r.mapId),
+          nodeType: nodes.find(n => n.nodeId === r.mapId)?.type || 'group',
         }),
         type: d.type,
         size: d.size,
@@ -107,6 +109,9 @@ const flattenPorts = (racks: Rack[], nodes?: HierarchyNode[], registeredDevices?
           nodeId: r.mapId,
           ...(nodes && {
             groupName: getNodeName(nodes, r.mapId),
+            depth: getNodeDepth(nodes, r.mapId),
+            nodePath: getFullPath(nodes, r.mapId),
+            nodeType: nodes.find(n => n.nodeId === r.mapId)?.type || 'group',
           }),
           status: p.status,
           errorLevel: p.errorLevel || "",
@@ -459,12 +464,14 @@ const GROUP_NAME_MAP: Record<string, string> = {
 const flattenRegisteredDevices = (
   devices: RegisteredDevice[],
   nodes: HierarchyNode[],
-) =>
-  devices.map((d) => ({
+) => {
+  const nodeMap = new Map(nodes.map(n => [n.nodeId, n]));
+  return devices.map((d) => ({
     id: d.deviceId,
     deviceGroupId: d.deviceGroupId,
     groupName: getNodeName(nodes, d.deviceGroupId || ''),
     nodePath: getFullPath(nodes, d.deviceGroupId || ''),
+    nodeType: nodeMap.get(d.deviceGroupId || '')?.type || 'group',
     depth: getNodeDepth(nodes, d.deviceGroupId || ''),
     title: d.title,
     modelName: d.modelName,
@@ -477,6 +484,7 @@ const flattenRegisteredDevices = (
     insertedCards: d.insertedCards ? JSON.stringify(d.insertedCards) : "",
     insertedModules: d.insertedModules ? JSON.stringify(d.insertedModules) : "",
   }));
+};
 
 // ─── Master Sheet Builders ──────────────────────────────────────────────────
 
@@ -694,6 +702,7 @@ export const parseRegisteredDevicesFromExcel = (
             const nodeIdInFile = r.mapId || r.groupId;
             const path = r.nodePath || r.groupPath || r.path;
             const grpName = r.nodeName || r.groupName || r.group || (nodeIdInFile ? undefined : GROUP_NAME_MAP[String(r.groupId)]);
+            const nodeTypeHint = r.nodeType ? String(r.nodeType).trim() : undefined;
             
             let nid = nodeIdInFile ? String(nodeIdInFile) : "";
             
@@ -703,7 +712,7 @@ export const parseRegisteredDevicesFromExcel = (
               if (strPath === "없음" || strPath.toLowerCase() === "none") {
                 nid = NONE_NODE_ID;
               } else {
-                const { nodeId: resolvedId, newNodes } = resolvePathToNodeId(nodes, strPath, accumulatedNewNodes);
+                const { nodeId: resolvedId, newNodes } = resolvePathToNodeId(nodes, strPath, accumulatedNewNodes, nodeTypeHint);
                 if (newNodes.length > 0) {
                   // Deduplicate before adding to accumulated array
                   newNodes.forEach(nn => {
@@ -732,7 +741,7 @@ export const parseRegisteredDevicesFromExcel = (
                       nid = migrated;
                   } else {
                       // Create new node under root as fallback
-                      const { nodeId: resolvedId, newNodes } = resolvePathToNodeId(nodes, strName, accumulatedNewNodes);
+                      const { nodeId: resolvedId, newNodes } = resolvePathToNodeId(nodes, strName, accumulatedNewNodes, nodeTypeHint);
                       if (newNodes.length > 0) {
                           newNodes.forEach(nn => {
                               if (!accumulatedNewNodes.some(ex => ex.nodeId === nn.nodeId)) {
@@ -872,7 +881,8 @@ export const importGroupPackage = (
           const path = getValue(row, "groupPath") || getValue(row, "nodePath");
           const nid = getValue(row, "nodeId") || getValue(row, "mapId") || getValue(row, "groupId") || getValue(row, "id") || getValue(row, "deviceGroupId");
           const name = getValue(row, "groupName") || getValue(row, "nodeName");
-          return { path: path ? String(path) : undefined, nid: nid ? String(nid) : undefined, name: name ? String(name) : undefined };
+          const type = getValue(row, "nodeType");
+          return { path: path ? String(path) : undefined, nid: nid ? String(nid) : undefined, name: name ? String(name) : undefined, type: type ? String(type) : undefined };
         };
 
         const isTargeted = targetNodeId && targetNodeId !== "ALL";
@@ -905,7 +915,7 @@ export const importGroupPackage = (
         
         sortedFileNodes.forEach(fn => {
            const fullPath = getFileNodePath(fn.nodeId);
-           const { nodeId: resId, newNodes } = resolvePathToNodeId(systemNodes, fullPath, resolutionNodes);
+           const { nodeId: resId, newNodes } = resolvePathToNodeId(systemNodes, fullPath, resolutionNodes, fn.type);
            nodeIdMap[fn.nodeId] = resId;
            newNodes.forEach(nn => {
              if (!resolutionNodes.some(sn => sn.nodeId === nn.nodeId)) resolutionNodes.push(nn);
@@ -914,13 +924,13 @@ export const importGroupPackage = (
 
         let ignoredCount = 0;
 
-        const resolveRowToNodeId = (info: { path?: string, nid?: string, name?: string }): string => {
-          const { path, nid, name } = info;
+        const resolveRowToNodeId = (info: { path?: string, nid?: string, name?: string, type?: string }): string => {
+          const { path, nid, name, type } = info;
           
           if (path) {
             const strPath = String(path).trim();
             if (strPath === "없음" || strPath.toLowerCase() === "none") return NONE_NODE_ID;
-            const { nodeId: resId, newNodes } = resolvePathToNodeId(systemNodes, strPath, resolutionNodes);
+            const { nodeId: resId, newNodes } = resolvePathToNodeId(systemNodes, strPath, resolutionNodes, type);
             newNodes.forEach(nn => {
                if (!resolutionNodes.some(ex => ex.nodeId === nn.nodeId)) resolutionNodes.push(nn);
             });

@@ -1209,6 +1209,7 @@
   top: 0;
   z-index: 10;
   border-bottom: 1px solid var(--border-weak);
+  vertical-align: middle;
 }
 
 [data-theme=light] .drm-table th {
