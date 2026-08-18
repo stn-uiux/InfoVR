@@ -5,7 +5,7 @@ import { useStore } from "../store/useStore";
 import type { Rack, RegisteredDevice, HierarchyNode } from "../types";
 import type { ExportScope } from "../utils/storage";
 import { SharedTreeNodeItem } from "./SharedTreeNodeItem";
-import { getNodeName, getAncestorPath, getNodeEquipmentCount, getSubtreeNodeIds } from "../utils/nodeUtils";
+import { getSubtreeNodeIds } from "../utils/nodeUtils";
 import {
   exportGroupWorkbook,
   importGroupPackage,
@@ -75,8 +75,8 @@ export const ImportExportModal = () => {
   }, [nodes]);
 
   const [isExporting, setIsExporting] = useState(false);
-  const [importStatus, setImportStatus] = useState<string | null>(null);
-  const [overwriteNodes, setOverwriteNodes] = useState(true);
+  const [, setImportStatus] = useState<string | null>(null);
+  const [overwriteNodes] = useState(true);
   const [importPreview, setImportPreview] = useState<{
     fileName: string;
     nodes: HierarchyNode[];

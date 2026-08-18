@@ -2,7 +2,6 @@ import type { Rack, RegisteredDevice, HierarchyNode, Device, Orientation } from 
 import { DEVICE_TEMPLATES } from "./deviceTemplates";
 import { 
   getDefaultNodes, 
-  getNodeDepth, 
   GANGNAM_ROOM_1_NODE_ID,
 } from "./nodeUtils";
 import {

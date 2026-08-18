@@ -158,7 +158,7 @@ export const SharedTreeNodeItem = React.memo(({
       <div
         className={`tree-node ${isSelected ? "selected" : ""} ${isMatch ? "match" : ""} ${isDragged ? "dragging" : ""} ${dropPos === "inside" ? "drop-target" : ""} ${dropPos === "before" ? "drop-before" : ""} ${dropPos === "after" ? "drop-after" : ""} ${isPinned ? "has-pin" : ""}`}
         style={{ paddingLeft: `${4 + depth * 8}px` }}
-        onClick={(e) => {
+        onClick={() => {
           if (hasCheckbox && onCheck) {
             onCheck(node.nodeId, !isChecked);
           } else if (onSelect) {

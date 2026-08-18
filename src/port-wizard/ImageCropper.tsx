@@ -15,7 +15,7 @@ export interface ImageCropperRef {
 export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
   imageSrc,
   onCrop,
-  onCancel,
+
 }, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);

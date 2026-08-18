@@ -7,7 +7,6 @@ import {
   GizmoHelper,
   GizmoViewcube,
   useGizmoContext,
-  MeshReflectorMaterial,
   Edges,
   PivotControls,
 } from "@react-three/drei";
@@ -413,7 +412,8 @@ export const Scene = () => {
                 disableRotations={true}
                 disableScaling={true}
                 onDragStart={() => {
-                  useStore.getState()._controlsRef?.current?.enabled && (useStore.getState()._controlsRef!.current!.enabled = false);
+                  const controls = useStore.getState()._controlsRef as any;
+                  if (controls) controls.enabled = false;
                 }}
                 onDrag={(local) => {
                   const position = new Vector3();
@@ -425,7 +425,8 @@ export const Scene = () => {
                   };
                 }}
                 onDragEnd={() => {
-                  useStore.getState()._controlsRef?.current && (useStore.getState()._controlsRef!.current!.enabled = true);
+                  const controls = useStore.getState()._controlsRef as any;
+                  if (controls) controls.enabled = true;
                   // Commit to store once on drag end
                   useStore.getState().setCyberSpaceConfig({
                     csOffsetXCm: liveOffset.current.x,
@@ -475,7 +476,7 @@ export const Scene = () => {
                         e.stopPropagation();
                         document.body.style.cursor = "pointer";
                       }}
-                      onPointerOut={(e) => {
+                      onPointerOut={() => {
                         document.body.style.cursor = "auto";
                       }}
                     >

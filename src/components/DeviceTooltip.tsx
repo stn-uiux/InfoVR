@@ -1,4 +1,3 @@
-import React from "react";
 import { useStore } from "../store/useStore";
 import { getHighestError } from "../utils/errorHelpers";
 import { findNode } from "../utils/nodeUtils";

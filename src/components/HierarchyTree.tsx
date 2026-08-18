@@ -13,7 +13,6 @@ import type { HierarchyNode } from "../types";
 import {
   getChildren,
   getSubtreeEquipmentCount,
-  getNodeEquipmentCount,
   getSubtreeDevices,
   isLeafNode,
 } from "../utils/nodeUtils";

@@ -149,6 +149,8 @@ export interface AppState {
   csCustomSpaceSize: boolean;
   csRoomWidthCm: number;
   csRoomLengthCm: number;
+  csOffsetXCm: number;
+  csOffsetZCm: number;
   csWallColor: string;
   csCeilingColor: string;
   csFloorColor: string;
@@ -546,7 +548,6 @@ export const useStore = create<AppState>()(
         return { ...state, ...config, nodeEnvironments: newNodeEnvs };
       }),
       setCyberSpaceTheme: (isLight) => set((state) => {
-        const activeNodeId = state.activeNodeId;
         const themeConfig = isLight ? LIGHT_THEME_CYBER_SPACE_CONFIG : DEFAULT_CYBER_SPACE_CONFIG;
 
         // Preserve custom size values when swapping theme
@@ -627,8 +628,6 @@ export const useStore = create<AppState>()(
           racks,
           importedModels,
           nodes,
-          baselineRacks,
-          baselineModels,
           baselineNodes,
           registeredDevices,
           baselineRegisteredDevices,
@@ -639,8 +638,6 @@ export const useStore = create<AppState>()(
         } = get();
         if (_importDirty) return true;
 
-        const baseRacks = baselineRacks || racks;
-        const baseModels = baselineModels || importedModels;
         const baseNodes = baselineNodes || nodes;
         const baseRegDevices = baselineRegisteredDevices || registeredDevices;
         const baseNodeEnvs = baselineNodeEnvironments || nodeEnvironments;
@@ -727,30 +724,7 @@ export const useStore = create<AppState>()(
         });
       },
 
-      loadState: (racks, models = [], registeredDevices = [], nodes = []) => {
-        const newLayouts: Record<string, { racks: Rack[]; importedModels: ImportedModel[] }> = {};
-        
-        // Group racks by room (mapId)
-        const roomNodes = nodes.filter((n) => n.type === "room" || n.type === "root");
-        for (const room of roomNodes) {
-          newLayouts[room.nodeId] = {
-            racks: racks.filter((r) => r.mapId === room.nodeId),
-            importedModels: [], // Sample models are not provided per room
-          };
-        }
 
-        const activeSceneNodeId = get().activeSceneNodeId;
-        const currentRacks = activeSceneNodeId ? (newLayouts[activeSceneNodeId]?.racks || []) : racks;
-
-        set({ 
-          layouts: newLayouts,
-          racks: currentRacks, 
-          importedModels: models, 
-          registeredDevices, 
-          nodes,
-          _importDirty: true
-        });
-      },
 
       pushUndoState: () => {
         const { isEditMode, racks, importedModels, nodes, registeredDevices, undoStack } = get();
@@ -810,7 +784,6 @@ export const useStore = create<AppState>()(
           pendingAction,
           racks,
           importedModels,
-          activeNodeId,
           activeSceneNodeId,
           layouts,
           expandNodePath,
@@ -1042,7 +1015,7 @@ export const useStore = create<AppState>()(
         set({ _cameraRef: camera, _controlsRef: controls }),
       setHoveredRack: (id) => set({ hoveredRackId: id }),
       setActiveNode: (nodeId) => {
-        const { isEditMode, expandNodePath, layouts, nodes, racks, importedModels, activeSceneNodeId } = get();
+        const { expandNodePath, layouts, nodes, racks, importedModels, activeSceneNodeId } = get();
 
         // 1. Update the current node's layout in the central layouts object BEFORE switching
         const updatedLayouts = { ...layouts };

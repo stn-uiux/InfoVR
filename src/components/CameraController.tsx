@@ -413,7 +413,7 @@ export const CameraController = () => {
     if (controls) {
       const storeState = useStore.getState();
       if (storeState.focusedRackId) {
-        const orbitControls = controls as unknown as OrbitControls;
+
         const targetRack = storeState.racks.find(r => r.rackId === storeState.focusedRackId);
         
         if (targetRack) {
@@ -422,7 +422,7 @@ export const CameraController = () => {
           const rackZ = targetRack.position[1] * GRID_SPACING;
           const rackHeight = targetRack.rackSize * U_HEIGHT + 0.1;
           const targetCenterY = rackHeight * 0.5;
-          const targetVec = new Vector3(rackX, targetCenterY, rackZ);
+
 
           // 타겟 랙이 바라보는 방향 (앞면 방향)
           const orientation = targetRack.orientation ?? 180;

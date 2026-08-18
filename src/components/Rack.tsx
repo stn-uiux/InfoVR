@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback, forwardRef, Suspense, memo } from "react";
-import { RoundedBox, useTexture, Billboard, Html, Outlines, Edges } from "@react-three/drei";
+import { useTexture, Billboard, Html, Edges } from "@react-three/drei";
 import { type ThreeEvent, useThree, useFrame } from "@react-three/fiber";
 import { BoxGeometry, CanvasTexture, Color, DoubleSide, Euler, Mesh, MeshStandardMaterial, Object3D, Plane, RepeatWrapping, Vector3, Group, MathUtils } from 'three';
 import { useStore } from "../store/useStore";
@@ -559,7 +559,7 @@ export const Rack = memo(({
               }
             }
           }}
-          onPointerOut={isObstructing ? undefined : (e) => {
+          onPointerOut={isObstructing ? undefined : () => {
             const state = useStore.getState();
             if (state.hoveredRackId === rackId) {
               setHoveredRack(null);
@@ -786,7 +786,6 @@ const DeviceMesh = ({
 
   // Cache Color objects to avoid per-frame allocation
   const highlightColor = useMemo(() => new Color("#4dabf7"), []);
-  const hoverColor = useMemo(() => new Color("#ffffff"), []); // 약간 밝은 효과
   const blackColor = useMemo(() => new Color("#000000"), []);
 
   // Reset emissive once when animation stops (instead of every frame)
@@ -967,7 +966,7 @@ const DeviceMesh = ({
               {resolvedUrl ? (
                 <Suspense fallback={
                   <ImageFaceplate
-                    url={thumbUrl}
+                    url={thumbUrl || ""}
                     width={deviceWidth}
                     height={deviceH - 0.005}
                     hasError={hasError}

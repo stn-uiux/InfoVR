@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useProgress } from "@react-three/drei";
 import { useStore } from "../store/useStore";
 
 export const InitialLoader = () => {
   const { active, progress, total } = useProgress();
   const [isReady, setIsReady] = useState(false);
-  const [hasStarted, setHasStarted] = useState(false);
+  const [, setHasStarted] = useState(false);
   const nodes = useStore((s) => s.nodes);
   const activeNodeId = useStore((s) => s.activeNodeId);
   const isCanvasReady = useStore((s) => s.isCanvasReady);
