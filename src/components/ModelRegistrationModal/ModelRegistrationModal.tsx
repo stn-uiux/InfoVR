@@ -1,5 +1,5 @@
 import { Icon } from "@iconify/react";
-﻿import React, { useState, useRef, useCallback, useMemo } from "react";
+import React, { useState, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useStore } from "../../store/useStore";
 import type {
@@ -230,8 +230,8 @@ function ChassisPreviewWithOverlay({
   const displaySvg = useMemo(() => {
     return overlayedSvg
       .replace(/width="[^"]*"/, 'width="100%"')
-      .replace(/height="[^"]*"/, 'height="auto"')
-      .replace(/<svg/, '<svg style="max-width:100%;display:block"');
+      .replace(/\sheight="[^"]*"/, '')
+      .replace(/<svg/, '<svg style="max-width:100%;height:auto;display:block"');
   }, [overlayedSvg]);
 
   return (
@@ -255,7 +255,7 @@ export const ModelRegistrationModal: React.FC = () => {
   const removeDefaultTemplate = useStore((s) => s.removeDefaultTemplate);
 
   // Tabs: "register" | "list"
-  const [activeTab, setActiveTab] = useState<"register" | "list">("register");
+  const [activeTab, setActiveTab] = useState<"register" | "list">("list");
 
   interface AvailableCard {
     id: string;
@@ -711,23 +711,22 @@ export const ModelRegistrationModal: React.FC = () => {
           </button>
         </div>
 
-        {/* Tabs */}
-        <div style={{ padding: "16px 28px 0" }}>
-          <div className="mrm-tabs">
+        {/* Navigation for Register View */}
+        {activeTab === "register" && (
+          <div style={{ padding: "16px 28px 0" }}>
             <button
-              className={`mrm-tab ${activeTab === "register" ? "active" : ""}`}
-              onClick={() => setActiveTab("register")}
+              className="comm-btn comm-btn-secondary comm-btn-sm"
+              onClick={() => {
+                setActiveTab("list");
+                setEditingModelId(null);
+              }}
+              style={{ gap: 6, display: "inline-flex", alignItems: "center" }}
             >
-              {editingModelId ? "✏️ 모델 수정" : "새 모델 등록"}
-            </button>
-            <button
-              className={`mrm-tab ${activeTab === "list" ? "active" : ""}`}
-              onClick={() => setActiveTab("list")}
-            >
-              등록된 모델 ({DEVICE_TEMPLATES.filter((t) => !deletedDefaultTemplates.includes(t.modelName)).length + customModels.length})
+              <Icon icon="material-symbols:arrow-back" style={{ width: 16, height: 16 }} />
+              목록으로 돌아가기
             </button>
           </div>
-        </div>
+        )}
 
         {activeTab === "register" ? (
           <>
@@ -740,7 +739,7 @@ export const ModelRegistrationModal: React.FC = () => {
                   <span className="badge">필수</span>
                 </div>
 
-                <div className="mrm-form-grid">
+                <div className="mrm-form-grid" style={{ gridTemplateColumns: "1.5fr 1fr" }}>
                   <div className="mrm-field">
                     <label>
                       모델명<span className="required">*</span>
@@ -771,6 +770,34 @@ export const ModelRegistrationModal: React.FC = () => {
                       <span className="error-hint">{errors.unit}</span>
                     )}
                   </div>
+
+                  <div className="mrm-field full-width" style={{ marginTop: 4 }}>
+                    <label>
+                      폼 팩터<span className="required">*</span>
+                    </label>
+                    <div className="mrm-type-selector compact">
+                      <div
+                        className={`mrm-type-card compact ${modelType === "normal" ? "active" : ""}`}
+                        onClick={() => setModelType("normal")}
+                      >
+                        <div className="type-icon">📦</div>
+                        <div className="type-info">
+                          <div className="type-name">고정형</div>
+                          <div className="type-desc">단일 바디 장비</div>
+                        </div>
+                      </div>
+                      <div
+                        className={`mrm-type-card compact ${modelType === "card-based" ? "active" : ""}`}
+                        onClick={() => setModelType("card-based")}
+                      >
+                        <div className="type-icon">🗂️</div>
+                        <div className="type-info">
+                          <div className="type-name">섀시형</div>
+                          <div className="type-desc">카드 삽입 가능한 장비 (섀시+카드)</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Display Name Preview */}
@@ -780,35 +807,6 @@ export const ModelRegistrationModal: React.FC = () => {
                     <span className="preview-value">{displayName}</span>
                   </div>
                 )}
-              </div>
-
-              {/* Model Type */}
-              <div className="mrm-section">
-                <div className="mrm-section-title">모델 타입</div>
-                <div className="mrm-type-selector">
-                  <div
-                    className={`mrm-type-card ${modelType === "normal" ? "active" : ""}`}
-                    onClick={() => setModelType("normal")}
-                  >
-                    <div className="type-icon">📦</div>
-                    <div className="type-name">일반 장비</div>
-                    <div className="type-desc">
-                      단일 바디 장비<br />
-                      모델 파일만 필요
-                    </div>
-                  </div>
-                  <div
-                    className={`mrm-type-card ${modelType === "card-based" ? "active" : ""}`}
-                    onClick={() => setModelType("card-based")}
-                  >
-                    <div className="type-icon">🗂️</div>
-                    <div className="type-name">카드 기반 장비</div>
-                    <div className="type-desc">
-                      카드 삽입 가능한 장비<br />
-                      섀시 + 카드 구성
-                    </div>
-                  </div>
-                </div>
               </div>
 
               {/* Model SVG Upload */}
@@ -1451,215 +1449,223 @@ export const ModelRegistrationModal: React.FC = () => {
           <>
             {/* Body: Registered Models List */}
             <div className="mrm-body">
-              {/* Default (Built-in) Models */}
-              <div style={{ marginBottom: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <div style={{
-                  fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)",
+                  fontSize: 12, fontWeight: 700, color: "var(--text-tertiary)",
                   textTransform: "uppercase", letterSpacing: "0.05em",
-                  padding: "8px 0 6px", borderBottom: "1px solid var(--border-weak)",
-                  marginBottom: 8,
+                  padding: "8px 0 6px",
                 }}>
                   기본 장비 모델 ({DEVICE_TEMPLATES.filter((t) => !deletedDefaultTemplates.includes(t.modelName)).length})
                 </div>
+                <button
+                  className="comm-btn comm-btn-primary comm-btn-md"
+                  onClick={() => {
+                    setEditingModelId(null);
+                    setActiveTab("register");
+                  }}
+                  style={{ gap: 6, display: "inline-flex", alignItems: "center" }}
+                >
+                  <Icon icon="material-symbols:add" style={{ width: 16, height: 16 }} />
+                  새 모델 등록
+                </button>
+              </div>
+              {/* Default (Built-in) Models */}
+              <div style={{ marginBottom: 8 }}>
                 <div className="mrm-models-list">
                   {DEVICE_TEMPLATES.filter((t) => !deletedDefaultTemplates.includes(t.modelName)).map((tmpl) => {
                     const imgUrl = resolveDeviceImage(tmpl.modelName);
+                    const isCardBased = equipmentModels.some((m) => m.modelName === tmpl.modelName);
                     return (
                       <div key={`default-${tmpl.modelName}`} className="mrm-model-row">
-                        <div
-                          className="model-thumb"
-                          style={{
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            width: 80, height: 40, background: "var(--bg-tertiary)",
-                            borderRadius: 6, overflow: "hidden",
-                          }}
-                        >
+                        <span className={`model-type-tag ${isCardBased ? "card-based" : "normal"}`}>
+                          {isCardBased ? "섀시형" : "고정형"}
+                        </span>
+                        <div className="model-thumb">
                           {imgUrl ? (
-                            <img
-                              src={imgUrl}
-                              alt={tmpl.modelName}
-                              style={{ width: "100%", height: "100%", objectFit: "contain" }}
-                            />
+                            <img src={imgUrl} alt={tmpl.modelName} />
                           ) : (
                             <span style={{ fontSize: 18, color: "var(--text-tertiary)" }}>🖥️</span>
                           )}
                         </div>
-                        <div className="model-info">
-                          <div className="model-display-name">
-                            [{tmpl.uSize}U] {tmpl.modelName}
+                        <div className="model-info-wrapper">
+                          <div className="model-info-header">
+                            <div className="model-info">
+                              <div className="model-display-name">
+                                [{tmpl.uSize}U] {tmpl.modelName}
+                              </div>
+                              <div className="model-meta">
+                                <span>{tmpl.uSize}U</span>
+                                <span>·</span>
+                                <span>{tmpl.vendor}</span>
+                                <span>·</span>
+                                <span>{tmpl.type}</span>
+                              </div>
+                            </div>
                           </div>
-                          <div className="model-meta">
-                            <span>{tmpl.uSize}U</span>
-                            <span>·</span>
-                            <span>{tmpl.vendor}</span>
-                            <span>·</span>
-                            <span>{tmpl.type}</span>
+                          <div className="model-actions">
+                            <button
+                              className="comm-btn comm-btn-secondary comm-btn-sm"
+                              onClick={async () => {
+                                // 기본 장비를 편집 폼에 로드 (SVG 이미지 + 카드 영역 설정 포함)
+                                setModelName(tmpl.modelName);
+                                setUnit(tmpl.uSize);
+                                setErrors({});
+                                setEditingModelId(null);
+                                setUseDualView(false);
+                                setRearSvgRaw(null);
+                                setRearSvgFileName("");
+                                setDefaultViewSide("front");
+                                setActiveTab("register");
+
+                                // 카드 기반 모델 여부 확인
+                                const eqModel = equipmentModels.find(
+                                  (m) => m.modelName === tmpl.modelName
+                                );
+                                if (eqModel) {
+                                  setModelType("card-based");
+
+                                  if (eqModel.rows && eqModel.rows.length > 0) {
+                                    // ── rows 기반 모델 (IXR-6, IXR-10): rows에서 카드 영역 역산 ──
+                                    const firstRow = eqModel.rows[0];
+                                    const lastRow = eqModel.rows[eqModel.rows.length - 1];
+                                    const computedX = firstRow.x;
+                                    const computedY = firstRow.y;
+                                    const computedW = firstRow.width;
+                                    const computedH = (lastRow.y + lastRow.height) - firstRow.y;
+                                    const computedCols = firstRow.columns;
+                                    const computedColW = Math.round(computedW / computedCols);
+
+                                    setCaXStr(String(computedX));
+                                    setCaYStr(String(computedY));
+                                    setCaWidthStr(String(computedW));
+                                    setCaHeightStr(String(computedH));
+                                    setCaColumnsStr(String(computedCols));
+                                    setCaColWidthStr(String(computedColW));
+
+                                    // 행 수 & 행 높이 & 행별 열 수 & 행 간 간격
+                                    const rCount = eqModel.rows.length;
+                                    setCaRowCountStr(String(rCount));
+                                    setRowHeights(eqModel.rows.map((r) => String(r.height)));
+                                    setRowColumnsArr(eqModel.rows.map((r) => String(r.columns)));
+                                    // rows Y좌표 차이로 간격 계산
+                                    const gaps: string[] = [];
+                                    for (let ri = 0; ri < rCount - 1; ri++) {
+                                      const currentEnd = eqModel.rows[ri].y + eqModel.rows[ri].height;
+                                      const nextStart = eqModel.rows[ri + 1].y;
+                                      gaps.push(String(Math.max(0, nextStart - currentEnd)));
+                                    }
+                                    setRowGapsArr(gaps);
+                                  } else if (eqModel.cardArea) {
+                                    // ── cardArea 기반 모델 (R4, R6, R6d, R6dl) ──
+                                    setCaXStr(String(eqModel.cardArea.x));
+                                    setCaYStr(String(eqModel.cardArea.y));
+                                    setCaWidthStr(String(eqModel.cardArea.width));
+                                    setCaHeightStr(String(eqModel.cardArea.height));
+                                    setCaColumnsStr(String(eqModel.cardArea.columns));
+                                    setCaColWidthStr(String(eqModel.cardArea.columnWidth));
+
+                                    // slots에서 고유 행 높이 추출, 없으면 기본값으로 계산
+                                    if (eqModel.slots && eqModel.slots.length > 0) {
+                                      const rowMap = new Map<number, number>();
+                                      for (const s of eqModel.slots) {
+                                        if (!rowMap.has(s.row) || s.height > (rowMap.get(s.row) || 0)) {
+                                          rowMap.set(s.row, s.height);
+                                        }
+                                      }
+                                      const sortedRows = [...rowMap.entries()].sort((a, b) => a[0] - b[0]);
+                                      setCaRowCountStr(String(sortedRows.length));
+                                      setRowHeights(sortedRows.map(([, h]) => String(h)));
+                                      setRowColumnsArr(Array.from({ length: sortedRows.length }, () => String(eqModel.cardArea!.columns)));
+                                      // slots 기반: 행 간 Y좌표 차이로 간격 계산
+                                      const slotGaps: string[] = [];
+                                      const sortedRowKeys = sortedRows.map(([k]) => k);
+                                      for (let ri = 0; ri < sortedRowKeys.length - 1; ri++) {
+                                        const curRow = eqModel.slots!.filter((s) => s.row === sortedRowKeys[ri]);
+                                        const nextRow = eqModel.slots!.filter((s) => s.row === sortedRowKeys[ri + 1]);
+                                        if (curRow.length > 0 && nextRow.length > 0) {
+                                          const curEnd = Math.max(...curRow.map((s) => s.y + s.height));
+                                          const nextStart = Math.min(...nextRow.map((s) => s.y));
+                                          slotGaps.push(String(Math.max(0, nextStart - curEnd)));
+                                        } else {
+                                          slotGaps.push("0");
+                                        }
+                                      }
+                                      setRowGapsArr(slotGaps);
+                                    } else {
+                                      const rCount = Math.max(1, Math.floor(eqModel.cardArea.height / 46));
+                                      setCaRowCountStr(String(rCount));
+                                      setRowHeights(Array.from({ length: rCount }, () => "46"));
+                                      setRowColumnsArr(Array.from({ length: rCount }, () => String(eqModel.cardArea!.columns)));
+                                      setRowGapsArr(Array.from({ length: Math.max(0, rCount - 1) }, () => "0"));
+                                    }
+                                  }
+
+                                  // 섀시 SVG 로드
+                                  if (eqModel.baseSvgUrl) {
+                                    const chassisSvg = await loadBaseEquipmentSvgRaw(eqModel.baseSvgUrl);
+                                    if (chassisSvg) {
+                                      setBaseChassisRaw(chassisSvg);
+                                      setBaseChassisFileName(eqModel.baseSvgUrl);
+                                    }
+                                  }
+                                } else {
+                                  setModelType("normal");
+                                  setBaseChassisRaw(null);
+                                  setBaseChassisFileName("");
+                                  setCaRowCountStr("0");
+                                  setRowHeights([]);
+                                  setRowColumnsArr([]);
+                                  setRowGapsArr([]);
+                                }
+
+                                // 카드 할당: 카드 기반 모델이면 호환 카드를 자동 할당
+                                if (eqModel) {
+                                  const compatibleCards = getCardsForModel(eqModel);
+                                  setAssignedCardIds(compatibleCards.map((c) => c.cardFileName));
+                                } else {
+                                  setAssignedCardIds([]);
+                                }
+
+                                // 모델 SVG 로드
+                                const svgContent = await resolveDeviceSvgContent(tmpl.modelName);
+                                if (svgContent) {
+                                  setModelSvgRaw(svgContent);
+                                  setModelSvgFileName(`[${tmpl.uSize}U] ${tmpl.modelName}.svg`);
+                                  showToastMsg("기본 모델 정보와 이미지를 폼에 로드했습니다.", "success");
+                                } else {
+                                  setModelSvgRaw(null);
+                                  setModelSvgFileName("");
+                                  showToastMsg("기본 모델 정보를 로드했습니다. SVG 파일을 업로드해주세요.", "success");
+                                }
+
+                                const sides = getDeviceViewSides(tmpl.modelName);
+                                if (sides.includes("rear")) {
+                                  const rearSvgContent = await resolveDeviceSvgContent(tmpl.modelName, "rear");
+                                  setUseDualView(!!rearSvgContent);
+                                  setRearSvgRaw(rearSvgContent || null);
+                                  setRearSvgFileName(rearSvgContent ? `[${tmpl.uSize}U] ${tmpl.modelName} back.svg` : "");
+                                }
+                              }}
+                              title="모델 폼에 로드"
+                              style={{ display: "inline-flex", gap: 6, flex: 1, justifyContent: "center" }}
+                            >
+                              <Icon icon="material-symbols:edit" style={{ width: 14, height: 14 }} />
+                              폼에 복사
+                            </button>
+                            <button
+                              className="comm-btn comm-btn-danger comm-btn-sm"
+                              onClick={() => {
+                                removeDefaultTemplate(tmpl.modelName);
+                                showToastMsg(`기본 모델 "[${tmpl.uSize}U] ${tmpl.modelName}" 삭제됨`, "success");
+                              }}
+                              title="기본 모델 삭제"
+                              aria-label="기본 모델 삭제"
+                              style={{ display: "inline-flex", gap: 6 }}
+                            >
+                              <Icon icon="material-symbols:delete" style={{ width: 14, height: 14 }} />
+                            </button>
                           </div>
                         </div>
-                        <span className="model-type-tag" style={{
-                          background: "rgba(59,130,246,0.15)", color: "rgb(96,165,250)",
-                        }}>
-                          기본
-                        </span>
-                        <button
-                          className="mrm-btn-sm"
-                          onClick={async () => {
-                            // 기본 장비를 편집 폼에 로드 (SVG 이미지 + 카드 영역 설정 포함)
-                            setModelName(tmpl.modelName);
-                            setUnit(tmpl.uSize);
-                            setErrors({});
-                            setEditingModelId(null);
-                            setUseDualView(false);
-                            setRearSvgRaw(null);
-                            setRearSvgFileName("");
-                            setDefaultViewSide("front");
-                            setActiveTab("register");
-
-                            // 카드 기반 모델 여부 확인
-                            const eqModel = equipmentModels.find(
-                              (m) => m.modelName === tmpl.modelName
-                            );
-                            if (eqModel) {
-                              setModelType("card-based");
-
-                              if (eqModel.rows && eqModel.rows.length > 0) {
-                                // ── rows 기반 모델 (IXR-6, IXR-10): rows에서 카드 영역 역산 ──
-                                const firstRow = eqModel.rows[0];
-                                const lastRow = eqModel.rows[eqModel.rows.length - 1];
-                                const computedX = firstRow.x;
-                                const computedY = firstRow.y;
-                                const computedW = firstRow.width;
-                                const computedH = (lastRow.y + lastRow.height) - firstRow.y;
-                                const computedCols = firstRow.columns;
-                                const computedColW = Math.round(computedW / computedCols);
-
-                                setCaXStr(String(computedX));
-                                setCaYStr(String(computedY));
-                                setCaWidthStr(String(computedW));
-                                setCaHeightStr(String(computedH));
-                                setCaColumnsStr(String(computedCols));
-                                setCaColWidthStr(String(computedColW));
-
-                                // 행 수 & 행 높이 & 행별 열 수 & 행 간 간격
-                                const rCount = eqModel.rows.length;
-                                setCaRowCountStr(String(rCount));
-                                setRowHeights(eqModel.rows.map((r) => String(r.height)));
-                                setRowColumnsArr(eqModel.rows.map((r) => String(r.columns)));
-                                // rows Y좌표 차이로 간격 계산
-                                const gaps: string[] = [];
-                                for (let ri = 0; ri < rCount - 1; ri++) {
-                                  const currentEnd = eqModel.rows[ri].y + eqModel.rows[ri].height;
-                                  const nextStart = eqModel.rows[ri + 1].y;
-                                  gaps.push(String(Math.max(0, nextStart - currentEnd)));
-                                }
-                                setRowGapsArr(gaps);
-                              } else if (eqModel.cardArea) {
-                                // ── cardArea 기반 모델 (R4, R6, R6d, R6dl) ──
-                                setCaXStr(String(eqModel.cardArea.x));
-                                setCaYStr(String(eqModel.cardArea.y));
-                                setCaWidthStr(String(eqModel.cardArea.width));
-                                setCaHeightStr(String(eqModel.cardArea.height));
-                                setCaColumnsStr(String(eqModel.cardArea.columns));
-                                setCaColWidthStr(String(eqModel.cardArea.columnWidth));
-
-                                // slots에서 고유 행 높이 추출, 없으면 기본값으로 계산
-                                if (eqModel.slots && eqModel.slots.length > 0) {
-                                  const rowMap = new Map<number, number>();
-                                  for (const s of eqModel.slots) {
-                                    if (!rowMap.has(s.row) || s.height > (rowMap.get(s.row) || 0)) {
-                                      rowMap.set(s.row, s.height);
-                                    }
-                                  }
-                                  const sortedRows = [...rowMap.entries()].sort((a, b) => a[0] - b[0]);
-                                  setCaRowCountStr(String(sortedRows.length));
-                                  setRowHeights(sortedRows.map(([, h]) => String(h)));
-                                  setRowColumnsArr(Array.from({ length: sortedRows.length }, () => String(eqModel.cardArea!.columns)));
-                                  // slots 기반: 행 간 Y좌표 차이로 간격 계산
-                                  const slotGaps: string[] = [];
-                                  const sortedRowKeys = sortedRows.map(([k]) => k);
-                                  for (let ri = 0; ri < sortedRowKeys.length - 1; ri++) {
-                                    const curRow = eqModel.slots!.filter((s) => s.row === sortedRowKeys[ri]);
-                                    const nextRow = eqModel.slots!.filter((s) => s.row === sortedRowKeys[ri + 1]);
-                                    if (curRow.length > 0 && nextRow.length > 0) {
-                                      const curEnd = Math.max(...curRow.map((s) => s.y + s.height));
-                                      const nextStart = Math.min(...nextRow.map((s) => s.y));
-                                      slotGaps.push(String(Math.max(0, nextStart - curEnd)));
-                                    } else {
-                                      slotGaps.push("0");
-                                    }
-                                  }
-                                  setRowGapsArr(slotGaps);
-                                } else {
-                                  const rCount = Math.max(1, Math.floor(eqModel.cardArea.height / 46));
-                                  setCaRowCountStr(String(rCount));
-                                  setRowHeights(Array.from({ length: rCount }, () => "46"));
-                                  setRowColumnsArr(Array.from({ length: rCount }, () => String(eqModel.cardArea!.columns)));
-                                  setRowGapsArr(Array.from({ length: Math.max(0, rCount - 1) }, () => "0"));
-                                }
-                              }
-
-                              // 섀시 SVG 로드
-                              if (eqModel.baseSvgUrl) {
-                                const chassisSvg = await loadBaseEquipmentSvgRaw(eqModel.baseSvgUrl);
-                                if (chassisSvg) {
-                                  setBaseChassisRaw(chassisSvg);
-                                  setBaseChassisFileName(eqModel.baseSvgUrl);
-                                }
-                              }
-                            } else {
-                              setModelType("normal");
-                              setBaseChassisRaw(null);
-                              setBaseChassisFileName("");
-                              setCaRowCountStr("0");
-                              setRowHeights([]);
-                              setRowColumnsArr([]);
-                              setRowGapsArr([]);
-                            }
-
-                            // 카드 할당: 카드 기반 모델이면 호환 카드를 자동 할당
-                            if (eqModel) {
-                              const compatibleCards = getCardsForModel(eqModel);
-                              setAssignedCardIds(compatibleCards.map((c) => c.cardFileName));
-                            } else {
-                              setAssignedCardIds([]);
-                            }
-
-                            // 모델 SVG 로드
-                            const svgContent = await resolveDeviceSvgContent(tmpl.modelName);
-                            if (svgContent) {
-                              setModelSvgRaw(svgContent);
-                              setModelSvgFileName(`[${tmpl.uSize}U] ${tmpl.modelName}.svg`);
-                              showToastMsg("기본 모델 정보와 이미지를 폼에 로드했습니다.", "success");
-                            } else {
-                              setModelSvgRaw(null);
-                              setModelSvgFileName("");
-                              showToastMsg("기본 모델 정보를 로드했습니다. SVG 파일을 업로드해주세요.", "success");
-                            }
-
-                            const sides = getDeviceViewSides(tmpl.modelName);
-                            if (sides.includes("rear")) {
-                              const rearSvgContent = await resolveDeviceSvgContent(tmpl.modelName, "rear");
-                              setUseDualView(!!rearSvgContent);
-                              setRearSvgRaw(rearSvgContent || null);
-                              setRearSvgFileName(rearSvgContent ? `[${tmpl.uSize}U] ${tmpl.modelName} back.svg` : "");
-                            }
-                          }}
-                          title="모델 수정"
-                          style={{ fontSize: 11, padding: "4px 10px", marginRight: 4 }}
-                        >
-                          ✏️ 수정
-                        </button>
-                        <button
-                          className="card-remove"
-                          onClick={() => {
-                            removeDefaultTemplate(tmpl.modelName);
-                            showToastMsg(`기본 모델 "[${tmpl.uSize}U] ${tmpl.modelName}" 삭제됨`, "success");
-                          }}
-                          title="모델 삭제"
-                          aria-label="모델 삭제"
-                        >
-                          <Icon icon="material-symbols:delete" className="icon" style={DELETE_ICON_STYLE} />
-                        </button>
                       </div>
                     );
                   })}
@@ -1680,59 +1686,65 @@ export const ModelRegistrationModal: React.FC = () => {
                   <div className="mrm-models-list">
                     {customModels.map((model) => (
                       <div key={model.modelId} className="mrm-model-row">
+                        <span className={`model-type-tag ${model.modelType}`}>
+                          {model.modelType === "normal" ? "고정형" : "섀시형"}
+                        </span>
                         <div
                           className="model-thumb"
                           dangerouslySetInnerHTML={{
                             __html: (model.defaultViewSide === "rear" && model.rearSvgRaw ? model.rearSvgRaw : model.modelSvgRaw)
-                              .replace(/width="[^"]*"/, 'width="80"')
-                              .replace(/height="[^"]*"/, 'height="40"'),
                           }}
                         />
-                        <div className="model-info">
-                          <div className="model-display-name">
-                            {model.displayName}
+                        <div className="model-info-wrapper">
+                          <div className="model-info-header">
+                            <div className="model-info">
+                              <div className="model-display-name">
+                                {model.displayName}
+                              </div>
+                              <div className="model-meta">
+                                <span>{model.unit}U</span>
+                                <span>·</span>
+                                <span>
+                                  {model.equipmentSize
+                                    ? `${model.equipmentSize.width}×${model.equipmentSize.height}px`
+                                    : ""}
+                                </span>
+                                {model.modelType === "card-based" && (
+                                  <>
+                                    <span>·</span>
+                                    <span>카드 {model.assignedCardIds.length}개</span>
+                                  </>
+                                )}
+                                {model.rearSvgRaw && (
+                                  <>
+                                    <span>·</span>
+                                    <span>양면/{model.defaultViewSide === "rear" ? "뒷면 기본" : "앞면 기본"}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                          <div className="model-meta">
-                            <span>{model.unit}U</span>
-                            <span>·</span>
-                            <span>
-                              {model.equipmentSize
-                                ? `${model.equipmentSize.width}×${model.equipmentSize.height}px`
-                                : ""}
-                            </span>
-                            {model.modelType === "card-based" && (
-                              <>
-                                <span>·</span>
-                                <span>카드 {model.assignedCardIds.length}개</span>
-                              </>
-                            )}
-                            {model.rearSvgRaw && (
-                              <>
-                                <span>·</span>
-                                <span>양면/{model.defaultViewSide === "rear" ? "뒷면 기본" : "앞면 기본"}</span>
-                              </>
-                            )}
+                          <div className="model-actions">
+                            <button
+                              className="comm-btn comm-btn-secondary comm-btn-sm"
+                              onClick={() => loadModelForEdit(model.modelId)}
+                              title="모델 폼에 로드"
+                              style={{ display: "inline-flex", gap: 6, flex: 1, justifyContent: "center" }}
+                            >
+                              <Icon icon="material-symbols:edit" style={{ width: 14, height: 14 }} />
+                              폼에 복사
+                            </button>
+                            <button
+                              className="comm-btn comm-btn-danger comm-btn-sm"
+                              onClick={() => handleDeleteModel(model.modelId)}
+                              title="커스텀 모델 삭제"
+                              aria-label="커스텀 모델 삭제"
+                              style={{ display: "inline-flex", gap: 6 }}
+                            >
+                              <Icon icon="material-symbols:delete" style={{ width: 14, height: 14 }} />
+                            </button>
                           </div>
                         </div>
-                        <span className={`model-type-tag ${model.modelType}`}>
-                          {model.modelType === "normal" ? "일반" : "카드 기반"}
-                        </span>
-                        <button
-                          className="mrm-btn-sm"
-                          onClick={() => loadModelForEdit(model.modelId)}
-                          title="모델 수정"
-                          style={{ fontSize: 11, padding: "4px 10px", marginRight: 4 }}
-                        >
-                          ✏️ 수정
-                        </button>
-                        <button
-                          className="card-remove"
-                          onClick={() => handleDeleteModel(model.modelId)}
-                          title="모델 삭제"
-                          aria-label="모델 삭제"
-                        >
-                          <Icon icon="material-symbols:delete" className="icon" style={DELETE_ICON_STYLE} />
-                        </button>
                       </div>
                     ))}
                   </div>

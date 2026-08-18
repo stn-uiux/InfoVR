@@ -3047,7 +3047,7 @@ input:checked+.slider:before {
   border: 1px solid var(--border-medium, #2a2d35);
   border-radius: 20px;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
-  width: 860px;
+  width: 1400px;
   max-width: 95vw;
   max-height: 90vh;
   display: flex;
@@ -3130,7 +3130,7 @@ input:checked+.slider:before {
   padding: 28px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 8px;
 }
 
 /* Section */
@@ -3304,6 +3304,43 @@ input:checked+.slider:before {
   font-size: 11px;
   color: var(--text-tertiary, #5f6377);
   line-height: 1.4;
+}
+
+.mrm-type-selector.compact {
+  gap: 8px;
+  height: 44px;
+}
+
+.mrm-type-card.compact {
+  padding: 0 12px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+
+.mrm-type-card.compact .type-icon {
+  font-size: 20px;
+  margin-bottom: 0;
+}
+
+.mrm-type-card.compact .type-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  justify-content: center;
+}
+
+.mrm-type-card.compact .type-name {
+  margin-bottom: 0;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.mrm-type-card.compact .type-desc {
+  font-size: 10px;
+  white-space: nowrap;
 }
 
 /* File Upload */
@@ -3794,39 +3831,63 @@ input:checked+.slider:before {
 /* Registered Models List */
 .mrm-models-list {
   margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
 }
 
 .mrm-model-row {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
+  flex-direction: column;
   border: 1px solid var(--border-weak, #222530);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--bg-primary, #111217);
-  margin-bottom: 8px;
-  transition: all 0.15s;
+  overflow: hidden;
+  transition: all 0.2s ease;
+  position: relative;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .mrm-model-row:hover {
-  border-color: var(--border-medium, #2a2d35);
+  border-color: var(--theme-primary, #5b7cf7);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  transform: translateY(-2px);
 }
 
 .mrm-model-row .model-thumb {
-  width: 80px;
-  height: 40px;
-  border-radius: 6px;
+  width: 100%;
+  height: 140px;
   background: #0d0e12;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
-  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-weak, #222530);
 }
 
 .mrm-model-row .model-thumb svg {
-  max-width: 100%;
-  max-height: 100%;
+  max-width: 90%;
+  max-height: 90%;
+  object-fit: contain;
+}
+
+.mrm-model-row .model-thumb img {
+  max-width: 90%;
+  max-height: 90%;
+  object-fit: contain;
+}
+
+.mrm-model-row .model-info-wrapper {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mrm-model-row .model-info-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 .mrm-model-row .model-info {
@@ -3835,17 +3896,30 @@ input:checked+.slider:before {
 }
 
 .mrm-model-row .model-info .model-display-name {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-primary, #e8eaed);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .mrm-model-row .model-info .model-meta {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-tertiary, #5f6377);
-  margin-top: 2px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.mrm-model-row .model-actions {
   display: flex;
   gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-weak, #222530);
 }
 
 .mrm-model-row .model-type-tag {
@@ -3854,18 +3928,24 @@ input:checked+.slider:before {
   padding: 3px 8px;
   border-radius: 6px;
   white-space: nowrap;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
 }
 
 .mrm-model-row .model-type-tag.normal {
-  background: rgba(34, 197, 94, 0.12);
-  color: #22c55e;
-  border: 1px solid rgba(34, 197, 94, 0.25);
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.3);
 }
 
 .mrm-model-row .model-type-tag.card-based {
-  background: rgba(249, 115, 22, 0.12);
-  color: #f97316;
-  border: 1px solid rgba(249, 115, 22, 0.25);
+  background: rgba(249, 115, 22, 0.2);
+  color: #fb923c;
+  border: 1px solid rgba(251, 146, 60, 0.3);
 }
 
 /* Card Registration Sub-Modal */
