@@ -18,6 +18,23 @@ import {
 import { migrateGroupNameToNodeId, NONE_NODE_ID } from "../utils/nodeUtils";
 import { Camera, Plane, Raycaster, Vector2, Vector3 } from 'three';
 import { layoutsEqual } from "../utils/comparison";
+import initialCustomModelsData from "../utils/customModels.json";
+
+const saveCustomModelsToProject = (models: CustomEquipmentModel[]) => {
+  if (import.meta.env.DEV) {
+    fetch('/__save_custom_models', {
+      method: 'POST',
+      body: JSON.stringify(models),
+    }).catch(err => console.error('Failed to save custom models to project:', err));
+  }
+};
+
+if (import.meta.hot) {
+  import.meta.hot.accept("../utils/customModels.json", () => {
+    // Silently accept updates to customModels.json to prevent full page reloads.
+    // The Zustand store already has the latest state in memory when it initiated the save.
+  });
+}
 
 export interface CameraState {
   position: [number, number, number];
@@ -303,7 +320,7 @@ export interface AppState {
   setPendingImportFile: (file: File | null) => void;
 
   // Imported Model Actions
-  addImportedModel: (model: Omit<ImportedModel, "id">) => string;
+  addImportedModel: (model: Omit<ImportedModel, "id">) => string | null;
   selectModel: (id: string | null) => void;
   deleteModel: (id: string) => void;
   updateModel: (
@@ -580,7 +597,7 @@ export const useStore = create<AppState>()(
       _cameraRef: null,
       _controlsRef: null,
 
-      customModels: [],
+      customModels: (initialCustomModelsData as any) || [],
       deletedDefaultTemplates: [],
       customCards: [],
 
@@ -735,9 +752,6 @@ export const useStore = create<AppState>()(
           layouts: {},
           nodeEnvironments: {},
           registeredDevices: [],
-          customModels: [],
-          customCards: [],
-          deletedDefaultTemplates: [],
           activeNodeId: null,
           activeSceneNodeId: null,
           pinnedNodeId: null,
@@ -1107,24 +1121,98 @@ export const useStore = create<AppState>()(
       addCustomModel: (modelData) => {
         const modelId = `custom-model-${crypto.randomUUID().slice(0, 8)}`;
         const newModel: CustomEquipmentModel = { ...modelData, modelId };
-        set((state) => ({
-          customModels: [...state.customModels, newModel],
-        }));
+        set((state) => {
+          const newModels = [...state.customModels, newModel];
+          saveCustomModelsToProject(newModels);
+          return { customModels: newModels };
+        });
         return modelId;
       },
 
       updateCustomModel: (modelId, updates) => {
-        set((state) => ({
-          customModels: state.customModels.map((m) =>
-            m.modelId === modelId ? { ...m, ...updates } : m
-          ),
-        }));
+        set((state) => {
+          const oldModel = state.customModels.find((m) => m.modelId === modelId);
+          if (!oldModel) return state;
+
+          const updatedModel = { ...oldModel, ...updates };
+          const customModels = state.customModels.map((m) =>
+            m.modelId === modelId ? updatedModel : m
+          );
+
+          // 변경된 모델 정보를 기존 인스턴스(등록 장비 & 랙 장비)에 전파
+          const registeredDevices = state.registeredDevices.map((dev) => {
+            // Check if dev matches ANY variant of the OLD model
+            let matchedVariant = oldModel.variants?.find((v) => {
+              const oldVariantName = v.variantName === "기본타입" ? oldModel.modelName : `${oldModel.modelName} ${v.variantName}`;
+              return dev.modelName === oldVariantName;
+            });
+            if (!matchedVariant && dev.modelName === oldModel.modelName) {
+              matchedVariant = oldModel.variants?.[0];
+            }
+
+            if (matchedVariant || dev.modelName === oldModel.modelName) {
+              const newVariant = updatedModel.variants?.find(v => v.variantId === matchedVariant?.variantId) 
+                              || updatedModel.variants?.find(v => v.variantName === matchedVariant?.variantName)
+                              || updatedModel.variants?.[0];
+              
+              const newDevModelName = newVariant 
+                 ? (newVariant.variantName === "기본타입" ? updatedModel.modelName : `${updatedModel.modelName} ${newVariant.variantName}`)
+                 : updatedModel.modelName;
+
+              return {
+                ...dev,
+                modelName: newDevModelName,
+                size: updatedModel.unit ?? dev.size,
+                insertedCards: newVariant?.insertedCards || [],
+              };
+            }
+            return dev;
+          });
+
+          // 2. 랙에 탑재된 장비 업데이트
+          const racks = state.racks.map((rack) => {
+            let changed = false;
+            const newDevices = rack.devices.map((dev) => {
+              let matchedVariant = oldModel.variants?.find((v) => {
+                const oldVariantName = v.variantName === "기본타입" ? oldModel.modelName : `${oldModel.modelName} ${v.variantName}`;
+                return dev.modelName === oldVariantName;
+              });
+              if (!matchedVariant && dev.modelName === oldModel.modelName) {
+                matchedVariant = oldModel.variants?.[0];
+              }
+
+              if (matchedVariant || dev.modelName === oldModel.modelName) {
+                changed = true;
+                const newVariant = updatedModel.variants?.find(v => v.variantId === matchedVariant?.variantId)
+                                || updatedModel.variants?.find(v => v.variantName === matchedVariant?.variantName)
+                                || updatedModel.variants?.[0];
+                const newDevModelName = newVariant 
+                  ? (newVariant.variantName === "기본타입" ? updatedModel.modelName : `${updatedModel.modelName} ${newVariant.variantName}`)
+                  : updatedModel.modelName;
+                  
+                return {
+                  ...dev,
+                  modelName: newDevModelName,
+                  size: updatedModel.unit ?? dev.size,
+                  insertedCards: newVariant?.insertedCards || [],
+                };
+              }
+              return dev;
+            });
+            return changed ? { ...rack, devices: newDevices } : rack;
+          });
+
+          saveCustomModelsToProject(customModels);
+          return { customModels, registeredDevices, racks };
+        });
       },
 
       removeCustomModel: (modelId) => {
-        set((state) => ({
-          customModels: state.customModels.filter((m) => m.modelId !== modelId),
-        }));
+        set((state) => {
+          const newModels = state.customModels.filter((m) => m.modelId !== modelId);
+          saveCustomModelsToProject(newModels);
+          return { customModels: newModels };
+        });
       },
 
       addCustomCard: (cardData) => {
@@ -1270,7 +1358,6 @@ export const useStore = create<AppState>()(
                     size: updates.size ?? device.size,
                     insertedCards: updates.insertedCards !== undefined ? updates.insertedCards : device.insertedCards,
                     insertedModules: updates.insertedModules !== undefined ? updates.insertedModules : device.insertedModules,
-                    dashboardThumbnailUrl: updates.dashboardThumbnailUrl !== undefined ? updates.dashboardThumbnailUrl : device.dashboardThumbnailUrl,
                     defaultViewSide: updates.defaultViewSide !== undefined ? updates.defaultViewSide : device.defaultViewSide,
                     portStates: updates.generatedPorts
                       ? updates.generatedPorts.map(gp => {
@@ -1394,8 +1481,9 @@ export const useStore = create<AppState>()(
           spawnPos = [0, 0];
         }
 
-        const { activeNodeId } = get();
-        if (!activeNodeId) {
+        const { activeNodeId, nodes } = get();
+        const activeNode = nodes.find(n => n.nodeId === activeNodeId);
+        if (!activeNodeId || activeNode?.type !== "room") {
           get().showToast("전산실을 선택하거나 생성해주세요.", "error");
           return;
         }
@@ -1914,7 +2002,6 @@ export const useStore = create<AppState>()(
           portStates: deviceData.portStates || [],
           insertedCards: deviceData.insertedCards,
           insertedModules: deviceData.insertedModules,
-          dashboardThumbnailUrl: deviceData.dashboardThumbnailUrl,
           defaultViewSide: deviceData.defaultViewSide,
         };
 
@@ -2496,7 +2583,14 @@ export const useStore = create<AppState>()(
 
       // Imported Model Actions
       addImportedModel: (modelData) => {
-        const { _cameraRef, isEditMode, pushUndoState } = get();
+        const { _cameraRef, isEditMode, pushUndoState, activeNodeId, nodes } = get();
+        
+        const activeNode = nodes.find(n => n.nodeId === activeNodeId);
+        if (!activeNodeId || activeNode?.type !== "room") {
+          get().showToast("전산실을 선택하거나 생성해주세요.", "error");
+          return null;
+        }
+
         if (isEditMode) pushUndoState();
         let spawnPos: [number, number, number] = modelData.position;
 
@@ -2522,7 +2616,6 @@ export const useStore = create<AppState>()(
         }
 
         const newId = crypto.randomUUID();
-        const activeNodeId = get().activeNodeId;
         const model: ImportedModel = {
           ...modelData,
           id: newId,
@@ -2785,16 +2878,27 @@ export const useStore = create<AppState>()(
           isEditMode,
           isCanvasReady,
           _importDirty,
+          customModels,
           ...rest
         } = state;
         return rest;
       },
       merge: (persistedState: any, currentState: AppState) => {
+        // Keep the imported initialCustomModelsData as the base source of truth,
+        // and override only if persistedState has non-empty custom models and they differ.
+        // But since we persist to project files now, we actually don't need to restore
+        // customModels from localStorage, except for backwards compatibility.
+        // To be safe, we just use the persisted state directly without deleting row properties.
+        const cleanedCustomModels = persistedState.customModels
+          ? structuredClone(persistedState.customModels)
+          : currentState.customModels;
+
         return {
           ...currentState,
           ...persistedState,
           isEditMode: false,
           isCanvasReady: false,
+          customModels: cleanedCustomModels,
           racks: persistedState.baselineRacks ? structuredClone(persistedState.baselineRacks) : (persistedState.racks ? structuredClone(persistedState.racks) : []),
           importedModels: persistedState.baselineModels ? structuredClone(persistedState.baselineModels) : (persistedState.importedModels ? structuredClone(persistedState.importedModels) : []),
           nodes: persistedState.baselineNodes ? structuredClone(persistedState.baselineNodes) : (persistedState.nodes ? structuredClone(persistedState.nodes) : []),

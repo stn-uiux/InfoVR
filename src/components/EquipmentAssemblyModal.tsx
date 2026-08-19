@@ -12,10 +12,13 @@ import {
 import { generatePortMap } from "../utils/portUtils";
 import type { GeneratedPort } from "../types/equipment";
 import { useStore } from "../store/useStore";
+import { drawBlankSlots } from "../hooks/useSvgComposer";
+
+import { CardThumbnail } from "./CardThumbnail";
 
 /* ────── 스타일 ────── */
 const STYLES = `
-.eam-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:2500;animation:eam-fi .25s ease-out}
+.eam-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;animation:eam-fi .25s ease-out}
 @keyframes eam-fi{from{opacity:0}to{opacity:1}}
 .eam-modal{background:var(--modal-bg);border:1px solid var(--border-medium);border-radius:20px;box-shadow:0 24px 80px rgba(0,0,0,.6);width:1400px;max-width:98vw;height:90vh;display:flex;flex-direction:column;overflow:hidden;animation:eam-zi .3s cubic-bezier(.16,1,.3,1)}
 @keyframes eam-zi{from{transform:scale(.96) translateY(16px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
@@ -46,23 +49,24 @@ const STYLES = `
 .eam-toolbar .btn.danger:hover{background:var(--severity-critical);color:#fff}
 .eam-canvas-area{flex:1;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:60px;background:#1a1c22;position:relative}
 .eam-equip-wrap{position:relative;margin:auto;display:inline-block;box-shadow:0 0 60px rgba(0,0,0,.7);border-radius:4px;background:#000;flex-shrink:0}
-.eam-equip-wrap svg{display:block;width:auto;height:auto;max-width:none}
+.eam-equip-wrap svg{display:block;max-width:none}
 .base-svg-container{display:block}
-.base-svg-container svg{display:block;width:auto;height:auto;max-width:none}
+.base-svg-container svg{display:block;max-width:none}
 .eam-card-area-overlay{position:absolute;pointer-events:none}
-.eam-slot{position:absolute;border:1px dashed rgba(var(--theme-primary-rgb),.35);border-radius:4px;transition:all .2s;pointer-events:all;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.eam-slot{position:absolute;border:1px dashed rgba(var(--theme-primary-rgb),.7);border-radius:4px;transition:all .2s;pointer-events:all;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .eam-slot:hover{background:rgba(var(--theme-primary-rgb),.08);border-color:var(--theme-primary)}
 .eam-slot.occupied{border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.04);cursor:default}
 .eam-slot.occupied:hover{background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.4)}
 .eam-slot .remove-btn{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:var(--severity-critical);color:#fff;border:none;cursor:pointer;font-size:11px;display:none;align-items:center;justify-content:center;z-index:10;line-height:0}
 .eam-slot.occupied:hover .remove-btn{display:flex}
-.eam-slot .slot-label{font-size:10px;color:var(--text-tertiary);opacity:.6;pointer-events:none}
+.eam-slot .slot-label{font-size:12px;font-weight:600;color:var(--theme-primary);opacity:.9;pointer-events:none}
 .eam-slot .card-svg-inline{width:100%;height:100%;pointer-events:none}
 .eam-slot .card-svg-inline svg{width:100%;height:100%}
+.eam-slot .card-svg-inline svg .port-hitbox{fill:transparent!important;stroke:transparent!important}
 .eam-slot.highlight{border-color:var(--theme-primary);border-style:solid;background:rgba(var(--theme-primary-rgb),.12);box-shadow:inset 0 0 12px rgba(var(--theme-primary-rgb),.2),0 0 8px rgba(var(--theme-primary-rgb),.25)}
 .eam-slot.dimmed{opacity:.3;cursor:not-allowed;border-color:rgba(255,255,255,.08);background:rgba(0,0,0,.15);pointer-events:none}
 .eam-slot.dimmed:hover{background:rgba(0,0,0,.15);border-color:rgba(255,255,255,.08)}
-.eam-warn{position:fixed;top:80px;left:50%;transform:translateX(-50%);background:var(--severity-critical);color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:3000;animation:eam-fi .2s ease-out;box-shadow:0 8px 24px rgba(239,68,68,.4)}
+.eam-warn{position:fixed;top:80px;left:50%;transform:translateX(-50%);background:var(--severity-critical);color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:10000;animation:eam-fi .2s ease-out;box-shadow:0 8px 24px rgba(239,68,68,.4)}
 .eam-model-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;padding:24px;flex:1;overflow-y:auto;align-content:start}
 .eam-model-card{padding:16px;border:1px solid var(--border-weak);border-radius:12px;background:var(--bg-secondary);cursor:pointer;transition:all .2s;text-align:center}
 .eam-model-card:hover{border-color:var(--theme-primary);background:rgba(var(--theme-primary-rgb),.06);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.15)}
@@ -126,9 +130,73 @@ function getGridPositionFromIndex(positionIndex: number, defaultColumns: number,
   };
 }
 
-function buildSlotGrid(model: EquipmentModel, customRowHeights?: number[], customRowGaps?: number[], customRowColumns?: number[]): SlotPosition[] {
+function buildSlotGrid(
+  model: EquipmentModel,
+  customRowHeights?: number[],
+  customRowGaps?: number[],
+  customRowColumns?: number[],
+  gridMerges?: { r: number; c: number; rs: number; cs: number }[],
+  gridColWidths?: number[],
+  gridRowHeights?: number[],
+): SlotPosition[] {
   const { cardArea } = model;
   if (!cardArea) return [];
+
+  // gridColWidths/gridRowHeights가 있으면 그리드 에디터 기반 레이아웃 사용
+  if (gridColWidths && gridRowHeights && gridColWidths.length > 0 && gridRowHeights.length > 0) {
+    const slots: SlotPosition[] = [];
+    const covered = new Set<string>();
+
+    // 병합 영역 등록
+    if (gridMerges) {
+      for (const merge of gridMerges) {
+        // 병합의 anchor 셀만 슬롯으로 생성, 나머지는 covered
+        for (let r = merge.r; r < merge.r + merge.rs; r++) {
+          for (let c = merge.c; c < merge.c + merge.cs; c++) {
+            if (r === merge.r && c === merge.c) continue; // anchor
+            covered.add(`${r},${c}`);
+          }
+        }
+      }
+    }
+
+    let currentY = cardArea.y;
+    for (let r = 0; r < gridRowHeights.length; r++) {
+      const rowH = gridRowHeights[r] || CARD_ROW_HEIGHT;
+      const rowGap = customRowGaps?.[r] ?? 0;
+      let currentX = cardArea.x;
+      for (let c = 0; c < gridColWidths.length; c++) {
+        const colW = gridColWidths[c] || 0;
+        if (!covered.has(`${r},${c}`)) {
+          // 이 셀이 병합의 anchor인지 확인
+          const merge = gridMerges?.find(m => m.r === r && m.c === c);
+          let slotW = colW;
+          let slotH = rowH;
+          if (merge) {
+            slotW = 0;
+            for (let mc = merge.c; mc < merge.c + merge.cs; mc++) slotW += gridColWidths[mc] || 0;
+            slotH = 0;
+            for (let mr = merge.r; mr < merge.r + merge.rs; mr++) {
+              slotH += gridRowHeights[mr] || 0;
+              if (mr < merge.r + merge.rs - 1) slotH += customRowGaps?.[mr] ?? 0;
+            }
+          }
+          slots.push({
+            row: r,
+            col: c,
+            positionIndex: getGridPositionIndex(r, c, cardArea.columns, customRowColumns),
+            x: currentX,
+            y: currentY,
+            width: slotW,
+            height: slotH,
+          });
+        }
+        currentX += colW;
+      }
+      currentY += rowH + rowGap;
+    }
+    return slots;
+  }
 
   const customRowCount = Math.max(
     customRowHeights?.length ?? 0,
@@ -268,9 +336,8 @@ interface Props {
   onSave?: (result: {
     model: EquipmentModel;
     cards: InsertedCard[];
-    thumbnailDataUrl: string;
     generatedPorts: GeneratedPort[];
-  }) => void;
+  }) => void | boolean | Promise<void | boolean>;
   /** When registering a new model, the model data is not in the store yet. Pass it inline. */
   inlineModel?: EquipmentModel & { _rowHeights?: number[]; _rowGaps?: number[]; _rowColumns?: number[] };
 }
@@ -285,19 +352,42 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
   }, []);
 
   const allEquipmentModels = useMemo(() => {
-    const customMapped: (EquipmentModel & { _rowHeights?: number[]; _rowGaps?: number[]; _rowColumns?: number[] })[] = customModels
+    const customMapped: (EquipmentModel & { _rowHeights?: number[]; _rowGaps?: number[]; _rowColumns?: number[]; _initialCards?: InsertedCard[]; _gridMerges?: { r: number; c: number; rs: number; cs: number }[]; _gridColWidths?: number[]; _gridRowHeights?: number[] })[] = [];
+
+    customModels
       .filter((m) => m.modelType === "card-based")
-      .map((m) => ({
-        modelId: m.modelId,
-        modelName: m.modelName,
-        rackUnit: `${m.unit}U`,
-        baseSvgUrl: `custom-model-base-${m.modelId}`,
-        equipmentSize: m.equipmentSize,
-        cardArea: m.cardArea,
-        _rowHeights: m.rowHeights,
-        _rowGaps: m.rowGaps,
-        _rowColumns: m.rowColumns,
-      }));
+      .forEach((m) => {
+        const baseProps = {
+          modelId: m.modelId,
+          rackUnit: `${m.unit}U`,
+          baseSvgUrl: `custom-model-base-${m.modelId}`,
+          equipmentSize: m.equipmentSize,
+          cardArea: m.cardArea,
+          _rowHeights: m.rowHeights,
+          _rowGaps: m.rowGaps,
+          _rowColumns: m.rowColumns,
+          _gridMerges: m.gridMerges,
+          _gridColWidths: m.gridColWidths,
+          _gridRowHeights: m.gridRowHeights,
+        };
+
+        if (m.variants && m.variants.length > 0) {
+          m.variants.forEach((v) => {
+            const appendedName = v.variantName === "기본타입" ? m.modelName : `${m.modelName} ${v.variantName}`;
+            customMapped.push({
+              ...baseProps,
+              modelName: appendedName,
+              _initialCards: v.insertedCards,
+            });
+          });
+        } else {
+          customMapped.push({
+            ...baseProps,
+            modelName: m.modelName,
+          });
+        }
+      });
+
     const models = [...customMapped, ...equipmentModels];
     if (inlineModel) {
       models.push(inlineModel);
@@ -309,6 +399,19 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
   const [insertedCards, setInsertedCards] = useState<InsertedCard[]>([]);
   const [baseSvgHtml, setBaseSvgHtml] = useState<string | null>(null);
   const [selectedCard, setSelectedCard] = useState<CardDefinition | null>(null);
+
+  // 툴팁(호버) 상태
+  const [hoveredTooltipCard, setHoveredTooltipCard] = useState<CardDefinition | null>(null);
+  const [hoveredTooltipPos, setHoveredTooltipPos] = useState({ x: 0, y: 0 });
+
+  const handleCardMouseMove = (e: React.MouseEvent, card: CardDefinition) => {
+    setHoveredTooltipCard(card);
+    setHoveredTooltipPos({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleCardMouseLeave = () => {
+    setHoveredTooltipCard(null);
+  };
   const [warning, setWarning] = useState<string | null>(null);
   const [slotNextId, setSlotNextId] = useState(1);
   const equipRef = useRef<HTMLDivElement>(null);
@@ -328,6 +431,24 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
   const currentRowColumns = useMemo(() => {
     if (!selectedModel) return undefined;
     return (selectedModel as { _rowColumns?: number[] })._rowColumns;
+  }, [selectedModel]);
+
+  const currentGridMerges = useMemo(() => {
+    if (!selectedModel) return undefined;
+    const sm = selectedModel as any;
+    return sm._gridMerges || sm.gridMerges;
+  }, [selectedModel]);
+
+  const currentGridColWidths = useMemo(() => {
+    if (!selectedModel) return undefined;
+    const sm = selectedModel as any;
+    return sm._gridColWidths || sm.gridColWidths;
+  }, [selectedModel]);
+
+  const currentGridRowHeights = useMemo(() => {
+    if (!selectedModel) return undefined;
+    const sm = selectedModel as any;
+    return sm._gridRowHeights || sm.gridRowHeights;
   }, [selectedModel]);
 
   const allCardDefinitions = useMemo(() => {
@@ -356,6 +477,13 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
   // Base SVG 로드
   useEffect(() => {
     if (!selectedModel) { setBaseSvgHtml(null); return; }
+
+    // Custom inline models provide their own raw SVG
+    if (selectedModel.baseEquipmentViewSvgRaw) {
+      setBaseSvgHtml(selectedModel.baseEquipmentViewSvgRaw);
+      return;
+    }
+
     let m = true;
     loadBaseEquipmentSvgRaw(selectedModel.baseSvgUrl).then((raw) => {
       if (m) setBaseSvgHtml(raw ?? null);
@@ -365,13 +493,17 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
 
   // 모델 초기화
   useEffect(() => {
-    if (open && initialModelName) {
-      const found = allEquipmentModels.find((m) => m.modelName === initialModelName);
-      if (found) {
-        setSelectedModel(found);
+    if (open) {
+      if (inlineModel) {
+        setSelectedModel(inlineModel);
+      } else if (initialModelName) {
+        const found = allEquipmentModels.find((m) => m.modelName === initialModelName);
+        if (found) {
+          setSelectedModel(found);
+        }
       }
     }
-  }, [open, initialModelName, allEquipmentModels]);
+  }, [open, initialModelName, allEquipmentModels, inlineModel]);
 
   // 카드 초기화 (기존 데이터가 있으면 로드)
   useEffect(() => {
@@ -395,11 +527,25 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
   }, [open, initialCards]);
 
   // 모델 변경 시 카드 초기화
-  const handleSelectModel = useCallback((model: EquipmentModel) => {
+  const handleSelectModel = useCallback((model: EquipmentModel & { _initialCards?: InsertedCard[] }) => {
     setSelectedModel(model);
-    setInsertedCards([]);
+
+    if (model._initialCards && model._initialCards.length > 0) {
+      setInsertedCards(model._initialCards.map(c => ({
+        ...c,
+        slotNo: c.slotNo ?? (c.positionIndex + 1)
+      })));
+      const maxId = model._initialCards.reduce((max, c) => {
+        const num = parseInt(c.instanceId.split("-").pop() || "0", 10);
+        return num > max ? num : max;
+      }, 0);
+      setSlotNextId(maxId + 1);
+    } else {
+      setInsertedCards([]);
+      setSlotNextId(1);
+    }
+
     setSelectedCard(null);
-    setSlotNextId(1);
   }, []);
 
   // 경고 자동 숨김
@@ -413,8 +559,8 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
   const slots = useMemo(() => {
     if (!selectedModel) return [];
     if (selectedModel.slots) return []; // slots 모델은 별도 처리
-    return buildSlotGrid(selectedModel, currentRowHeights, currentRowGaps, currentRowColumns);
-  }, [selectedModel, currentRowHeights, currentRowGaps, currentRowColumns]);
+    return buildSlotGrid(selectedModel, currentRowHeights, currentRowGaps, currentRowColumns, currentGridMerges, currentGridColWidths, currentGridRowHeights);
+  }, [selectedModel, currentRowHeights, currentRowGaps, currentRowColumns, currentGridMerges, currentGridColWidths, currentGridRowHeights]);
 
   // mixed layout 여부
   const isMixedLayout = !!selectedModel?.slots;
@@ -655,139 +801,11 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
     setSlotNextId(1);
   }, []);
 
-  // 저장 (썸네일 생성 – 카드 합성 후 PNG 변환)
+  // 저장 (카드 합성 없이 포트맵만 생성)
   const handleSave = useCallback(async () => {
     if (!selectedModel) return;
 
-    let thumbnailDataUrl = "";
-    try {
-      // 1. 베이스 SVG raw 로드
-      const baseRaw = await loadBaseEquipmentSvgRaw(selectedModel.baseSvgUrl);
-      if (baseRaw) {
-        const parser = new DOMParser();
-        const baseDoc = parser.parseFromString(baseRaw, "image/svg+xml");
-        const baseSvgEl = baseDoc.querySelector("svg");
-
-        if (baseSvgEl) {
-          const vb = baseSvgEl.getAttribute("viewBox");
-          if (!baseSvgEl.getAttribute("width") && vb) {
-            const parts = vb.split(/\s+/);
-            baseSvgEl.setAttribute("width", parts[2] || "100%");
-            baseSvgEl.setAttribute("height", parts[3] || "100%");
-          }
-
-          // 2. 각 카드 SVG를 베이스 SVG에 인라인 합성
-          const orderedCards = [...insertedCards].sort(
-            (a, b) => getCardPaintOrder(a, selectedModel) - getCardPaintOrder(b, selectedModel),
-          );
-          const cardPromises = orderedCards.map(card =>
-            loadCardSvgRaw(card.cardFileName).then(raw => ({ card, raw }))
-          );
-          const cardResults = await Promise.all(cardPromises);
-
-          for (const { card, raw } of cardResults) {
-            if (!raw) continue;
-            const cardDoc = parser.parseFromString(raw, "image/svg+xml");
-            const cardSvgEl = cardDoc.querySelector("svg");
-            if (!cardSvgEl) continue;
-
-            let x: number, y: number, cardW: number, cardH: number;
-
-            // slots 모델: slotId로 좌표 결정
-            if (selectedModel.slots && card.slotId) {
-              const slotDef = selectedModel.slots.find(s => s.slotId === card.slotId);
-              if (!slotDef || !selectedModel.cardArea) continue;
-              x = selectedModel.cardArea.x + slotDef.x;
-              y = selectedModel.cardArea.y + slotDef.y;
-              cardW = slotDef.width;
-              cardH = slotDef.height;
-            } else if (selectedModel.rows && card.rowId && card.slotId) {
-              // row-based 모델: rowId와 slotId로 결정
-              const rowDef = selectedModel.rows.find(r => r.rowId === card.rowId);
-              if (!rowDef) continue;
-              const subDef = rowDef.subSlots.find(s => s.slotId === card.slotId);
-              if (!subDef) continue;
-              x = rowDef.x + subDef.x;
-              y = rowDef.y + subDef.y;
-              cardW = subDef.width;
-              cardH = subDef.height;
-            } else if (selectedModel.cardArea) {
-              // uniform grid 모델
-              const { row, col, columns: rowColumns } = getGridPositionFromIndex(
-                card.positionIndex,
-                selectedModel.cardArea.columns,
-                currentRowColumns,
-              );
-              const rowColumnWidth = selectedModel.cardArea.width / rowColumns;
-              x = selectedModel.cardArea.x + col * rowColumnWidth;
-              // rowHeights/rowGaps 반영
-              if ((currentRowHeights && currentRowHeights.length > 0) || (currentRowGaps && currentRowGaps.length > 0)) {
-                let yOff = 0;
-                for (let r = 0; r < row; r++) {
-                  yOff += (currentRowHeights?.[r] ?? CARD_ROW_HEIGHT);
-                  yOff += currentRowGaps?.[r] ?? 0;
-                }
-                y = selectedModel.cardArea.y + yOff;
-                cardH = currentRowHeights?.[row] ?? CARD_ROW_HEIGHT;
-              } else {
-                y = selectedModel.cardArea.y + row * CARD_ROW_HEIGHT;
-                cardH = CARD_ROW_HEIGHT;
-              }
-              cardW = card.widthType === "full"
-                ? rowColumnWidth * rowColumns
-                : rowColumnWidth * getColSpan(card.widthType, rowColumns);
-            } else {
-              continue; // fallback
-            }
-
-            const vb = cardSvgEl.getAttribute("viewBox");
-            const parts = vb ? vb.split(/\s+/).map(Number) : [0, 0, cardW, cardH];
-            const origW = parts[2];
-            const origH = parts[3];
-
-            const g = baseDoc.createElementNS("http://www.w3.org/2000/svg", "g");
-            const scaleX = cardW / origW;
-            const scaleY = cardH / origH;
-            g.setAttribute("transform", `translate(${x}, ${y}) scale(${scaleX}, ${scaleY})`);
-
-            while (cardSvgEl.firstChild) {
-              g.appendChild(cardSvgEl.firstChild);
-            }
-            baseSvgEl.appendChild(g);
-          }
-
-          // 3. 합성된 SVG → Canvas → PNG
-          const serializer = new XMLSerializer();
-          const svgStr = serializer.serializeToString(baseDoc);
-          const blob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
-          const url = URL.createObjectURL(blob);
-
-          const img = new Image();
-          await new Promise<void>((resolve, reject) => {
-            img.onload = () => resolve();
-            img.onerror = reject;
-            img.src = url;
-          });
-
-          // Phase 3: SCALE 4→2, PNG→WebP로 data URL 크기 ~70% 감소
-          // → 3D 텍스처 GPU 업로드 비용 + structuredClone 비용 절감
-          const SCALE = 2;
-          const canvas = document.createElement("canvas");
-          canvas.width = img.naturalWidth * SCALE;
-          canvas.height = img.naturalHeight * SCALE;
-          const ctx = canvas.getContext("2d")!;
-          
-          // 크기를 키운 캔버스에 이미지를 그려 화질 보존
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          thumbnailDataUrl = canvas.toDataURL("image/webp", 0.8);
-          URL.revokeObjectURL(url);
-        }
-      }
-    } catch (e) {
-      console.error("Thumbnail generation failed:", e);
-    }
-
-    // 4. Generate Port Map
+    // Generate Port Map
     const cardSvgMap = new Map<string, string>();
     for (const card of insertedCards) {
       if (!cardSvgMap.has(card.cardFileName)) {
@@ -797,9 +815,12 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
     }
     const generatedPorts = generatePortMap(insertedCards, cardSvgMap);
 
-    onSave?.({ model: selectedModel, cards: insertedCards, thumbnailDataUrl, generatedPorts });
+    if (onSave) {
+      const res = await onSave({ model: selectedModel, cards: insertedCards, generatedPorts });
+      if (res === false) return;
+    }
     onClose();
-  }, [selectedModel, insertedCards, onSave, onClose, currentRowHeights, currentRowGaps, currentRowColumns]);
+  }, [selectedModel, insertedCards, onSave, onClose, currentRowHeights, currentRowGaps, currentRowColumns, slots]);
 
   // 점유 맵
   const occupied = useMemo(
@@ -846,10 +867,10 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
                     {m.slots
                       ? `${m.slots.length}개 슬롯 (Mixed)`
                       : m.rows
-                      ? `${m.rows.length}개 행 (Row-based)`
-                      : m.cardArea
-                      ? `${m.cardArea.columns}열 × ${Math.floor(m.cardArea.height / CARD_ROW_HEIGHT)}행 슬롯`
-                      : ""
+                        ? `${m.rows.length}개 행 (Row-based)`
+                        : m.cardArea
+                          ? `${m.cardArea.columns}열 × ${Math.floor(m.cardArea.height / CARD_ROW_HEIGHT)}행 슬롯`
+                          : ""
                     }
                   </div>
                 </div>
@@ -874,8 +895,10 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
                           background: selectedCard?.cardFileName === cd.cardFileName ? "rgba(var(--theme-primary-rgb),.1)" : undefined,
                         }}
                         onClick={() => setSelectedCard(cd)}
+                        onMouseMove={(e) => handleCardMouseMove(e, cd)}
+                        onMouseLeave={handleCardMouseLeave}
                       >
-                        <img src={cd.svgUrl} alt={cd.cardType} style={{ width: cd.widthType === "full" ? 80 : 50 }} />
+                        <CardThumbnail svgUrl={cd.svgUrl} alt={cd.cardType} style={{ width: cd.widthType === "full" ? 80 : 50 }} />
                         <div className="info">
                           <div className="name">{cd.cardType}</div>
                           <span className={`tag ${cd.widthType}`}>{cd.widthType === "full" ? "FULL" : "HALF"}</span>
@@ -904,8 +927,10 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
                                 background: selectedCard?.cardFileName === cd.cardFileName ? "rgba(var(--theme-primary-rgb),.1)" : undefined,
                               }}
                               onClick={() => setSelectedCard(cd)}
+                              onMouseMove={(e) => handleCardMouseMove(e, cd)}
+                              onMouseLeave={handleCardMouseLeave}
                             >
-                              <img src={cd.svgUrl} alt={cd.cardType} style={{ width: cd.widthType === "full" ? 80 : 50 }} />
+                              <CardThumbnail svgUrl={cd.svgUrl} alt={cd.cardType} style={{ width: cd.widthType === "full" ? 80 : 50 }} />
                               <div className="info">
                                 <div className="name">{cd.cardType}</div>
                                 <span className={`tag ${cd.widthType}`}>{cd.widthType === "full" ? "FULL" : "HALF"}</span>
@@ -926,8 +951,10 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
                                 background: selectedCard?.cardFileName === cd.cardFileName ? "rgba(168,85,247,.1)" : undefined,
                               }}
                               onClick={() => setSelectedCard(cd)}
+                              onMouseMove={(e) => handleCardMouseMove(e, cd)}
+                              onMouseLeave={handleCardMouseLeave}
                             >
-                              <img src={cd.svgUrl} alt={cd.cardType} style={{ width: 80 }} />
+                              <CardThumbnail svgUrl={cd.svgUrl} alt={cd.cardType} style={{ width: 80 }} />
                               <div className="info">
                                 <div className="name">{cd.cardType}</div>
                                 <span className="tag cpiom">CPIOM</span>
@@ -948,8 +975,10 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
                                 background: selectedCard?.cardFileName === cd.cardFileName ? "rgba(var(--theme-primary-rgb),.1)" : undefined,
                               }}
                               onClick={() => setSelectedCard(cd)}
+                              onMouseMove={(e) => handleCardMouseMove(e, cd)}
+                              onMouseLeave={handleCardMouseLeave}
                             >
-                              <img src={cd.svgUrl} alt={cd.cardType} style={{ width: cd.widthType === "full" ? 80 : 50 }} />
+                              <CardThumbnail svgUrl={cd.svgUrl} alt={cd.cardType} style={{ width: cd.widthType === "full" ? 80 : 50 }} />
                               <div className="info">
                                 <div className="name">{cd.cardType}</div>
                                 <span className={`tag ${cd.widthType === "full" ? "standard" : cd.widthType}`}>
@@ -972,8 +1001,10 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
                                 background: selectedCard?.cardFileName === cd.cardFileName ? "rgba(var(--theme-primary-rgb),.1)" : undefined,
                               }}
                               onClick={() => setSelectedCard(cd)}
+                              onMouseMove={(e) => handleCardMouseMove(e, cd)}
+                              onMouseLeave={handleCardMouseLeave}
                             >
-                              <img src={cd.svgUrl} alt={cd.cardType} style={{ width: cd.widthType === "full" ? 80 : 50 }} />
+                              <CardThumbnail svgUrl={cd.svgUrl} alt={cd.cardType} style={{ width: cd.widthType === "full" ? 80 : 50 }} />
                               <div className="info">
                                 <div className="name">{cd.cardType}</div>
                                 <span className={`tag ${cd.widthType === "full" ? "standard" : cd.widthType}`}>
@@ -1022,9 +1053,9 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
                   <div className="eam-equip-wrap" ref={equipRef}>
                     {/* Base SVG */}
                     {baseSvgHtml && (
-                      <div 
+                      <div
                         className="base-svg-container"
-                        dangerouslySetInnerHTML={{ __html: baseSvgHtml }} 
+                        dangerouslySetInnerHTML={{ __html: baseSvgHtml }}
                       />
                     )}
 
@@ -1170,9 +1201,11 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
                             // full 카드의 두번째 칸은 렌더링 건너뜀
                             if (isOccupied && !card) return null;
 
-                            const slotWidth = card
-                              ? slot.width * getColSpan(card.widthType, getRowColumnCount(slot.row, selectedModel.cardArea!.columns, currentRowColumns))
-                              : slot.width;
+                            let slotWidth = slot.width;
+                            if (card && (!currentGridColWidths || currentGridColWidths.length === 0)) {
+                              const colSpan = getColSpan(card.widthType, getRowColumnCount(slot.row, selectedModel.cardArea!.columns, currentRowColumns));
+                              slotWidth = slot.width * colSpan;
+                            }
 
                             return (
                               <div
@@ -1221,6 +1254,34 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
           )}
         </div>
       </div>
+
+      {/* 툴팁 오버레이 */}
+      {hoveredTooltipCard && (
+        <div
+          style={{
+            position: "fixed",
+            left: hoveredTooltipPos.x + 15,
+            top: hoveredTooltipPos.y + 15,
+            zIndex: 100000,
+            background: "var(--bg-secondary)",
+            padding: "8px",
+            borderRadius: "8px",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.6)",
+            pointerEvents: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: hoveredTooltipCard.widthType === "full" ? "800px" : "400px",
+            maxWidth: "80vw"
+          }}
+        >
+          <CardThumbnail
+            svgUrl={hoveredTooltipCard.svgUrl}
+            alt={hoveredTooltipCard.cardType}
+            style={{ width: "100%", height: "auto", objectFit: "contain" }}
+          />
+        </div>
+      )}
 
       {/* 경고 토스트 */}
       {warning && <div className="eam-warn">{warning}</div>}

@@ -12,12 +12,29 @@ import { getColSpan, type InsertedCard, type InsertedModule, type EquipmentModel
 import { moduleDefinitions } from '../utils/moduleAssets';
 import { getElementBBox, prefixSvgIds, isPortId, filterPortElements, PORT_SELECTOR, resolvePortId } from '../utils/svgUtils';
 import { useStore } from '../store/useStore';
+import { drawBlankSlots } from '../hooks/useSvgComposer';
 
 const CARD_ROW_HEIGHT = 46;
-type PreviewEquipmentModel = EquipmentModel & { _rowHeights?: number[]; _rowGaps?: number[]; _rowColumns?: number[] };
+type PreviewEquipmentModel = EquipmentModel & { 
+  _rowHeights?: number[]; 
+  _rowGaps?: number[]; 
+  _rowColumns?: number[];
+  gridMerges?: { r: number; c: number; rs: number; cs: number }[];
+  gridColWidths?: number[];
+  gridRowHeights?: number[];
+};
 
 function getRowColumnCount(row: number, defaultColumns: number, customRowColumns?: number[]): number {
   return Math.max(1, customRowColumns?.[row] ?? defaultColumns);
+}
+
+function getGridPositionIndex(row: number, col: number, defaultColumns: number, customRowColumns?: number[]): number {
+  if (!customRowColumns || customRowColumns.length === 0) return row * defaultColumns + col;
+  let index = 0;
+  for (let r = 0; r < row; r += 1) {
+    index += getRowColumnCount(r, defaultColumns, customRowColumns);
+  }
+  return index + col;
 }
 
 function getGridPositionFromIndex(positionIndex: number, defaultColumns: number, customRowColumns?: number[]): { row: number; col: number; columns: number } {
@@ -93,19 +110,39 @@ export const DeviceSvgPreview = memo(({
   const customModels = useStore((s) => s.customModels);
 
   const allEquipmentModels = useMemo(() => {
-    const customMapped: PreviewEquipmentModel[] = customModels
+    const customMapped: PreviewEquipmentModel[] = [];
+    customModels
       .filter((m) => m.modelType === "card-based")
-      .map((m) => ({
-        modelId: m.modelId,
-        modelName: m.modelName,
-        rackUnit: `${m.unit}U`,
-        baseSvgUrl: `custom-model-base-${m.modelId}`,
-        equipmentSize: m.equipmentSize,
-        cardArea: m.cardArea,
-        _rowHeights: m.rowHeights,
-        _rowGaps: m.rowGaps,
-        _rowColumns: m.rowColumns,
-      }));
+      .forEach((m) => {
+        const baseProps = {
+          modelId: m.modelId,
+          rackUnit: `${m.unit}U`,
+          baseSvgUrl: `custom-model-base-${m.modelId}`,
+          equipmentSize: m.equipmentSize,
+          cardArea: m.cardArea,
+          _rowHeights: m.rowHeights,
+          _rowGaps: m.rowGaps,
+          _rowColumns: m.rowColumns,
+          gridMerges: m.gridMerges,
+          gridColWidths: m.gridColWidths,
+          gridRowHeights: m.gridRowHeights,
+        };
+        
+        if (m.variants && m.variants.length > 0) {
+          m.variants.forEach((v) => {
+            const appendedName = v.variantName === "기본타입" ? m.modelName : `${m.modelName} ${v.variantName}`;
+            customMapped.push({
+              ...baseProps,
+              modelName: appendedName,
+            });
+          });
+        } else {
+          customMapped.push({
+            ...baseProps,
+            modelName: m.modelName,
+          });
+        }
+      });
     return [...customMapped, ...equipmentModels];
   }, [customModels]);
 
@@ -191,8 +228,11 @@ export const DeviceSvgPreview = memo(({
     let isMounted = true;
     const compose = async () => {
       try {
-        // 실제로 카드가 삽입된 경우에만 modular 베이스 SVG 사용
-        const isModularDevice = viewSide === "front" && insertedCards.length > 0;
+        // 모듈러 장비인지 확인 (카드가 있거나, 장비 모델에 슬롯 구조가 정의되어 있는 경우)
+        const isModularDevice = viewSide === "front" && (
+          insertedCards.length > 0 || 
+          Boolean(equipModel && (equipModel.cardArea || equipModel.slots || equipModel.rows))
+        );
 
         let baseSvg: string | undefined;
         if (isModularDevice && equipModel?.baseSvgUrl && equipModel.baseSvgUrl.startsWith("custom-model-base-")) {
@@ -225,6 +265,10 @@ export const DeviceSvgPreview = memo(({
         }
         baseSvgEl.style.display = "block";
 
+        if (isModularDevice) {
+           drawBlankSlots(baseSvgEl, baseDoc, equipModel as any);
+        }
+
         // 카드 합성
         const orderedCards = equipModel
           ? [...insertedCards].sort((a, b) => getCardPaintOrder(a, equipModel as PreviewEquipmentModel) - getCardPaintOrder(b, equipModel as PreviewEquipmentModel))
@@ -236,40 +280,90 @@ export const DeviceSvgPreview = memo(({
           const cardSvgEl = cardDoc.querySelector("svg");
           if (!cardSvgEl) continue;
 
-          let x: number, y: number, cardW: number, cardH: number;
-          if (equipModel.slots && card.slotId) {
-            const slotDef = equipModel.slots.find(s => s.slotId === card.slotId);
-            if (!slotDef || !equipModel.cardArea) continue;
-            x = equipModel.cardArea.x + slotDef.x; y = equipModel.cardArea.y + slotDef.y;
+          let x: number = 0, y: number = 0, cardW: number = 0, cardH: number = 0;
+          const pModel = equipModel as PreviewEquipmentModel;
+          if (pModel.slots && card.slotId) {
+            const slotDef = pModel.slots.find(s => s.slotId === card.slotId);
+            if (!slotDef || !pModel.cardArea) continue;
+            x = pModel.cardArea.x + slotDef.x; y = pModel.cardArea.y + slotDef.y;
             cardW = slotDef.width; cardH = slotDef.height;
-          } else if (equipModel.rows && card.rowId && card.slotId) {
-            const rowDef = equipModel.rows.find(r => r.rowId === card.rowId);
+          } else if (pModel.rows && card.rowId && card.slotId) {
+            const rowDef = pModel.rows.find(r => r.rowId === card.rowId);
             if (!rowDef) continue;
             const subDef = rowDef.subSlots.find(s => s.slotId === card.slotId);
             if (!subDef) continue;
             x = rowDef.x + subDef.x; y = rowDef.y + subDef.y; cardW = subDef.width; cardH = subDef.height;
-          } else if (equipModel.cardArea) {
-            const { row, col, columns: rowColumns } = getGridPositionFromIndex(
-              card.positionIndex,
-              equipModel.cardArea.columns,
-              currentRowColumns,
-            );
-            const rowColumnWidth = equipModel.cardArea.width / rowColumns;
-            x = equipModel.cardArea.x + col * rowColumnWidth;
-            if ((currentRowHeights && currentRowHeights.length > 0) || (currentRowGaps && currentRowGaps.length > 0)) {
-              let yOff = 0;
-              for (let r = 0; r < row; r++) {
-                yOff += (currentRowHeights?.[r] ?? CARD_ROW_HEIGHT);
-                yOff += currentRowGaps?.[r] ?? 0;
+          } else if (pModel.cardArea) {
+            if (pModel.gridColWidths && pModel.gridRowHeights && pModel.gridColWidths.length > 0 && pModel.gridRowHeights.length > 0) {
+              const covered = new Set<string>();
+              if (pModel.gridMerges) {
+                for (const merge of pModel.gridMerges) {
+                  for (let r = merge.r; r < merge.r + merge.rs; r++) {
+                    for (let c = merge.c; c < merge.c + merge.cs; c++) {
+                      if (r === merge.r && c === merge.c) continue;
+                      covered.add(`${r},${c}`);
+                    }
+                  }
+                }
               }
-              y = equipModel.cardArea.y + yOff;
-              cardH = currentRowHeights?.[row] ?? CARD_ROW_HEIGHT;
+              let found = false;
+              let currentY = pModel.cardArea.y;
+              for (let r = 0; r < pModel.gridRowHeights.length; r++) {
+                const rowH = pModel.gridRowHeights[r] || CARD_ROW_HEIGHT;
+                const rowGap = pModel._rowGaps?.[r] ?? 0;
+                let currentX = pModel.cardArea.x;
+                for (let c = 0; c < pModel.gridColWidths.length; c++) {
+                  const colW = pModel.gridColWidths[c] || 0;
+                  const idx = getGridPositionIndex(r, c, pModel.cardArea.columns, currentRowColumns);
+                  if (idx === card.positionIndex && !covered.has(`${r},${c}`)) {
+                    const merge = pModel.gridMerges?.find((m: any) => m.r === r && m.c === c);
+                    let slotW = colW;
+                    let slotH = rowH;
+                    if (merge) {
+                      slotW = 0;
+                      for (let mc = merge.c; mc < merge.c + merge.cs; mc++) slotW += pModel.gridColWidths![mc] || 0;
+                      slotH = 0;
+                      for (let mr = merge.r; mr < merge.r + merge.rs; mr++) {
+                        slotH += pModel.gridRowHeights![mr] || 0;
+                        if (mr < merge.r + merge.rs - 1) slotH += pModel._rowGaps?.[mr] ?? 0;
+                      }
+                    }
+                    x = currentX;
+                    y = currentY;
+                    cardW = slotW;
+                    cardH = slotH;
+                    found = true;
+                    break;
+                  }
+                  currentX += colW;
+                }
+                if (found) break;
+                currentY += rowH + rowGap;
+              }
+              if (!found) continue;
             } else {
-              y = equipModel.cardArea.y + row * CARD_ROW_HEIGHT;
-              cardH = CARD_ROW_HEIGHT;
+              const { row, col, columns: rowColumns } = getGridPositionFromIndex(
+                card.positionIndex,
+                pModel.cardArea.columns,
+                currentRowColumns,
+              );
+              const rowColumnWidth = pModel.cardArea.width / rowColumns;
+              x = pModel.cardArea.x + col * rowColumnWidth;
+              if ((currentRowHeights && currentRowHeights.length > 0) || (currentRowGaps && currentRowGaps.length > 0)) {
+                let yOff = 0;
+                for (let r = 0; r < row; r++) {
+                  yOff += (currentRowHeights?.[r] ?? CARD_ROW_HEIGHT);
+                  yOff += currentRowGaps?.[r] ?? 0;
+                }
+                y = pModel.cardArea.y + yOff;
+                cardH = currentRowHeights?.[row] ?? CARD_ROW_HEIGHT;
+              } else {
+                y = pModel.cardArea.y + row * CARD_ROW_HEIGHT;
+                cardH = CARD_ROW_HEIGHT;
+              }
+              const colSpan = getColSpan(card.widthType, rowColumns);
+              cardW = rowColumnWidth * colSpan;
             }
-            const colSpan = getColSpan(card.widthType, rowColumns);
-            cardW = rowColumnWidth * colSpan;
           } else continue;
 
           const vb = cardSvgEl.getAttribute("viewBox");

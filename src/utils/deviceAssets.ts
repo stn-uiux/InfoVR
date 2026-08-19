@@ -25,7 +25,16 @@ function findCustomModelByName(modelName: string) {
   try {
     const { customModels } = useStore.getState();
     return customModels.find(
-      (m) => m.modelName === modelName || m.modelName.toLowerCase() === modelName.toLowerCase()
+      (m) => {
+        if (m.modelName === modelName || m.modelName.toLowerCase() === modelName.toLowerCase()) return true;
+        if (m.variants && m.variants.length > 0) {
+          return m.variants.some((v) => {
+            const appendedName = v.variantName === "기본타입" ? m.modelName : `${m.modelName} ${v.variantName}`;
+            return appendedName.toLowerCase() === modelName.toLowerCase();
+          });
+        }
+        return false;
+      }
     );
   } catch {
     return undefined;
@@ -40,22 +49,17 @@ function getAssetKey(modelName: string, side: EquipmentViewSide): string {
   return `${modelName.toLowerCase()}::${side}`;
 }
 
-function parseAssetName(filename: string): { modelName: string; side: EquipmentViewSide; isThumb: boolean } {
+function parseAssetName(filename: string): { modelName: string; side: EquipmentViewSide } {
   let baseName = filename.replace(/\.(png|svg)$/i, "");
-  const isThumb = baseName.endsWith("_thumb");
-  if (isThumb) {
-    baseName = baseName.slice(0, -6);
-  }
   baseName = baseName.replace(/^\[\d+U\]\s*/, "").trim();
   
   const sideMatch = baseName.match(/\s+(front|back|rear)$/i);
-  if (!sideMatch) return { modelName: baseName, side: "front", isThumb };
+  if (!sideMatch) return { modelName: baseName, side: "front" };
 
   const side = sideMatch[1].toLowerCase() === "front" ? "front" : "rear";
   return {
     modelName: baseName.slice(0, sideMatch.index).trim(),
     side,
-    isThumb,
   };
 }
 
@@ -77,26 +81,16 @@ const svgRawModules = import.meta.glob<{ default: string }>(
 // ── PNG: modelName → resolved URL ──────────────────────────────────────────
 const deviceImageMap = new Map<string, string>();
 const deviceImageSideMap = new Map<string, string>();
-const deviceThumbMap = new Map<string, string>();
-const deviceThumbSideMap = new Map<string, string>();
 
 for (const [path, mod] of Object.entries(assetModules)) {
   const filename = path.split("/").pop() ?? "";
-  const { modelName, side, isThumb } = parseAssetName(filename);
+  const { modelName, side } = parseAssetName(filename);
   if (modelName && mod.default) {
     const key = getAssetKey(modelName, side);
-    if (isThumb) {
-      deviceThumbSideMap.set(key, mod.default);
-      if (side === "front") {
-        deviceThumbMap.set(modelName, mod.default);
-        deviceThumbMap.set(modelName.toLowerCase(), mod.default);
-      }
-    } else {
-      deviceImageSideMap.set(key, mod.default);
-      if (side === "front") {
-        deviceImageMap.set(modelName, mod.default);
-        deviceImageMap.set(modelName.toLowerCase(), mod.default);
-      }
+    deviceImageSideMap.set(key, mod.default);
+    if (side === "front") {
+      deviceImageMap.set(modelName, mod.default);
+      deviceImageMap.set(modelName.toLowerCase(), mod.default);
     }
   }
 }
@@ -126,13 +120,12 @@ for (const [path, importFn] of Object.entries(svgRawModules)) {
 export const resolveDeviceImage = (
   modelName?: string,
   side: EquipmentViewSide = "front",
-  useThumb: boolean = false,
 ): string | undefined => {
   if (!modelName) return undefined;
   
   // 1. Try to find PNG URL from static assets
-  const sideMap = useThumb ? deviceThumbSideMap : deviceImageSideMap;
-  const generalMap = useThumb ? deviceThumbMap : deviceImageMap;
+  const sideMap = deviceImageSideMap;
+  const generalMap = deviceImageMap;
 
   for (const lookupName of getLookupNames(modelName)) {
     const sideUrl = sideMap.get(getAssetKey(lookupName, side));
@@ -143,14 +136,9 @@ export const resolveDeviceImage = (
     }
   }
 
-  // 2. Fallback: If thumbnail was requested but not found, try getting full image
-  if (useThumb) {
-    return resolveDeviceImage(modelName, side, false);
-  }
-
   // 3. Fallback: 사용자 등록 모델 SVG → data URL
   const custom = findCustomModelByName(modelName);
-  const svgRaw = side === "rear" ? custom?.rearSvgRaw : custom?.modelSvgRaw;
+  const svgRaw = side === "rear" ? custom?.rearSvgRaw : (custom?.modelSvgRaw || custom?.baseEquipmentViewSvgRaw);
   if (svgRaw) {
     const cacheKey = `${modelName.toLowerCase()}::${side}`;
     let cached = customSvgDataUrlCache.get(cacheKey);
@@ -164,14 +152,7 @@ export const resolveDeviceImage = (
   return undefined;
 };
 
-/**
- * Dashboard thumbnails are generated as data URLs. Older built-in model metadata
- * may contain `/thumbnails/...` placeholders, but those files are not shipped.
- */
-export const isUsableDashboardThumbnail = (url?: string): url is string => {
-  if (!url) return false;
-  return !url.startsWith("/thumbnails/");
-};
+
 
 /**
  * Resolve a device SVG raw text content from modelName.
@@ -210,7 +191,7 @@ export const resolveDeviceSvgContent = async (
 
   // Fallback: 사용자 등록 모델 SVG raw text
   const custom = findCustomModelByName(modelName);
-  const svgRaw = side === "rear" ? custom?.rearSvgRaw : custom?.modelSvgRaw;
+  const svgRaw = side === "rear" ? custom?.rearSvgRaw : (custom?.modelSvgRaw || custom?.baseEquipmentViewSvgRaw);
   if (svgRaw) {
     svgContentCache.set(cacheKey, svgRaw);
     return svgRaw;
@@ -236,7 +217,7 @@ export const hasDeviceSvgAsset = (
   }
   // Fallback: 사용자 등록 모델 체크
   const custom = findCustomModelByName(modelName);
-  return side === "rear" ? !!custom?.rearSvgRaw : !!custom?.modelSvgRaw;
+  return side === "rear" ? !!custom?.rearSvgRaw : !!(custom?.modelSvgRaw || custom?.baseEquipmentViewSvgRaw);
 };
 
 export const getDeviceViewSides = (modelName?: string): EquipmentViewSide[] => {

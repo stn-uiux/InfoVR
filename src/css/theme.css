@@ -16,7 +16,7 @@
 [data-theme=light] {
   /* Background colors - Tech Light */
   --bg-canvas: #ffffff;
-  --bg-primary: rgba(255, 255, 255, 0.8);
+  --bg-primary: rgba(255, 255, 255, 0.9);
   --bg-secondary: #f4f6f9;
   --bg-tertiary: #e3e8ef;
   /* Text colors */

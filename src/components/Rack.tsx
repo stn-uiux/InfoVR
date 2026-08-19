@@ -9,7 +9,8 @@ import type { Rack as RackType, Device } from "../types";
 import { ErrorMarker } from "./ErrorMarker";
 import { U_HEIGHT, GRID_SPACING, DEVICE_DEPTH } from "./constants";
 import { getHighestError } from "../utils/errorHelpers";
-import { isUsableDashboardThumbnail, resolveDeviceImage } from "../utils/deviceAssets";
+import { resolveDeviceImage } from "../utils/deviceAssets";
+import { useSvgComposer } from "../hooks/useSvgComposer";
 
 // ─── Phase 1-A: 모듈 레벨 공유 Geometry (모든 Rack이 재사용) ───
 const SHARED_GEO = {
@@ -508,6 +509,17 @@ export const Rack = memo(({
             });
             if (hitGizmoHelper) return;
 
+            // Find the FIRST interactBox hit by the ray
+            const firstRackHit = e.intersections.find(
+              (hit) => (hit.object as Mesh).geometry === SHARED_GEO.interactBox
+            );
+            
+            // If the first interactBox hit is NOT this rack's interactBox, 
+            // it means this rack is behind another rack. Ignore the click!
+            if (firstRackHit && firstRackHit.object !== e.eventObject) {
+              return;
+            }
+
             let hitModel = false;
             for (const hit of e.intersections) {
               let isModel = false;
@@ -533,7 +545,11 @@ export const Rack = memo(({
             // We only want to prevent racks behind from being selected. But since this is onClick,
             // if we don't stop propagation, both rack and device might process it, which is fine, 
             // device ignores first click.
-            useStore.getState().selectRack(rackId);
+            const state = useStore.getState();
+            if (state.selectedRackId !== rackId || state.focusedRackId !== rackId) {
+              state.selectRack(rackId);
+              state.focusRack(rackId);
+            }
           }}
           onPointerOver={isObstructing ? undefined : (e) => {
             if (useStore.getState().isGizmoHovered) return;
@@ -850,14 +866,27 @@ const DeviceMesh = ({
     }
   });
 
+  // Always generate SVG if there are inserted cards AND no cached PNG is available
+  const needsComposer = !device.devicePngRaw && (device.insertedCards?.length || 0) > 0;
+  const { composedHtml } = useSvgComposer(
+    needsComposer ? device.modelName : undefined,
+    needsComposer ? (device.insertedCards || []) : [],
+    needsComposer ? (device.insertedModules || []) : [],
+    needsComposer ? (device.portStates || []) : [],
+    needsComposer ? (device.defaultViewSide || "front") : "front"
+  );
+
   const thumbUrl = useMemo(
     () => {
-      return (device.defaultViewSide !== "rear" && isUsableDashboardThumbnail(device.dashboardThumbnailUrl)
-        ? device.dashboardThumbnailUrl
-        : "") ||
-        resolveDeviceImage(device.modelName, device.defaultViewSide || "front", true)
+      if (device.devicePngRaw) {
+        return device.devicePngRaw;
+      }
+      if (composedHtml) {
+        return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(composedHtml)))}`;
+      }
+      return resolveDeviceImage(device.modelName, device.defaultViewSide || "front");
     },
-    [device.dashboardThumbnailUrl, device.defaultViewSide, device.modelName],
+    [device.defaultViewSide, device.modelName, composedHtml, device.devicePngRaw],
   );
 
   const resolvedUrl = thumbUrl;

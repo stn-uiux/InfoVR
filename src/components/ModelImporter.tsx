@@ -366,13 +366,33 @@ export const ModelImporter = () => {
   );
 
   useEffect(() => {
-    const handleDragEnter = (e: DragEvent) => {
+    let dragTimeout: NodeJS.Timeout;
+    
+    const handleDragOver = (e: DragEvent) => {
       if (e.dataTransfer?.types.includes("Files") && isEditMode) {
+        e.preventDefault();
         setIsDragOver(true);
+        
+        clearTimeout(dragTimeout);
+        dragTimeout = setTimeout(() => {
+          setIsDragOver(false);
+        }, 150);
       }
     };
-    window.addEventListener("dragenter", handleDragEnter);
-    return () => window.removeEventListener("dragenter", handleDragEnter);
+    
+    const handleDrop = () => {
+      clearTimeout(dragTimeout);
+      setIsDragOver(false);
+    };
+
+    window.addEventListener("dragover", handleDragOver, { capture: true });
+    window.addEventListener("drop", handleDrop, { capture: true });
+    
+    return () => {
+      clearTimeout(dragTimeout);
+      window.removeEventListener("dragover", handleDragOver, { capture: true });
+      window.removeEventListener("drop", handleDrop, { capture: true });
+    };
   }, [isEditMode]);
 
   const renderServerRoomEnvPanel = () => {

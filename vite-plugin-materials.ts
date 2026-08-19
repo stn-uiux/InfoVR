@@ -49,6 +49,24 @@ export function publicAssetsPlugin(): Plugin {
           res.end(JSON.stringify(files));
           return;
         }
+        if (req.method === 'POST' && url === '/__save_custom_models') {
+          let body = '';
+          req.on('data', chunk => {
+            body += chunk.toString();
+          });
+          req.on('end', () => {
+            try {
+              const customModelsPath = path.resolve(__dirname, './src/utils/customModels.json');
+              fs.writeFileSync(customModelsPath, body, 'utf-8');
+              res.statusCode = 200;
+              res.end(JSON.stringify({ success: true }));
+            } catch (err) {
+              res.statusCode = 500;
+              res.end(JSON.stringify({ success: false, error: String(err) }));
+            }
+          });
+          return;
+        }
         next();
       });
     },

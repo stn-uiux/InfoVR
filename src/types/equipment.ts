@@ -70,7 +70,9 @@ export interface EquipmentModel {
   modelName: string;
   rackUnit?: string; // e.g. "4U", "7U"
   baseSvgUrl: string; // e.g. "/equipment/[2U] 7250 IXR-R4-CARD.svg"
-  dashboardThumbnailUrl?: string;
+  /** 사용자 정의 장비용 raw SVG */
+  baseEquipmentViewSvgRaw?: string;
+
   cardArea?: {
     x: number;
     y: number;
@@ -191,7 +193,7 @@ export interface EquipmentAssemblyResult {
   equipmentModel: EquipmentModel;
   insertedCards: InsertedCard[];
   insertedModules?: InsertedModule[];
-  thumbnailDataUrl?: string; // PNG/WebP data URL
+
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -207,6 +209,7 @@ export interface EquipmentVariant {
   variantName: string;
   isDefault: boolean;
   insertedCards: InsertedCard[];
+  variantPngRaw?: string;
 }
 
 /** 사용자 등록 장비 모델 */
@@ -218,6 +221,8 @@ export interface CustomEquipmentModel {
   displayName: string;
   /** 장비 모델 SVG raw text */
   modelSvgRaw: string;
+  /** 장비 모델 PNG 이미지 (data URI) */
+  modelPngRaw?: string;
   /** 장비 뒷면 SVG raw text */
   rearSvgRaw?: string;
   /** 대시보드/랙에서 기본으로 표시할 면 */
@@ -240,6 +245,12 @@ export interface CustomEquipmentModel {
   rowColumns?: number[];
   /** 각 행 아래 간격(margin) 배열 (카드 기반 장비 전용, 미설정 시 0) */
   rowGaps?: number[];
+  /** 그리드 병합 정보 (InteractiveGridEditor 사용) */
+  gridMerges?: { r: number; c: number; rs: number; cs: number }[];
+  /** 각 열의 너비 배열 (그리드 에디터 개별 너비 지원) */
+  gridColWidths?: number[];
+  /** 각 행의 높이 배열 (그리드 에디터 개별 높이 지원 - rowHeights와 분리 보존용) */
+  gridRowHeights?: number[];
   /** 장비 SVG 원본 크기 */
   equipmentSize?: {
     width: number;

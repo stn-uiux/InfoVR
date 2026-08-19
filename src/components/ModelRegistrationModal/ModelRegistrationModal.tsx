@@ -1,16 +1,22 @@
 import { Icon } from "@iconify/react";
-import React, { useState, useRef, useCallback, useMemo } from "react";
+import InteractiveGridEditor, { type GridMerge } from "./InteractiveGridEditor";
+import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useStore } from "../../store/useStore";
 import type {
   CustomModelType,
   CardWidthType,
   EquipmentViewSide,
+  EquipmentVariant,
 } from "../../types/equipment";
 import { CardRegistrationForm } from "./CardRegistrationForm";
+import { EquipmentAssemblyModal } from "../EquipmentAssemblyModal";
+import { CardThumbnail } from "../CardThumbnail";
 import { cardDefinitions, equipmentModels, loadBaseEquipmentSvgRaw, getCardsForModel } from "../../utils/cardAssets";
 import { DEVICE_TEMPLATES } from "../../utils/deviceTemplates";
 import { getDeviceViewSides, resolveDeviceImage, resolveDeviceSvgContent } from "../../utils/deviceAssets";
+import { generateComposedSvgAsync } from "../../hooks/useSvgComposer";
+import { convertSvgToPngAsync } from "../../utils/imageUtils";
 
 const DELETE_ICON_STYLE: React.CSSProperties = {
   width: 14,
@@ -38,13 +44,13 @@ function parseSvgDimensions(svgRaw: string): { width: number; height: number } {
 }
 
 /** SVG raw text를 안전하게 축소 렌더링 */
-function SvgPreview({ svgRaw, maxHeight = 180 }: { svgRaw: string; maxHeight?: number }) {
+function SvgPreview({ svgRaw, maxHeight = 500 }: { svgRaw: string; maxHeight?: number }) {
   const sanitized = useMemo(() => {
     // width/height를 100%로 치환하여 반응형 렌더링
     return svgRaw
       .replace(/width="[^"]*"/, 'width="100%"')
       .replace(/height="[^"]*"/, `height="${maxHeight}px"`)
-      .replace(/<svg/, '<svg style="max-width:100%;max-height:' + maxHeight + 'px"');
+      .replace(/<svg/, '<svg style="max-width:984px;max-height:' + maxHeight + 'px"');
   }, [svgRaw, maxHeight]);
 
   return (
@@ -59,188 +65,181 @@ function SvgPreview({ svgRaw, maxHeight = 180 }: { svgRaw: string; maxHeight?: n
 function ChassisPreviewWithOverlay({
   svgRaw,
   cardArea,
-  rowCount,
-  rowHeights,
-  rowColumns,
-  rowGaps,
-  defaultRowH,
+  colWidths,
+  rowHeights: rowHeightsNum,
+  merges,
+  onDrawEnd,
+  onGridChange,
+  onSave
 }: {
   svgRaw: string;
   cardArea: { x: number; y: number; width: number; height: number; columns: number; columnWidth: number };
-  rowCount: number;
-  rowHeights: string[];
-  rowColumns: string[];
-  rowGaps: string[];
-  defaultRowH: number;
+  colWidths: number[];
+  rowHeights: number[];
+  merges: GridMerge[];
+  onDrawEnd?: (rect: { x: number; y: number; width: number; height: number }) => void;
+  onGridChange?: (data: { colWidths: number[]; rowHeights: number[]; merges: GridMerge[]; baseX?: number; baseY?: number }) => void;
+  onSave?: () => void;
 }) {
-  const overlayedSvg = useMemo(() => {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [startPt, setStartPt] = useState({ x: 0, y: 0 });
+  const [currentPt, setCurrentPt] = useState({ x: 0, y: 0 });
+
+  const svgInfo = useMemo(() => {
     const parser = new DOMParser();
     const doc = parser.parseFromString(svgRaw, "image/svg+xml");
     const svg = doc.querySelector("svg");
-    if (!svg) return svgRaw;
-
-    const getSvgBounds = () => {
-      const vb = svg.getAttribute("viewBox");
-      if (vb) {
-        const parts = vb.split(/[\s,]+/).map(Number);
-        if (parts.length === 4 && parts.every((n) => Number.isFinite(n))) {
-          return { minX: parts[0], minY: parts[1], maxX: parts[0] + parts[2], maxY: parts[1] + parts[3] };
-        }
-      }
-
-      const width = parseFloat(svg.getAttribute("width") || "800") || 800;
-      const height = parseFloat(svg.getAttribute("height") || "200") || 200;
-      return { minX: 0, minY: 0, maxX: width, maxY: height };
-    };
-
-    let rowCursor = 0;
-    let rowMinY = 0;
-    let rowMaxY = 0;
-    for (let i = 0; i < rowCount; i += 1) {
-      const h = parseFloat(rowHeights[i]) || defaultRowH;
-      const gap = i > 0 ? (parseFloat(rowGaps[i - 1]) || 0) : 0;
-      rowCursor += gap;
-      rowMinY = Math.min(rowMinY, rowCursor);
-      rowCursor += h;
-      rowMaxY = Math.max(rowMaxY, rowCursor);
+    if (!svg) return { viewBox: "0 0 800 200" };
+    let vb = svg.getAttribute("viewBox");
+    if (!vb) {
+      const w = parseFloat(svg.getAttribute("width") || "800") || 800;
+      const h = parseFloat(svg.getAttribute("height") || "200") || 200;
+      vb = `0 0 ${w} ${h}`;
     }
-    const overlayTop = Math.min(0, rowMinY);
-    const overlayBottom = Math.max(cardArea.height, rowMaxY);
-    const overlayHeight = overlayBottom - overlayTop;
-    const padding = 18;
-    const bounds = getSvgBounds();
-    const minX = Math.min(bounds.minX, cardArea.x - padding);
-    const minY = Math.min(bounds.minY, cardArea.y + overlayTop - padding);
-    const maxX = Math.max(bounds.maxX, cardArea.x + cardArea.width + padding + 72);
-    const maxY = Math.max(bounds.maxY, cardArea.y + overlayBottom + padding);
-    const viewWidth = maxX - minX;
-    const viewHeight = maxY - minY;
-    svg.setAttribute("viewBox", `${minX} ${minY} ${viewWidth} ${viewHeight}`);
-    svg.setAttribute("width", String(viewWidth));
-    svg.setAttribute("height", String(viewHeight));
-    svg.setAttribute("overflow", "visible");
-
-    // 오버레이 그룹 생성
-    const g = doc.createElementNS("http://www.w3.org/2000/svg", "g");
-    g.setAttribute("class", "card-area-overlay");
-    g.setAttribute("shape-rendering", "geometricPrecision");
-
-    const applyOverlayStroke = (el: SVGElement) => {
-      el.setAttribute("vector-effect", "non-scaling-stroke");
-      el.setAttribute("stroke-linecap", "square");
-    };
-
-    if (cardArea.width > 0 && cardArea.height > 0) {
-      // 카드 영역 사각형
-      const rect = doc.createElementNS("http://www.w3.org/2000/svg", "rect");
-      rect.setAttribute("x", String(cardArea.x));
-      rect.setAttribute("y", String(cardArea.y + overlayTop));
-      rect.setAttribute("width", String(cardArea.width));
-      rect.setAttribute("height", String(overlayHeight));
-      rect.setAttribute("fill", "rgba(0,200,255,0.08)");
-      rect.setAttribute("stroke", "rgba(0,200,255,0.7)");
-      rect.setAttribute("stroke-width", "2");
-      rect.setAttribute("stroke-dasharray", "6 3");
-      rect.setAttribute("rx", "2");
-      applyOverlayStroke(rect);
-      g.appendChild(rect);
-
-      // 행 구분선 + 행별 열 구분선 + 간격
-      let yOff = 0;
-      for (let i = 0; i < rowCount; i++) {
-        const h = parseFloat(rowHeights[i]) || defaultRowH;
-        const gap = i > 0 ? (parseFloat(rowGaps[i - 1]) || 0) : 0;
-        if (gap !== 0) {
-          const gapY = cardArea.y + (gap > 0 ? yOff : yOff + gap);
-          const gapHeight = Math.abs(gap);
-          const gapRect = doc.createElementNS("http://www.w3.org/2000/svg", "rect");
-          gapRect.setAttribute("x", String(cardArea.x));
-          gapRect.setAttribute("y", String(gapY));
-          gapRect.setAttribute("width", String(cardArea.width));
-          gapRect.setAttribute("height", String(gapHeight));
-          gapRect.setAttribute("fill", gap > 0 ? "rgba(255,193,7,0.22)" : "rgba(239,68,68,0.24)");
-          gapRect.setAttribute("stroke", gap > 0 ? "rgba(255,193,7,0.9)" : "rgba(248,113,113,0.95)");
-          gapRect.setAttribute("stroke-width", "1.5");
-          gapRect.setAttribute("stroke-dasharray", "4 2");
-          applyOverlayStroke(gapRect);
-          g.appendChild(gapRect);
-
-          const gapText = doc.createElementNS("http://www.w3.org/2000/svg", "text");
-          gapText.setAttribute("x", String(cardArea.x + cardArea.width + 6));
-          gapText.setAttribute("y", String(gapY + Math.max(9, gapHeight / 2 + 3)));
-          gapText.setAttribute("fill", gap > 0 ? "rgba(255,214,102,0.95)" : "rgba(252,165,165,0.98)");
-          gapText.setAttribute("font-size", "10");
-          gapText.setAttribute("font-weight", "700");
-          gapText.setAttribute("font-family", "sans-serif");
-          gapText.textContent = gap > 0 ? `간격 ${gap}px` : `겹침 ${Math.abs(gap)}px`;
-          g.appendChild(gapText);
-
-          yOff += gap; // 이전 행과의 간격/겹침
-        }
-        const cols = parseInt(rowColumns[i]) || cardArea.columns;
-        const colW = cardArea.width / cols;
-
-        // 이 행의 열 구분선
-        for (let c = 1; c < cols; c++) {
-          const cx = cardArea.x + c * colW;
-          const line = doc.createElementNS("http://www.w3.org/2000/svg", "line");
-          line.setAttribute("x1", String(cx));
-          line.setAttribute("y1", String(cardArea.y + yOff));
-          line.setAttribute("x2", String(cx));
-          line.setAttribute("y2", String(cardArea.y + yOff + h));
-          line.setAttribute("stroke", "rgba(0,200,255,0.35)");
-          line.setAttribute("stroke-width", "1");
-          applyOverlayStroke(line);
-          g.appendChild(line);
-        }
-
-        yOff += h;
-        if (i < rowCount - 1) {
-          const line = doc.createElementNS("http://www.w3.org/2000/svg", "line");
-          line.setAttribute("x1", String(cardArea.x));
-          line.setAttribute("y1", String(cardArea.y + yOff));
-          line.setAttribute("x2", String(cardArea.x + cardArea.width));
-          line.setAttribute("y2", String(cardArea.y + yOff));
-          line.setAttribute("stroke", "rgba(0,200,255,0.35)");
-          line.setAttribute("stroke-width", "1");
-          applyOverlayStroke(line);
-          g.appendChild(line);
-        }
-      }
-
-      // 라벨
-      const maxCols = rowColumns.length > 0
-        ? Math.max(...rowColumns.map((c) => parseInt(c) || cardArea.columns))
-        : cardArea.columns;
-      const text = doc.createElementNS("http://www.w3.org/2000/svg", "text");
-      text.setAttribute("x", String(cardArea.x + 5));
-      text.setAttribute("y", String(cardArea.y + 12));
-      text.setAttribute("fill", "rgba(0,200,255,0.9)");
-      text.setAttribute("font-size", "10");
-      text.setAttribute("font-weight", "700");
-      text.setAttribute("font-family", "sans-serif");
-      text.textContent = `카드 영역 (최대${maxCols}열×${rowCount}행)`;
-      g.appendChild(text);
-    }
-
-    svg.appendChild(g);
-    return new XMLSerializer().serializeToString(svg);
-  }, [svgRaw, cardArea, rowCount, rowHeights, rowColumns, rowGaps, defaultRowH]);
+    return { viewBox: vb };
+  }, [svgRaw]);
 
   const displaySvg = useMemo(() => {
-    return overlayedSvg
+    return svgRaw
       .replace(/width="[^"]*"/, 'width="100%"')
       .replace(/\sheight="[^"]*"/, '')
-      .replace(/<svg/, '<svg style="max-width:100%;height:auto;display:block"');
-  }, [overlayedSvg]);
+      .replace(/<svg/, '<svg style="max-width:984px;max-height:580px;height:auto;display:block"');
+  }, [svgRaw]);
+
+  const getSvgPoint = (e: React.PointerEvent) => {
+    const svg = svgRef.current;
+    if (!svg) return { x: 0, y: 0 };
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const transformed = pt.matrixTransform(svg.getScreenCTM()?.inverse());
+    return { x: transformed.x, y: transformed.y };
+  };
+
+  const [toolbarNode, setToolbarNode] = useState<HTMLElement | null>(null);
+
+  const hasGrid = colWidths.length > 0 && rowHeightsNum.length > 0 && cardArea.width > 0 && cardArea.height > 0;
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    // Don't draw if clicking on grid editor elements
+    if (hasGrid) return;
+    const pt = getSvgPoint(e);
+    setIsDrawing(true);
+    setStartPt(pt);
+    setCurrentPt(pt);
+    (e.target as Element).setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDrawing) return;
+    setCurrentPt(getSvgPoint(e));
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (!isDrawing) return;
+    setIsDrawing(false);
+    (e.target as Element).releasePointerCapture(e.pointerId);
+
+    const x = Math.min(startPt.x, currentPt.x);
+    const y = Math.min(startPt.y, currentPt.y);
+    const width = Math.abs(currentPt.x - startPt.x);
+    const height = Math.abs(currentPt.y - startPt.y);
+
+    if (width > 5 && height > 5 && onDrawEnd) {
+      onDrawEnd({ x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) });
+    }
+  };
+
+  const drawRect = isDrawing ? {
+    x: Math.min(startPt.x, currentPt.x),
+    y: Math.min(startPt.y, currentPt.y),
+    width: Math.abs(currentPt.x - startPt.x),
+    height: Math.abs(currentPt.y - startPt.y)
+  } : null;
 
   return (
-    <div
-      className="mrm-svg-preview mrm-svg-preview--chassis"
-      dangerouslySetInnerHTML={{ __html: displaySvg }}
-    />
+    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      <div className="mrm-svg-preview mrm-svg-preview--chassis" style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', position: 'relative' }}>
+        <div style={{ position: 'relative', width: '100%', maxWidth: '984px', display: 'flex', justifyContent: 'center' }}>
+          <div dangerouslySetInnerHTML={{ __html: displaySvg }} style={{ width: '100%' }} />
+          <svg
+            ref={svgRef}
+            viewBox={svgInfo.viewBox}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              overflow: 'visible',
+              pointerEvents: 'auto',
+              cursor: hasGrid ? 'default' : 'crosshair',
+              zIndex: 10
+            }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerLeave={handlePointerUp}
+          >
+            {/* Drawing mode rect */}
+            {isDrawing && drawRect && (
+              <rect
+                x={drawRect.x}
+                y={drawRect.y}
+                width={drawRect.width}
+                height={drawRect.height}
+                fill="rgba(0,200,255,0.2)"
+                stroke="rgba(0,200,255,1)"
+                strokeWidth="2"
+                strokeDasharray="4 4"
+                vectorEffect="non-scaling-stroke"
+              />
+            )}
+
+            {/* Interactive grid editor */}
+            {hasGrid && onGridChange && (
+              <InteractiveGridEditor
+                svgRef={svgRef}
+                baseX={cardArea.x}
+                baseY={cardArea.y}
+                colWidths={colWidths}
+                rowHeights={rowHeightsNum}
+                merges={merges}
+                toolbarContainer={toolbarNode}
+                onGridChange={onGridChange}
+                onSave={onSave}
+              />
+            )}
+          </svg>
+        </div>
+
+        {/* Guidance Message */}
+        {!hasGrid && !isDrawing && (
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: 'rgba(0,0,0,0.65)',
+            color: '#fff',
+            padding: '12px 24px',
+            borderRadius: '8px',
+            pointerEvents: 'none',
+            fontSize: '14px',
+            fontWeight: '600',
+            backdropFilter: 'blur(4px)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+          }}>
+            이미지에 드래그하여 섀시 영역을 그려주세요
+          </div>
+        )}
+      </div>
+      <div ref={setToolbarNode} className="interactive-grid-toolbar-container" style={{ padding: "4px 0" }} />
+    </div>
   );
 }
+
 
 export const ModelRegistrationModal: React.FC = () => {
   const isOpen = useStore((s) => s.modelRegistrationModalOpen);
@@ -292,7 +291,7 @@ export const ModelRegistrationModal: React.FC = () => {
 
   // Form state
   const [modelName, setModelName] = useState("");
-  const [vendor, setVendor] = useState("Cisco (시스코)");
+  const [vendor, setVendor] = useState("Cisco");
   const [unit, setUnit] = useState<number>(1);
   const [modelType, setModelType] = useState<CustomModelType>("normal");
   const [modelSvgRaw, setModelSvgRaw] = useState<string | null>(null);
@@ -303,7 +302,14 @@ export const ModelRegistrationModal: React.FC = () => {
   const [defaultViewSide, setDefaultViewSide] = useState<EquipmentViewSide>("front");
   const [baseChassisRaw, setBaseChassisRaw] = useState<string | null>(null);
   const [baseChassisFileName, setBaseChassisFileName] = useState("");
+  const chassisOriginalFileRef = useRef<File | null>(null);
+  const [variants, setVariants] = useState<EquipmentVariant[]>([]);
+  const [isAssemblyOpen, setIsAssemblyOpen] = useState(false);
+  const [editingVariantIndex, setEditingVariantIndex] = useState<number | null>(null);
 
+  // List Thumb Tooltip
+  const [hoveredListThumb, setHoveredListThumb] = useState<{ pngRaw?: string | null, svgRaw?: string | null, imgUrl?: string | null, name: string } | null>(null);
+  const [hoveredListThumbPos, setHoveredListThumbPos] = useState({ x: 0, y: 0 });
   // Card area config (card-based models) — string 기반으로 자유로운 편집 지원
   const [caXStr, setCaXStr] = useState("0");
   const [caYStr, setCaYStr] = useState("0");
@@ -324,6 +330,11 @@ export const ModelRegistrationModal: React.FC = () => {
   // Row gaps (행 간 간격 - margin)
   const [rowGapsArr, setRowGapsArr] = useState<string[]>([]);
   const [uniformRowGap, setUniformRowGap] = useState("0");
+
+  // Interactive grid state
+  const [gridColWidths, setGridColWidths] = useState<number[]>([]);
+  const [gridRowHeights, setGridRowHeights] = useState<number[]>([]);
+  const [gridMerges, setGridMerges] = useState<GridMerge[]>([]);
 
   // Editing mode
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
@@ -349,7 +360,79 @@ export const ModelRegistrationModal: React.FC = () => {
 
   // 행 수 (사용자 설정 우선)
   const defaultRowHeight = 46;
+
+  // Auto-generate missing variant PNGs
+  useEffect(() => {
+    let isCancelled = false;
+
+    // Only run if there is a missing png AND we have the necessary base data
+    if (variants.length > 0 && variants.some(v => !v.variantPngRaw) && (baseChassisRaw || modelSvgRaw)) {
+      const generateMissingPngs = async () => {
+        let changed = false;
+        const newVariants = [...variants];
+        for (let i = 0; i < newVariants.length; i++) {
+          if (isCancelled) return;
+          const v = newVariants[i];
+          if (!v.variantPngRaw) {
+            try {
+              const dims = parseSvgDimensions(modelSvgRaw || baseChassisRaw || "");
+              const parsedRowHeights = rowHeights.map((h) => parseFloat(h) || defaultRowHeight);
+              const parsedRowColumns = rowColumnsArr.map((c) => parseInt(c) || caColumns);
+              const parsedRowGaps = rowGapsArr.map((g) => parseFloat(g) || 0);
+              const effectiveMaxCols = parsedRowColumns.length > 0 ? Math.max(...parsedRowColumns, 1) : caColumns;
+              const effectiveColWidth = caWidth / effectiveMaxCols;
+
+              const composed = await generateComposedSvgAsync(
+                modelName.trim(),
+                {
+                  modelId: editingModelId || "temp",
+                  modelName: modelName.trim(),
+                  rackUnit: `${unit}U`,
+                  baseSvgUrl: baseChassisFileName || "",
+                  baseEquipmentViewSvgRaw: baseChassisRaw || "",
+                  equipmentSize: { width: dims.width, height: dims.height },
+                  cardArea: { x: caX, y: caY, width: caWidth, height: caHeight, columns: effectiveMaxCols, columnWidth: effectiveColWidth },
+                  _rowHeights: parsedRowHeights,
+                  _rowColumns: parsedRowColumns,
+                  _rowGaps: parsedRowGaps,
+                  gridMerges: gridMerges,
+                  gridColWidths: gridColWidths,
+                  gridRowHeights: gridRowHeights,
+                } as any,
+                v.insertedCards,
+                [],
+                "front"
+              );
+              if (composed && !isCancelled) {
+                const png = await convertSvgToPngAsync(composed, dims.width || 860, dims.height || 200);
+                if (png && !isCancelled) {
+                  newVariants[i] = { ...v, variantPngRaw: png };
+                  changed = true;
+                }
+              }
+            } catch (err) {
+              console.error("Failed to generate missing variant PNG", err);
+            }
+          }
+        }
+        if (changed && !isCancelled) {
+          setVariants(newVariants);
+        }
+      };
+
+      generateMissingPngs();
+    }
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    variants, baseChassisRaw, modelSvgRaw, modelName, editingModelId, unit, baseChassisFileName,
+    caX, caY, caWidth, caHeight, rowHeights, rowColumnsArr, rowGapsArr, caColumns, gridMerges, gridColWidths, gridRowHeights
+  ]);
+
   const computedRowCount = caRowCount;
+  const isChassisDrawn = gridColWidths.length > 0 && gridRowHeights.length > 0 && caWidth > 0 && caHeight > 0;
 
   // rowHeights & rowColumns 자동 초기화: 행 수 변경 시 배열 크기 동기화
   const syncRowHeights = useCallback((newRowCount: number) => {
@@ -389,6 +472,19 @@ export const ModelRegistrationModal: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
+  // 툴팁(호버) 상태
+  const [hoveredTooltipCard, setHoveredTooltipCard] = useState<AvailableCard | null>(null);
+  const [hoveredTooltipPos, setHoveredTooltipPos] = useState({ x: 0, y: 0 });
+
+  const handleCardMouseMove = (e: React.MouseEvent, card: AvailableCard) => {
+    setHoveredTooltipCard(card);
+    setHoveredTooltipPos({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleCardMouseLeave = () => {
+    setHoveredTooltipCard(null);
+  };
+
   const modelFileRef = useRef<HTMLInputElement>(null);
   const rearFileRef = useRef<HTMLInputElement>(null);
   const chassisFileRef = useRef<HTMLInputElement>(null);
@@ -402,6 +498,7 @@ export const ModelRegistrationModal: React.FC = () => {
   // Reset form
   const resetForm = useCallback(() => {
     setModelName("");
+    setVendor("Nokia");
     setUnit(1);
     setModelType("normal");
     setModelSvgRaw(null);
@@ -425,18 +522,22 @@ export const ModelRegistrationModal: React.FC = () => {
     setUniformRowColumns("2");
     setRowGapsArr([]);
     setUniformRowGap("0");
+    setGridColWidths([]);
+    setGridRowHeights([]);
+    setGridMerges([]);
     setAssignedCardIds([]);
+    setVariants([]);
     setErrors({});
     setEditingModelId(null);
   }, []);
 
   // Load model into form for editing
-  const loadModelForEdit = useCallback((modelId: string) => {
+  const loadModelForEdit = useCallback(async (modelId: string) => {
     const model = customModels.find((m) => m.modelId === modelId);
     if (!model) return;
     setEditingModelId(modelId);
     setModelName(model.modelName);
-    setVendor(model.vendor || "Cisco (시스코)");
+    setVendor(model.vendor || "Nokia");
     setUnit(model.unit);
     setModelType(model.modelType);
     setModelSvgRaw(model.modelSvgRaw);
@@ -445,8 +546,22 @@ export const ModelRegistrationModal: React.FC = () => {
     setRearSvgRaw(model.rearSvgRaw || null);
     setRearSvgFileName(model.rearSvgRaw ? "(기존 파일)" : "");
     setDefaultViewSide(model.defaultViewSide || "front");
-    setBaseChassisRaw(model.baseEquipmentViewSvgRaw || null);
-    setBaseChassisFileName(model.baseEquipmentViewSvgRaw ? "(기존 파일)" : "");
+
+    let baseRaw = model.baseEquipmentViewSvgRaw || null;
+    let baseFileName = baseRaw ? "(기존 파일)" : "";
+    if (!baseRaw && model.modelType === "card-based") {
+      const eqModel = equipmentModels.find(m => m.modelName === model.modelName);
+      if (eqModel && eqModel.baseSvgUrl) {
+        const raw = await loadBaseEquipmentSvgRaw(eqModel.baseSvgUrl);
+        if (raw) {
+          baseRaw = raw;
+          baseFileName = eqModel.baseSvgUrl;
+        }
+      }
+    }
+
+    setBaseChassisRaw(baseRaw);
+    setBaseChassisFileName(baseFileName);
     if (model.cardArea) {
       setCaXStr(String(model.cardArea.x));
       setCaYStr(String(model.cardArea.y));
@@ -477,7 +592,22 @@ export const ModelRegistrationModal: React.FC = () => {
       const rCount = model.rowHeights?.length || (model.cardArea ? Math.floor(model.cardArea.height / defaultRowHeight) : 0);
       setRowGapsArr(Array.from({ length: Math.max(0, rCount - 1) }, () => "0"));
     }
+    // Initialize grid state from model data
+    if (model.cardArea) {
+      const rh = model.rowHeights || [];
+      const rc = model.rowColumns || [];
+      const maxCols = rc.length > 0 ? Math.max(...rc, 1) : model.cardArea.columns;
+      const colW = model.cardArea.width / maxCols;
+      setGridColWidths(model.gridColWidths && model.gridColWidths.length > 0 ? [...model.gridColWidths] : Array.from({ length: maxCols }, () => colW));
+      setGridRowHeights(model.gridRowHeights && model.gridRowHeights.length > 0 ? [...model.gridRowHeights] : (rh.length > 0 ? [...rh] : [model.cardArea.height]));
+      setGridMerges(model.gridMerges || []);
+    } else {
+      setGridColWidths([]);
+      setGridRowHeights([]);
+      setGridMerges([]);
+    }
     setAssignedCardIds(model.assignedCardIds || []);
+    setVariants(model.variants || []);
     setErrors({});
     setActiveTab("register");
   }, [customModels]);
@@ -490,69 +620,121 @@ export const ModelRegistrationModal: React.FC = () => {
     [],
   );
 
-  // File handlers
-  const handleModelFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      if (!file.name.toLowerCase().endsWith(".svg")) {
-        setErrors((p) => ({ ...p, modelFile: "SVG 파일만 지원합니다." }));
-        return;
-      }
+  const processImageFile = useCallback((file: File, setRaw: (val: string) => void, setFileName: (val: string) => void, setError: (err: string | undefined) => void, forceW?: number, forceH?: number) => {
+    const name = file.name.toLowerCase();
+    if (name.endsWith(".svg")) {
       const reader = new FileReader();
       reader.onload = () => {
-        setModelSvgRaw(reader.result as string);
-        setModelSvgFileName(file.name);
-        setErrors((p) => {
-          const next = { ...p };
-          delete next.modelFile;
-          return next;
-        });
+        let svgRaw = reader.result as string;
+        if (forceW && forceH) {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(svgRaw, "image/svg+xml");
+          const svg = doc.querySelector("svg");
+          if (svg) {
+            svg.setAttribute("width", String(forceW));
+            svg.setAttribute("height", String(forceH));
+            if (!svg.hasAttribute("viewBox")) {
+              svg.setAttribute("viewBox", `0 0 ${forceW} ${forceH}`);
+            }
+            svg.setAttribute("preserveAspectRatio", "none");
+            svgRaw = new XMLSerializer().serializeToString(doc);
+          }
+        }
+        setRaw(svgRaw);
+        setFileName(file.name);
+        setError(undefined);
       };
       reader.readAsText(file);
+    } else if (name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".webp")) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        const img = new Image();
+        img.onload = () => {
+          const w = forceW || img.width || 800;
+          const h = forceH || img.height || 200;
+          const svgRaw = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><image href="${dataUrl}" width="${w}" height="${h}" preserveAspectRatio="none" /></svg>`;
+          setRaw(svgRaw);
+          setFileName(file.name);
+          setError(undefined);
+        };
+        img.src = dataUrl;
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setError("SVG, PNG, JPG 파일만 지원합니다.");
+    }
+  }, []);
+
+  // File handlers
+  const processModelFile = useCallback((file?: File) => {
+    if (!file) return;
+    processImageFile(file, setModelSvgRaw, setModelSvgFileName, (err) => setErrors((p) => { const n = { ...p }; if (err) n.modelFile = err; else delete n.modelFile; return n; }));
+  }, [processImageFile]);
+
+  const handleModelFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      processModelFile(e.target.files?.[0]);
     },
-    [],
+    [processModelFile]
   );
+
+  const processChassisFile = useCallback((file?: File) => {
+    if (!file) return;
+    chassisOriginalFileRef.current = file;
+    // Reset grid variables when a new image is uploaded
+    setCaXStr("0");
+    setCaYStr("0");
+    setCaWidthStr("0");
+    setCaHeightStr("0");
+    setGridColWidths([]);
+    setGridRowHeights([]);
+    setGridMerges([]);
+    setRowHeights([]);
+    setRowColumnsArr([]);
+    setRowGapsArr([]);
+    
+    processImageFile(
+      file,
+      setBaseChassisRaw,
+      setBaseChassisFileName,
+      (err) => setErrors((p) => { const n = { ...p }; if (err) n.chassisFile = err; else delete n.chassisFile; return n; }),
+      984,
+      unit * 96
+    );
+  }, [processImageFile, unit]);
+
+  // Re-process chassis image when unit changes
+  useEffect(() => {
+    const file = chassisOriginalFileRef.current;
+    if (!file || !baseChassisRaw) return;
+    processImageFile(
+      file,
+      setBaseChassisRaw,
+      setBaseChassisFileName,
+      () => { },
+      984,
+      unit * 96
+    );
+  }, [unit]);
 
   const handleChassisFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      if (!file.name.toLowerCase().endsWith(".svg")) {
-        setErrors((p) => ({ ...p, chassisFile: "SVG 파일만 지원합니다." }));
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => {
-        setBaseChassisRaw(reader.result as string);
-        setBaseChassisFileName(file.name);
-      };
-      reader.readAsText(file);
+      processChassisFile(e.target.files?.[0]);
     },
-    [],
+    [processChassisFile]
   );
+
+  const processRearFile = useCallback((file?: File) => {
+    if (!file) return;
+    processImageFile(file, setRearSvgRaw, setRearSvgFileName, (err) => setErrors((p) => { const n = { ...p }; if (err) n.rearFile = err; else delete n.rearFile; return n; }));
+  }, [processImageFile]);
 
   const handleRearFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      if (!file.name.toLowerCase().endsWith(".svg")) {
-        setErrors((p) => ({ ...p, rearFile: "SVG 파일만 지원합니다." }));
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => {
-        setRearSvgRaw(reader.result as string);
-        setRearSvgFileName(file.name);
-        setErrors((p) => {
-          const next = { ...p };
-          delete next.rearFile;
-          return next;
-        });
-      };
-      reader.readAsText(file);
+      processRearFile(e.target.files?.[0]);
     },
-    [],
+    [processRearFile]
   );
 
   // Card management
@@ -585,15 +767,60 @@ export const ModelRegistrationModal: React.FC = () => {
     setAssignedCardIds((prev) => prev.filter((id) => id !== cardId));
   }, []);
 
+  const isUnchanged = useMemo(() => {
+    if (!editingModelId) return false;
+    const model = customModels.find(m => m.modelId === editingModelId);
+    if (!model) return false;
+
+    if (modelName.trim() !== model.modelName) return false;
+    if (vendor !== (model.vendor || "Nokia")) return false;
+    if (unit !== model.unit) return false;
+    if (modelType !== model.modelType) return false;
+    if (modelSvgRaw !== (model.modelSvgRaw || null)) return false;
+    if (useDualView !== !!model.rearSvgRaw) return false;
+    if (rearSvgRaw !== (model.rearSvgRaw || null)) return false;
+    if (defaultViewSide !== (model.defaultViewSide || "front")) return false;
+
+    if (modelType === "card-based") {
+      const prevCa = model.cardArea || { x: 0, y: 0, width: 860, height: 200, columns: 2, columnWidth: 430 };
+      if (caXStr !== String(prevCa.x)) return false;
+      if (caYStr !== String(prevCa.y)) return false;
+      if (caWidthStr !== String(prevCa.width)) return false;
+      if (caHeightStr !== String(prevCa.height)) return false;
+      if (caColumnsStr !== String(prevCa.columns)) return false;
+      if (caColWidthStr !== String(prevCa.columnWidth)) return false;
+
+      const rCount = model.rowHeights?.length || (model.cardArea ? Math.floor(model.cardArea.height / 50) : 0);
+
+      const prevRh = model.rowHeights ? model.rowHeights.map(String) : Array.from({ length: rCount }, () => "50");
+      if (JSON.stringify(rowHeights) !== JSON.stringify(prevRh)) return false;
+
+      const prevRc = model.rowColumns ? model.rowColumns.map(String) : Array.from({ length: rCount }, () => String(prevCa.columns));
+      if (JSON.stringify(rowColumnsArr) !== JSON.stringify(prevRc)) return false;
+
+      const prevRg = model.rowGaps ? model.rowGaps.map(String) : Array.from({ length: Math.max(0, rCount - 1) }, () => "0");
+      if (JSON.stringify(rowGapsArr) !== JSON.stringify(prevRg)) return false;
+
+      if (JSON.stringify(variants) !== JSON.stringify(model.variants || [])) return false;
+      if (JSON.stringify(assignedCardIds) !== JSON.stringify(model.assignedCardIds || [])) return false;
+    }
+
+    return true;
+  }, [
+    editingModelId, customModels, modelName, vendor, unit, modelType, modelSvgRaw,
+    useDualView, rearSvgRaw, defaultViewSide, caXStr, caYStr, caWidthStr, caHeightStr, caColumnsStr, caColWidthStr,
+    rowHeights, rowColumnsArr, rowGapsArr, variants, assignedCardIds
+  ]);
+
   // Submit
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     const newErrors: Record<string, string> = {};
     if (!modelName.trim()) newErrors.modelName = "모델명을 입력하세요.";
     if (unit < 1 || unit > 48) newErrors.unit = "1~48 사이의 값을 입력하세요.";
-    if (!modelSvgRaw) newErrors.modelFile = "모델 SVG 파일을 업로드하세요.";
-    if (useDualView && !rearSvgRaw) newErrors.rearFile = "뒷면 SVG 파일을 업로드하세요.";
+    if (modelType !== "card-based" && !modelSvgRaw) newErrors.modelFile = "모델 이미지 파일을 업로드하세요.";
+    if (modelType !== "card-based" && useDualView && !rearSvgRaw) newErrors.rearFile = "뒷면 이미지 파일을 업로드하세요.";
     if (modelType === "card-based" && !baseChassisRaw) {
-      newErrors.chassisFile = "기본 섀시 SVG 파일을 업로드하세요.";
+      newErrors.chassisFile = "기본 섀시 이미지 파일을 업로드하세요.";
     }
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) return;
@@ -606,12 +833,63 @@ export const ModelRegistrationModal: React.FC = () => {
     const effectiveMaxCols = parsedRowColumns.length > 0 ? Math.max(...parsedRowColumns, 1) : caColumns;
     const effectiveColWidth = caWidth / effectiveMaxCols;
 
+    let finalModelSvgRaw = modelSvgRaw || "";
+    let finalModelPngRaw: string | undefined = undefined;
+    if (modelType === "card-based") {
+      const defaultVariant = variants.find(v => v.isDefault) || variants[0];
+      if (defaultVariant) {
+        try {
+          const composed = await generateComposedSvgAsync(
+            modelName.trim(),
+            {
+              modelId: editingModelId || "temp",
+              modelName: modelName.trim(),
+              rackUnit: `${unit}U`,
+              baseSvgUrl: baseChassisFileName || "",
+              baseEquipmentViewSvgRaw: baseChassisRaw || "",
+              equipmentSize: { width: dims.width, height: dims.height },
+              cardArea: { x: caX, y: caY, width: caWidth, height: caHeight, columns: effectiveMaxCols, columnWidth: effectiveColWidth },
+              _rowHeights: parsedRowHeights,
+              _rowColumns: parsedRowColumns,
+              _rowGaps: parsedRowGaps,
+              gridMerges: gridMerges,
+              gridColWidths: gridColWidths,
+              gridRowHeights: gridRowHeights,
+            } as any,
+            defaultVariant.insertedCards,
+            [],
+            "front"
+          );
+          if (composed) {
+            finalModelSvgRaw = composed;
+            setModelSvgRaw(composed);
+            try {
+              finalModelPngRaw = await convertSvgToPngAsync(composed, dims.width || 860, dims.height || 200);
+            } catch (err) {
+              console.error("Failed to generate PNG on submit", err);
+            }
+          }
+        } catch (err) {
+          console.error("Failed to generate composed SVG on submit", err);
+        }
+      }
+    }
+
+    if (!finalModelPngRaw && finalModelSvgRaw) {
+      try {
+        finalModelPngRaw = await convertSvgToPngAsync(finalModelSvgRaw, dims.width || 860, dims.height || 200);
+      } catch (err) {
+        console.error("Failed to generate fallback PNG on submit", err);
+      }
+    }
+
     const payload: Omit<import("../../types/equipment").CustomEquipmentModel, "modelId"> = {
       modelName: modelName.trim(),
       vendor: vendor,
       unit,
       displayName: `[${unit}U] ${modelName.trim()}`,
-      modelSvgRaw: modelSvgRaw!,
+      modelSvgRaw: finalModelSvgRaw,
+      modelPngRaw: finalModelPngRaw,
       rearSvgRaw: useDualView ? rearSvgRaw || undefined : undefined,
       defaultViewSide: useDualView ? defaultViewSide : "front",
       modelType,
@@ -627,11 +905,15 @@ export const ModelRegistrationModal: React.FC = () => {
             columnWidth: effectiveColWidth,
           }
           : undefined,
-      rowHeights: modelType === "card-based" && parsedRowHeights.length > 0 ? parsedRowHeights : undefined,
-      rowColumns: modelType === "card-based" && parsedRowColumns.length > 0 ? parsedRowColumns : undefined,
-      rowGaps: modelType === "card-based" && parsedRowGaps.some((g) => g !== 0) ? parsedRowGaps : undefined,
+      rowHeights: undefined,
+      rowColumns: undefined,
+      rowGaps: undefined,
+      gridMerges: modelType === "card-based" && gridMerges.length > 0 ? gridMerges : undefined,
+      gridColWidths: modelType === "card-based" && gridColWidths.length > 0 ? gridColWidths : undefined,
+      gridRowHeights: modelType === "card-based" && gridRowHeights.length > 0 ? gridRowHeights : undefined,
       equipmentSize: { width: dims.width, height: dims.height },
       assignedCardIds: modelType === "card-based" ? assignedCardIds : [],
+      variants: modelType === "card-based" ? variants : undefined,
       createdAt: editingModelId ? customModels.find((m) => m.modelId === editingModelId)?.createdAt || new Date().toISOString() : new Date().toISOString(),
     };
 
@@ -643,6 +925,7 @@ export const ModelRegistrationModal: React.FC = () => {
       showToastMsg(`모델 "${displayName}" 등록 완료!`, "success");
     }
     resetForm();
+    setActiveTab("list");
   }, [
     modelName,
     vendor,
@@ -657,6 +940,9 @@ export const ModelRegistrationModal: React.FC = () => {
     rowHeights,
     rowColumnsArr,
     rowGapsArr,
+    gridMerges,
+    gridColWidths,
+    gridRowHeights,
     assignedCardIds,
     editingModelId,
     customModels,
@@ -665,6 +951,7 @@ export const ModelRegistrationModal: React.FC = () => {
     displayName,
     showToastMsg,
     resetForm,
+    variants,
   ]);
 
   // Delete model
@@ -743,7 +1030,7 @@ export const ModelRegistrationModal: React.FC = () => {
                   <span className="badge">필수</span>
                 </div>
 
-                <div className="mrm-form-grid" style={{ gridTemplateColumns: "1.5fr 1fr 1fr" }}>
+                <div className="mrm-form-grid" style={{ gridTemplateColumns: "1.2fr 0.8fr 1fr 1.5fr" }}>
                   <div className="mrm-field">
                     <label>
                       모델명<span className="required">*</span>
@@ -775,7 +1062,7 @@ export const ModelRegistrationModal: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="mrm-field" style={{ flex: 1 }}>
+                  <div className="mrm-field">
                     <label>
                       제조사<span className="mrm-required">*</span>
                     </label>
@@ -786,23 +1073,26 @@ export const ModelRegistrationModal: React.FC = () => {
                     >
                       <option value="" disabled>제조사를 선택하세요</option>
                       {[
-                        "Cisco (시스코)",
-                        "Ciena (시에나)",
-                        "Coweaver (코위버)",
-                        "Dasan (다산네트웍스)",
-                        "Dell (델)",
-                        "Juniper (주니퍼)",
-                        "Nokia (노키아)",
-                        "Rebellions (리벨리온)",
-                        "Ubiquoss (유비쿼스)",
-                        "Woorinet (우리넷)"
+                        "AXGATE",
+                        "Cisco",
+                        "Ciena",
+                        "Coweaver",
+                        "Dasan",
+                        "Dell",
+                        "Edgecore",
+                        "Juniper",
+                        "Nokia",
+                        "Rebellions",
+                        "Supermicro",
+                        "Ubiquoss",
+                        "Woorinet"
                       ].map(v => (
                         <option key={v} value={v}>{v}</option>
                       ))}
                     </select>
                   </div>
 
-                  <div className="mrm-field full-width" style={{ marginTop: 4 }}>
+                  <div className="mrm-field">
                     <label>
                       폼 팩터<span className="required">*</span>
                     </label>
@@ -824,225 +1114,245 @@ export const ModelRegistrationModal: React.FC = () => {
                         <div className="type-icon">🗂️</div>
                         <div className="type-info">
                           <div className="type-name">섀시형</div>
-                          <div className="type-desc">카드 삽입 가능한 장비 (섀시+카드)</div>
+                          <div className="type-desc">장비(섀시+카드)</div>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
-
-                {/* Display Name Preview */}
-                {displayName && (
-                  <div className="mrm-display-preview" style={{ marginTop: 16 }}>
-                    <span className="preview-label">표시 이름 →</span>
-                    <span className="preview-value">{displayName}</span>
-                  </div>
-                )}
               </div>
 
               {/* Model SVG Upload */}
-              <div className="mrm-section">
-                <div className="mrm-section-title">
-                  모델 파일 업로드
-                  <span className="badge">SVG</span>
-                </div>
+              {modelType !== "card-based" && (
+                <div className="mrm-section">
+                  <div className="mrm-section-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      모델 파일 업로드
+                      <span className="badge">SVG</span>
+                    </div>
+                    {modelSvgRaw && !useDualView && (
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <button type="button" onClick={() => modelFileRef.current?.click()} style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "4px", background: "var(--bg-tertiary)", border: "1px solid var(--border-medium)", color: "var(--text-secondary)", cursor: "pointer" }}>변경</button>
+                        <button type="button" onClick={() => { setModelSvgRaw(null); setModelSvgFileName(""); }} style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "4px", background: "var(--severity-critical)", border: "none", color: "#fff", cursor: "pointer" }}>삭제</button>
+                      </div>
+                    )}
+                  </div>
 
-                <input
-                  type="file"
-                  accept=".svg"
-                  ref={modelFileRef}
-                  style={{ display: "none" }}
-                  onChange={handleModelFileChange}
-                />
-                <input
-                  type="file"
-                  accept=".svg"
-                  ref={rearFileRef}
-                  style={{ display: "none" }}
-                  onChange={handleRearFileChange}
-                />
+                  <input
+                    type="file"
+                    accept=".svg,.png,.jpg,.jpeg,.webp"
+                    ref={modelFileRef}
+                    style={{ display: "none" }}
+                    onChange={handleModelFileChange}
+                  />
+                  <input
+                    type="file"
+                    accept=".svg,.png,.jpg,.jpeg,.webp"
+                    ref={rearFileRef}
+                    style={{ display: "none" }}
+                    onChange={handleRearFileChange}
+                  />
 
-                <div className="mrm-upload-mode-row">
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={useDualView}
-                      onChange={(e) => {
-                        setUseDualView(e.target.checked);
-                        if (!e.target.checked) {
-                          setDefaultViewSide("front");
-                          setErrors((p) => {
-                            const next = { ...p };
-                            delete next.rearFile;
-                            return next;
-                          });
-                        }
-                      }}
-                    />
-                    앞면/뒷면 이미지 사용
-                  </label>
-                  <span>
-                    서버처럼 후면 포트 확인이 필요한 모델은 뒷면 SVG를 함께 등록하세요.
-                  </span>
-                </div>
+                  <div className="mrm-upload-mode-row">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={useDualView}
+                        onChange={(e) => {
+                          setUseDualView(e.target.checked);
+                          if (!e.target.checked) {
+                            setDefaultViewSide("front");
+                            setErrors((p) => {
+                              const next = { ...p };
+                              delete next.rearFile;
+                              return next;
+                            });
+                          }
+                        }}
+                      />
+                      앞면/뒷면 이미지 사용
+                    </label>
+                    <span>
+                      서버처럼 후면 포트 확인이 필요한 모델은 뒷면 SVG를 함께 등록하세요.
+                    </span>
+                  </div>
 
-                {!useDualView ? (
-                  <>
-                    <div
-                      className={`mrm-file-upload ${modelSvgRaw ? "has-file" : ""}`}
-                      onClick={() => modelFileRef.current?.click()}
-                    >
-                      {modelSvgRaw ? (
-                        <>
-                          <div className="file-name">✓ {modelSvgFileName}</div>
-                          <div className="upload-hint">클릭하여 변경</div>
-                        </>
-                      ) : (
-                        <>
+                  {!useDualView ? (
+                    <>
+                      {!modelSvgRaw && (
+                        <div
+                          className="mrm-file-upload"
+                          onClick={() => modelFileRef.current?.click()}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            processModelFile(e.dataTransfer.files?.[0]);
+                          }}
+                        >
                           <div className="upload-icon">📁</div>
                           <div className="upload-text">
-                            장비 모델 SVG 파일을 업로드하세요
+                            장비 모델 이미지 파일을 업로드하세요
                           </div>
                           <div className="upload-hint">
                             클릭하거나 파일을 선택하세요
                           </div>
-                        </>
+                        </div>
                       )}
-                    </div>
-                    {errors.modelFile && (
-                      <span className="error-hint" style={{ marginTop: 4, display: "block" }}>
-                        {errors.modelFile}
-                      </span>
-                    )}
-
-                    {modelSvgRaw && <SvgPreview svgRaw={modelSvgRaw} />}
-                  </>
-                ) : (
-                  <div className="mrm-dual-upload-grid">
-                    <div className={`mrm-side-panel ${defaultViewSide === "front" ? "is-default" : ""}`}>
-                      <div className="mrm-side-title">
-                        <label>
-                          <input
-                            type="radio"
-                            checked={defaultViewSide === "front"}
-                            onChange={() => setDefaultViewSide("front")}
-                          />
-                          앞면
-                        </label>
-                        {defaultViewSide === "front" && <span>기본</span>}
-                      </div>
-                      <div
-                        className={`mrm-file-upload mrm-file-upload--compact ${modelSvgRaw ? "has-file" : ""}`}
-                        onClick={() => modelFileRef.current?.click()}
-                      >
-                        {modelSvgRaw ? (
-                          <>
-                            <div className="file-name">✓ {modelSvgFileName}</div>
-                            <div className="upload-hint">앞면 SVG 변경</div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="upload-text">앞면 SVG 업로드</div>
-                            <div className="upload-hint">장비 전면 이미지</div>
-                          </>
-                        )}
-                      </div>
                       {errors.modelFile && (
                         <span className="error-hint" style={{ marginTop: 4, display: "block" }}>
                           {errors.modelFile}
                         </span>
                       )}
-                      <div className="mrm-side-preview">
-                        {modelSvgRaw ? <SvgPreview svgRaw={modelSvgRaw} maxHeight={220} /> : (
-                          <div className="mrm-side-empty">앞면 SVG를 업로드하세요.</div>
+
+                      {modelSvgRaw && <SvgPreview svgRaw={modelSvgRaw} />}
+                    </>
+                  ) : (
+                    <div className="mrm-dual-upload-grid">
+                      <div className={`mrm-side-panel ${defaultViewSide === "front" ? "is-default" : ""}`}>
+                        <div className="mrm-side-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div style={{ fontWeight: 600 }}>앞면</div>
+                          {modelSvgRaw && (
+                            <div style={{ display: "flex", gap: "8px" }}>
+                              <button type="button" onClick={() => modelFileRef.current?.click()} style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "4px", background: "var(--bg-tertiary)", border: "1px solid var(--border-medium)", color: "var(--text-secondary)", cursor: "pointer" }}>변경</button>
+                              <button type="button" onClick={() => { setModelSvgRaw(null); setModelSvgFileName(""); }} style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "4px", background: "var(--severity-critical)", border: "none", color: "#fff", cursor: "pointer" }}>삭제</button>
+                            </div>
+                          )}
+                        </div>
+                        {!modelSvgRaw && (
+                          <div
+                            className="mrm-file-upload mrm-file-upload--compact"
+                            onClick={() => modelFileRef.current?.click()}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              processModelFile(e.dataTransfer.files?.[0]);
+                            }}
+                          >
+                            <div className="upload-text">앞면 SVG 업로드</div>
+                            <div className="upload-hint">장비 전면 이미지</div>
+                          </div>
+                        )}
+                        {errors.modelFile && (
+                          <span className="error-hint" style={{ marginTop: 4, display: "block" }}>
+                            {errors.modelFile}
+                          </span>
+                        )}
+                        {modelSvgRaw && (
+                          <div className="mrm-side-preview">
+                            <SvgPreview svgRaw={modelSvgRaw} maxHeight={220} />
+                          </div>
                         )}
                       </div>
-                    </div>
 
-                    <div className={`mrm-side-panel ${defaultViewSide === "rear" ? "is-default" : ""}`}>
-                      <div className="mrm-side-title">
-                        <label>
-                          <input
-                            type="radio"
-                            checked={defaultViewSide === "rear"}
-                            disabled={!rearSvgRaw}
-                            onChange={() => setDefaultViewSide("rear")}
-                          />
-                          뒷면
-                        </label>
-                        {defaultViewSide === "rear" && <span>기본</span>}
-                      </div>
-                      <div
-                        className={`mrm-file-upload mrm-file-upload--compact ${rearSvgRaw ? "has-file" : ""}`}
-                        onClick={() => rearFileRef.current?.click()}
-                      >
-                        {rearSvgRaw ? (
-                          <>
-                            <div className="file-name">✓ {rearSvgFileName}</div>
-                            <div className="upload-hint">클릭하여 변경</div>
-                          </>
-                        ) : (
-                          <>
+                      <div className={`mrm-side-panel ${defaultViewSide === "rear" ? "is-default" : ""}`}>
+                        <div className="mrm-side-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div style={{ fontWeight: 600 }}>뒷면</div>
+                          {rearSvgRaw && (
+                            <div style={{ display: "flex", gap: "8px" }}>
+                              <button type="button" onClick={() => rearFileRef.current?.click()} style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "4px", background: "var(--bg-tertiary)", border: "1px solid var(--border-medium)", color: "var(--text-secondary)", cursor: "pointer" }}>변경</button>
+                              <button type="button" onClick={() => { setRearSvgRaw(null); setRearSvgFileName(""); }} style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "4px", background: "var(--severity-critical)", border: "none", color: "#fff", cursor: "pointer" }}>삭제</button>
+                            </div>
+                          )}
+                        </div>
+                        {!rearSvgRaw && (
+                          <div
+                            className="mrm-file-upload mrm-file-upload--compact"
+                            onClick={() => rearFileRef.current?.click()}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              processRearFile(e.dataTransfer.files?.[0]);
+                            }}
+                          >
                             <div className="upload-text">뒷면 SVG 업로드</div>
                             <div className="upload-hint">장비 후면 이미지</div>
-                          </>
+                          </div>
                         )}
-                      </div>
-                      {errors.rearFile && (
-                        <span className="error-hint" style={{ marginTop: 4, display: "block" }}>
-                          {errors.rearFile}
-                        </span>
-                      )}
-                      <div className="mrm-side-preview">
-                        {rearSvgRaw ? <SvgPreview svgRaw={rearSvgRaw} maxHeight={220} /> : (
-                          <div className="mrm-side-empty">뒷면 SVG를 업로드하세요.</div>
+                        {errors.rearFile && (
+                          <span className="error-hint" style={{ marginTop: 4, display: "block" }}>
+                            {errors.rearFile}
+                          </span>
+                        )}
+                        {rearSvgRaw && (
+                          <div className="mrm-side-preview">
+                            <SvgPreview svgRaw={rearSvgRaw} maxHeight={220} />
+                          </div>
                         )}
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
 
               {/* Card-based Configuration */}
               {modelType === "card-based" && (
                 <>
                   {/* Base Chassis SVG */}
                   <div className="mrm-section">
-                    <div className="mrm-section-title">
-                      기본 섀시 (Base Equipment View)
-                      <span className="badge">카드 기반</span>
+                    <div className="mrm-section-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        기본 섀시 (Base Equipment View)
+                        <span className="badge">카드 기반</span>
+                      </div>
+                      {baseChassisRaw && (
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          <button type="button" onClick={() => chassisFileRef.current?.click()} style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "4px", background: "var(--bg-tertiary)", border: "1px solid var(--border-medium)", color: "var(--text-secondary)", cursor: "pointer" }}>변경</button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBaseChassisRaw(null);
+                              setBaseChassisFileName("");
+                              setCaXStr("0");
+                              setCaYStr("0");
+                              setCaWidthStr("0");
+                              setCaHeightStr("0");
+                              setCaColumnsStr("1");
+                              setCaColWidthStr("0");
+                              setCaRowCountStr("1");
+                              setRowHeights([]);
+                              setUniformRowHeight("46");
+                              setRowColumnsArr([]);
+                              setUniformRowColumns("1");
+                              setRowGapsArr([]);
+                              setUniformRowGap("0");
+                              setGridColWidths([]);
+                              setGridRowHeights([]);
+                              setGridMerges([]);
+                            }}
+                            style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "4px", background: "var(--severity-critical)", border: "none", color: "#fff", cursor: "pointer" }}
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     <input
                       type="file"
-                      accept=".svg"
+                      accept=".svg,.png,.jpg,.jpeg,.webp"
                       ref={chassisFileRef}
                       style={{ display: "none" }}
                       onChange={handleChassisFileChange}
                     />
-                    <div
-                      className={`mrm-file-upload ${baseChassisRaw ? "has-file" : ""}`}
-                      onClick={() => chassisFileRef.current?.click()}
-                    >
-                      {baseChassisRaw ? (
-                        <>
-                          <div className="file-name">
-                            ✓ {baseChassisFileName}
-                          </div>
-                          <div className="upload-hint">클릭하여 변경</div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="upload-icon">🖼️</div>
-                          <div className="upload-text">
-                            기본 섀시 SVG 파일을 업로드하세요
-                          </div>
-                          <div className="upload-hint">
-                            카드가 삽입되는 빈 장비 바디
-                          </div>
-                        </>
-                      )}
-                    </div>
+                    {!baseChassisRaw && (
+                      <div
+                        className="mrm-file-upload"
+                        onClick={() => chassisFileRef.current?.click()}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          processChassisFile(e.dataTransfer.files?.[0]);
+                        }}
+                      >
+                        <div className="upload-icon">🖼️</div>
+                        <div className="upload-text">
+                          기본 섀시 이미지 파일을 업로드하세요
+                        </div>
+                        <div className="upload-hint">
+                          카드가 삽입되는 빈 장비 바디
+                        </div>
+                      </div>
+                    )}
                     {errors.chassisFile && (
                       <span className="error-hint" style={{ marginTop: 4, display: "block" }}>
                         {errors.chassisFile}
@@ -1053,262 +1363,45 @@ export const ModelRegistrationModal: React.FC = () => {
                       <ChassisPreviewWithOverlay
                         svgRaw={baseChassisRaw}
                         cardArea={{ x: caX, y: caY, width: caWidth, height: caHeight, columns: caColumns, columnWidth: caColWidth }}
-                        rowCount={computedRowCount}
-                        rowHeights={rowHeights}
-                        rowColumns={rowColumnsArr}
-                        rowGaps={rowGapsArr}
-                        defaultRowH={defaultRowHeight}
+                        colWidths={gridColWidths}
+                        rowHeights={gridRowHeights}
+                        merges={gridMerges}
+                        onDrawEnd={(rect) => {
+                          setCaXStr(String(rect.x));
+                          setCaYStr(String(rect.y));
+                          setCaWidthStr(String(rect.width));
+                          setCaHeightStr(String(rect.height));
+                          // Initialize grid with default 2 cols × 4 rows
+                          const cols = 2;
+                          const rows = 4;
+                          setGridColWidths(Array.from({ length: cols }, () => Math.round(rect.width / cols)));
+                          setGridRowHeights(Array.from({ length: rows }, () => Math.round(rect.height / rows)));
+                          setGridMerges([]);
+                          setCaColumnsStr(String(cols));
+                          setCaRowCountStr(String(rows));
+                        }}
+                        onGridChange={(data) => {
+                          setGridColWidths(data.colWidths);
+                          setGridRowHeights(data.rowHeights);
+                          setGridMerges(data.merges);
+                          if (data.baseX !== undefined) setCaXStr(String(Math.round(data.baseX)));
+                          if (data.baseY !== undefined) setCaYStr(String(Math.round(data.baseY)));
+                          // Sync back to legacy state
+                          setCaColumnsStr(String(data.colWidths.length));
+                          setCaRowCountStr(String(data.rowHeights.length));
+                          setCaWidthStr(String(Math.round(data.colWidths.reduce((a, b) => a + b, 0))));
+                          setCaHeightStr(String(Math.round(data.rowHeights.reduce((a, b) => a + b, 0))));
+                          setRowHeights(data.rowHeights.map(String));
+                          setRowColumnsArr(data.rowHeights.map(() => String(data.colWidths.length)));
+                        }}
+                        onSave={() => {
+                          showToastMsg("카드 영역 및 기본 섀시 정보가 임시 저장되었습니다.", "success");
+                        }}
                       />
                     )}
                   </div>
 
-                  {/* Card Area Configuration */}
-                  <div className="mrm-section">
-                    <div className="mrm-section-title">
-                      카드 영역 설정
-                      <span className="badge">좌표</span>
-                    </div>
-
-                    <div className="mrm-card-area-grid">
-                      <div className="mrm-field">
-                        <label>X 위치</label>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={caXStr}
-                          onChange={(e) => setCaXStr(e.target.value)}
-                        />
-                      </div>
-                      <div className="mrm-field">
-                        <label>Y 위치</label>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={caYStr}
-                          onChange={(e) => setCaYStr(e.target.value)}
-                        />
-                      </div>
-                      <div className="mrm-field">
-                        <label>너비</label>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={caWidthStr}
-                          onChange={(e) => setCaWidthStr(e.target.value)}
-                        />
-                      </div>
-                      <div className="mrm-field">
-                        <label>높이</label>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={caHeightStr}
-                          onChange={(e) => {
-                            setCaHeightStr(e.target.value);
-                          }}
-                        />
-                      </div>
-                      <div className="mrm-field">
-                        <label>행 수</label>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          value={caRowCountStr}
-                          onChange={(e) => {
-                            setCaRowCountStr(e.target.value);
-                            const count = parseInt(e.target.value);
-                            if (count > 0) syncRowHeights(count);
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Row Configuration: 행별 높이 + 열 수 */}
-                    {computedRowCount > 0 && (
-                      <div style={{ marginTop: 16 }}>
-                        <div style={{
-                          display: "flex", alignItems: "center", justifyContent: "space-between",
-                          marginBottom: 8,
-                        }}>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)" }}>
-                            행별 설정 ({computedRowCount}행)
-                          </div>
-                          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              value={uniformRowHeight}
-                              onChange={(e) => setUniformRowHeight(e.target.value)}
-                              style={{
-                                width: 44, height: 28, padding: "0 4px",
-                                border: "1px solid var(--border-medium)",
-                                borderRadius: 6, fontSize: 11,
-                                background: "var(--bg-tertiary)", color: "var(--text-primary)",
-                                textAlign: "center",
-                              }}
-                              placeholder="높이"
-                              title="높이 통일값"
-                            />
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              value={uniformRowColumns}
-                              onChange={(e) => setUniformRowColumns(e.target.value)}
-                              style={{
-                                width: 44, height: 28, padding: "0 4px",
-                                border: "1px solid var(--border-medium)",
-                                borderRadius: 6, fontSize: 11,
-                                background: "var(--bg-tertiary)", color: "var(--text-primary)",
-                                textAlign: "center",
-                              }}
-                              placeholder="열 수"
-                              title="열 수 통일값"
-                            />
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              value={uniformRowGap}
-                              onChange={(e) => setUniformRowGap(e.target.value)}
-                              style={{
-                                width: 44, height: 28, padding: "0 4px",
-                                border: "1px solid var(--border-medium)",
-                                borderRadius: 6, fontSize: 11,
-                                background: "var(--bg-tertiary)", color: "var(--text-primary)",
-                                textAlign: "center",
-                              }}
-                              placeholder="간격"
-                              title="간격 통일값"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const count = computedRowCount;
-                                setRowHeights(Array.from({ length: count }, () => uniformRowHeight || "46"));
-                                setRowColumnsArr(Array.from({ length: count }, () => uniformRowColumns || "2"));
-                                setRowGapsArr(Array.from({ length: Math.max(0, count - 1) }, () => uniformRowGap || "0"));
-                              }}
-                              style={{
-                                height: 28, padding: "0 10px", fontSize: 11, fontWeight: 600,
-                                border: "1px solid var(--border-medium)", borderRadius: 6,
-                                background: "var(--bg-tertiary)", color: "var(--text-primary)",
-                                cursor: "pointer", whiteSpace: "nowrap",
-                              }}
-                            >
-                              전체 통일
-                            </button>
-                          </div>
-                        </div>
-                        {/* Column Headers */}
-                        <div style={{
-                          display: "grid", gridTemplateColumns: "32px 1fr 1fr 1fr 1fr",
-                          gap: 6, marginBottom: 4,
-                        }}>
-                          <span style={{ fontSize: 10, color: "var(--text-tertiary)", fontWeight: 700, textAlign: "center" }}></span>
-                          <span style={{ fontSize: 10, color: "var(--text-tertiary)", fontWeight: 700, textAlign: "center" }}>높이</span>
-                          <span style={{ fontSize: 10, color: "var(--text-tertiary)", fontWeight: 700, textAlign: "center" }}>열 수</span>
-                          <span style={{ fontSize: 10, color: "var(--text-tertiary)", fontWeight: 700, textAlign: "center" }}>열 너비</span>
-                          <span style={{ fontSize: 10, color: "var(--text-tertiary)", fontWeight: 700, textAlign: "center" }}>간격</span>
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          {Array.from({ length: computedRowCount }).map((_, i) => {
-                            const rowCols = parseInt(rowColumnsArr[i]) || caColumns;
-                            const rowColWidth = caWidth > 0 && rowCols > 0 ? Math.round(caWidth / rowCols) : 0;
-                            const isLastRow = i === computedRowCount - 1;
-                            return (
-                              <div key={i} style={{
-                                display: "grid", gridTemplateColumns: "32px 1fr 1fr 1fr 1fr",
-                                gap: 6, alignItems: "center",
-                              }}>
-                                <span style={{
-                                  fontSize: 11, color: "var(--text-tertiary)", fontWeight: 600,
-                                  textAlign: "center",
-                                }}>R{i + 1}</span>
-                                <input
-                                  type="text"
-                                  inputMode="decimal"
-                                  value={rowHeights[i] ?? String(defaultRowHeight)}
-                                  onChange={(e) => {
-                                    setRowHeights((prev) => {
-                                      const next = [...prev];
-                                      while (next.length <= i) next.push(String(defaultRowHeight));
-                                      next[i] = e.target.value;
-                                      return next;
-                                    });
-                                  }}
-                                  style={{
-                                    width: "100%", height: 30, padding: "0 8px",
-                                    border: "1px solid var(--border-weak)",
-                                    borderRadius: 6, fontSize: 12,
-                                    background: "var(--bg-primary)", color: "var(--text-primary)",
-                                    textAlign: "center",
-                                  }}
-                                />
-                                <input
-                                  type="text"
-                                  inputMode="numeric"
-                                  value={rowColumnsArr[i] ?? caColumnsStr}
-                                  onChange={(e) => {
-                                    setRowColumnsArr((prev) => {
-                                      const next = [...prev];
-                                      while (next.length <= i) next.push(caColumnsStr);
-                                      next[i] = e.target.value;
-                                      return next;
-                                    });
-                                  }}
-                                  style={{
-                                    width: "100%", height: 30, padding: "0 8px",
-                                    border: "1px solid var(--border-weak)",
-                                    borderRadius: 6, fontSize: 12,
-                                    background: "var(--bg-primary)", color: "var(--text-primary)",
-                                    textAlign: "center",
-                                  }}
-                                />
-                                <div style={{
-                                  height: 30, display: "flex", alignItems: "center",
-                                  justifyContent: "center", fontSize: 12,
-                                  color: "var(--text-tertiary)",
-                                  background: "var(--bg-tertiary)", borderRadius: 6,
-                                  border: "1px solid var(--border-weak)",
-                                }}>
-                                  {rowColWidth}px
-                                </div>
-                                {isLastRow ? (
-                                  <div style={{
-                                    height: 30, display: "flex", alignItems: "center",
-                                    justifyContent: "center", fontSize: 11,
-                                    color: "var(--text-tertiary)", opacity: 0.4,
-                                  }}>
-                                    —
-                                  </div>
-                                ) : (
-                                  <input
-                                    type="text"
-                                    inputMode="decimal"
-                                    value={rowGapsArr[i] ?? "0"}
-                                    onChange={(e) => {
-                                      setRowGapsArr((prev) => {
-                                        const next = [...prev];
-                                        while (next.length <= i) next.push("0");
-                                        next[i] = e.target.value;
-                                        return next;
-                                      });
-                                    }}
-                                    style={{
-                                      width: "100%", height: 30, padding: "0 8px",
-                                      border: "1px solid var(--border-weak)",
-                                      borderRadius: 6, fontSize: 12,
-                                      background: "var(--bg-primary)", color: "var(--text-primary)",
-                                      textAlign: "center",
-                                    }}
-                                  />
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  {/* Legacy Card Area Configuration (Coordinates) removed as requested */}
 
                   {/* Card Assignment */}
                   <div className="mrm-section">
@@ -1319,25 +1412,19 @@ export const ModelRegistrationModal: React.FC = () => {
                       <div className="mrm-card-list">
                         {assignedCardDetails.length > 0 ? (
                           assignedCardDetails.map((card) => (
-                            <div key={card.id} className="mrm-card-item">
+                            <div
+                              key={card.id}
+                              className="mrm-card-item"
+                              onMouseMove={(e) => handleCardMouseMove(e, card)}
+                              onMouseLeave={handleCardMouseLeave}
+                            >
                               <div className="card-preview" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                {card.isBuiltIn ? (
-                                  <img
-                                    src={card.svgUrl}
-                                    alt={card.name}
-                                    style={{ width: "60px", height: "30px", objectFit: "contain" }}
-                                  />
-                                ) : (
-                                  <div
-                                    dangerouslySetInnerHTML={{
-                                      __html: card.svgRaw
-                                        ? card.svgRaw
-                                          .replace(/width="[^"]*"/, 'width="60"')
-                                          .replace(/height="[^"]*"/, 'height="30"')
-                                        : "",
-                                    }}
-                                  />
-                                )}
+                                <CardThumbnail
+                                  svgUrl={card.isBuiltIn ? card.svgUrl : undefined}
+                                  svgRaw={!card.isBuiltIn ? card.svgRaw : undefined}
+                                  alt={card.name}
+                                  style={{ width: "100%", height: "48px", objectFit: "contain" }}
+                                />
                               </div>
                               <div className="card-info">
                                 <div className="card-name">{card.name}</div>
@@ -1351,7 +1438,7 @@ export const ModelRegistrationModal: React.FC = () => {
                                 title="할당 해제"
                                 aria-label="할당 해제"
                               >
-                                <Icon icon="material-symbols:delete" className="icon" style={DELETE_ICON_STYLE} />
+                                <Icon icon="material-symbols:close-rounded" className="icon" style={DELETE_ICON_STYLE} />
                               </button>
                             </div>
                           ))
@@ -1399,10 +1486,12 @@ export const ModelRegistrationModal: React.FC = () => {
                                 key={card.id}
                                 className={`mrm-existing-card ${isSelected ? "selected" : ""}`}
                                 onClick={() => handleSelectExistingCard(card.id)}
+                                onMouseMove={(e) => handleCardMouseMove(e, card)}
+                                onMouseLeave={handleCardMouseLeave}
                               >
                                 <div
                                   style={{
-                                    height: 30,
+                                    height: 48,
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
@@ -1411,24 +1500,12 @@ export const ModelRegistrationModal: React.FC = () => {
                                     background: "var(--bg-tertiary)",
                                   }}
                                 >
-                                  {card.isBuiltIn ? (
-                                    <img
-                                      src={card.svgUrl}
-                                      alt={card.name}
-                                      style={{ width: "100%", height: "30px", objectFit: "contain" }}
-                                    />
-                                  ) : (
-                                    <div
-                                      style={{ display: "flex", width: "100%", height: "100%", alignItems: "center", justifyContent: "center" }}
-                                      dangerouslySetInnerHTML={{
-                                        __html: card.svgRaw
-                                          ? card.svgRaw
-                                            .replace(/width="[^"]*"/, 'width="100%"')
-                                            .replace(/height="[^"]*"/, 'height="30"')
-                                          : "",
-                                      }}
-                                    />
-                                  )}
+                                  <CardThumbnail
+                                    svgUrl={card.isBuiltIn ? card.svgUrl : undefined}
+                                    svgRaw={!card.isBuiltIn ? card.svgRaw : undefined}
+                                    alt={card.name}
+                                    style={{ width: "100%", height: "48px", objectFit: "contain" }}
+                                  />
                                 </div>
                                 <div className="ec-name">{card.name}</div>
                                 <div className="ec-meta">
@@ -1453,26 +1530,118 @@ export const ModelRegistrationModal: React.FC = () => {
                       )}
                     </div>
                   </div>
+
+                  {/* Type/Variant Configuration */}
+                  <div className="mrm-section">
+                    <div className="mrm-section-title">
+                      타입 관리
+                      <span className="badge">미리 구성된 모델 옵션</span>
+                    </div>
+                    <div style={{ padding: "16px", border: "1px solid var(--border-weak)", borderRadius: "10px", background: "var(--bg-secondary)" }}>
+                      <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "12px", lineHeight: 1.5 }}>
+                        이 섀시 모델을 선택했을 때 자동으로 할당될 카드 구성을 미리 정의합니다.
+                        기본타입 외에 A타입, B타입 등을 추가할 수 있으며, 등록 후 '새 장비 등록' 메뉴에서 개별 모델로 선택할 수 있습니다.
+                      </p>
+
+                      <div className="mrm-models-list" style={{ marginBottom: "16px", marginTop: "4px" }}>
+                        {variants.map((v, i) => (
+                          <div key={v.variantId || i} className="mrm-model-row">
+                            <span className="model-type-tag card-based">
+                              {v.isDefault ? "기본" : "추가"}
+                            </span>
+                            <div className="model-thumb">
+                              {v.variantPngRaw ? (
+                                <img src={v.variantPngRaw} alt={v.variantName} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                              ) : (
+                                <div
+                                  style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}
+                                  dangerouslySetInnerHTML={{
+                                    __html: modelSvgRaw || baseChassisRaw || ""
+                                  }}
+                                />
+                              )}
+                            </div>
+                            <div className="model-info-wrapper">
+                              <div className="model-info-header">
+                                <div className="model-info">
+                                  <div className="model-display-name">
+                                    {v.variantName}
+                                  </div>
+                                  <div className="model-meta">
+                                    <span>{v.insertedCards?.length || 0}개 카드 장착됨</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="model-actions">
+                                <button
+                                  type="button"
+                                  className="action-icon-btn edit-btn"
+                                  onClick={() => { setEditingVariantIndex(i); setIsAssemblyOpen(true); }}
+                                  title="타입 수정"
+                                  aria-label="타입 수정"
+                                >
+                                  <Icon icon="material-symbols:edit" style={{ width: 16, height: 16 }} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="action-icon-btn delete-btn"
+                                  onClick={() => setVariants(prev => prev.filter((_, idx) => idx !== i))}
+                                  title="타입 삭제"
+                                  aria-label="타입 삭제"
+                                >
+                                  <Icon icon="material-symbols:delete" style={{ width: 16, height: 16 }} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {variants.length === 0 && (
+                        <div style={{ padding: "20px", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px", background: "var(--bg-primary)", borderRadius: "6px", border: "1px dashed var(--border-medium)", marginBottom: "16px" }}>
+                          구성된 타입이 없습니다. 새 타입을 추가해주세요.
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        disabled={!baseChassisRaw || !isChassisDrawn}
+                        onClick={() => {
+                          setEditingVariantIndex(null);
+                          setIsAssemblyOpen(true);
+                        }}
+                        style={{
+                          width: "100%", padding: "10px", borderRadius: "6px",
+                          background: "var(--theme-primary)", color: "#fff", fontWeight: 600, border: "none",
+                          opacity: (!baseChassisRaw || !isChassisDrawn) ? 0.5 : 1,
+                          cursor: (!baseChassisRaw || !isChassisDrawn) ? "not-allowed" : "pointer"
+                        }}
+                      >
+                        + 새 타입 추가
+                      </button>
+                    </div>
+                  </div>
                 </>
               )}
             </div>
 
             {/* Footer */}
             <div className="mrm-actions">
-              {editingModelId && (
-                <button className="mrm-btn secondary" onClick={() => { resetForm(); }}>
-                  신규 등록으로 전환
-                </button>
-              )}
-              <button className="mrm-btn secondary" onClick={() => { resetForm(); setOpen(false); }}>
+              <button className="mrm-btn secondary" onClick={() => { resetForm(); setActiveTab("list"); }}>
                 취소
               </button>
               <button
                 className="mrm-btn primary"
-                disabled={!modelName.trim() || !modelSvgRaw || (useDualView && !rearSvgRaw)}
+                disabled={
+                  isUnchanged ||
+                  !modelName.trim() ||
+                  (modelType !== "card-based" && !modelSvgRaw) ||
+                  (modelType !== "card-based" && useDualView && !rearSvgRaw) ||
+                  (modelType === "card-based" && !baseChassisRaw)
+                }
                 onClick={handleSubmit}
               >
-                {editingModelId ? "모델 수정" : "모델 등록"}
+                저장
               </button>
             </div>
           </>
@@ -1491,7 +1660,7 @@ export const ModelRegistrationModal: React.FC = () => {
                 <button
                   className="comm-btn comm-btn-primary comm-btn-md"
                   onClick={() => {
-                    setEditingModelId(null);
+                    resetForm();
                     setActiveTab("register");
                   }}
                   style={{ gap: 6, display: "inline-flex", alignItems: "center" }}
@@ -1504,15 +1673,48 @@ export const ModelRegistrationModal: React.FC = () => {
               <div style={{ marginBottom: 8 }}>
                 <div className="mrm-models-list">
                   {DEVICE_TEMPLATES.filter((t) => !deletedDefaultTemplates.includes(t.modelName)).map((tmpl) => {
-                    const imgUrl = resolveDeviceImage(tmpl.modelName);
-                    const isCardBased = equipmentModels.some((m) => m.modelName === tmpl.modelName);
+                    const overrideModel = customModels.find((m) => m.modelName === tmpl.modelName);
+                    const eqModel = equipmentModels.find((m) => m.modelName === tmpl.modelName);
+                    const isCardBased = !!overrideModel || !!eqModel;
+                    const displayUnit = overrideModel ? overrideModel.unit : tmpl.uSize;
+                    let displayThumbPng = overrideModel ? overrideModel.modelPngRaw : null;
+                    let displayThumb = overrideModel
+                      ? (overrideModel.defaultViewSide === "rear" && overrideModel.rearSvgRaw ? overrideModel.rearSvgRaw : (overrideModel.modelSvgRaw || overrideModel.baseEquipmentViewSvgRaw))
+                      : null;
+                    
+                    if (overrideModel && overrideModel.variants) {
+                      const defaultVariant = overrideModel.variants.find(v => v.variantName === "기본타입");
+                      if (defaultVariant && defaultVariant.variantPngRaw) {
+                        displayThumbPng = defaultVariant.variantPngRaw;
+                        displayThumb = null;
+                      }
+                    }
+
+                    const imgUrl = (!displayThumb && !displayThumbPng) ? resolveDeviceImage(tmpl.modelName) : null;
+                    const variantCount = overrideModel?.variants?.length || 0;
                     return (
                       <div key={`default-${tmpl.modelName}`} className="mrm-model-row">
                         <span className={`model-type-tag ${isCardBased ? "card-based" : "normal"}`}>
                           {isCardBased ? "섀시형" : "고정형"}
                         </span>
-                        <div className="model-thumb">
-                          {imgUrl ? (
+                        <div
+                          className="model-thumb"
+                          onMouseEnter={(e) => {
+                            setHoveredListThumb({ pngRaw: displayThumbPng, svgRaw: displayThumb, imgUrl, name: tmpl.modelName });
+                            setHoveredListThumbPos({ x: e.clientX, y: e.clientY });
+                          }}
+                          onMouseMove={(e) => {
+                            setHoveredListThumbPos({ x: e.clientX, y: e.clientY });
+                          }}
+                          onMouseLeave={() => {
+                            setHoveredListThumb(null);
+                          }}
+                        >
+                          {displayThumbPng ? (
+                            <img src={displayThumbPng} alt={tmpl.modelName} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                          ) : displayThumb ? (
+                            <div dangerouslySetInnerHTML={{ __html: displayThumb }} style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }} />
+                          ) : imgUrl ? (
                             <img src={imgUrl} alt={tmpl.modelName} />
                           ) : (
                             <span style={{ fontSize: 18, color: "var(--text-tertiary)" }}>🖥️</span>
@@ -1522,23 +1724,36 @@ export const ModelRegistrationModal: React.FC = () => {
                           <div className="model-info-header">
                             <div className="model-info">
                               <div className="model-display-name">
-                                [{tmpl.uSize}U] {tmpl.modelName}
+                                [{displayUnit}U] {tmpl.modelName} {overrideModel && <span style={{ fontSize: 10, padding: "2px 6px", background: "var(--theme-primary)", color: "#fff", borderRadius: 4, marginLeft: 6 }}>수정됨</span>}
                               </div>
                               <div className="model-meta">
-                                <span>{tmpl.uSize}U</span>
+                                <span>{displayUnit}U</span>
                                 <span>·</span>
                                 <span>{tmpl.vendor}</span>
                                 <span>·</span>
                                 <span>{tmpl.type}</span>
+                                {isCardBased && overrideModel && (
+                                  <>
+                                    <span>·</span>
+                                    <span>타입 {variantCount}개</span>
+                                  </>
+                                )}
                               </div>
                             </div>
                           </div>
                           <div className="model-actions">
                             <button
-                              className="comm-btn comm-btn-secondary comm-btn-sm"
+                              className="action-icon-btn edit-btn"
                               onClick={async () => {
+                                if (overrideModel) {
+                                  // Load the overridden model for editing
+                                  loadModelForEdit(overrideModel.modelId);
+                                  return;
+                                }
+
                                 // 기본 장비를 편집 폼에 로드 (SVG 이미지 + 카드 영역 설정 포함)
                                 setModelName(tmpl.modelName);
+                                setVendor(tmpl.vendor || "Nokia");
                                 setUnit(tmpl.uSize);
                                 setErrors({});
                                 setEditingModelId(null);
@@ -1662,11 +1877,9 @@ export const ModelRegistrationModal: React.FC = () => {
                                 if (svgContent) {
                                   setModelSvgRaw(svgContent);
                                   setModelSvgFileName(`[${tmpl.uSize}U] ${tmpl.modelName}.svg`);
-                                  showToastMsg("기본 모델 정보와 이미지를 폼에 로드했습니다.", "success");
                                 } else {
                                   setModelSvgRaw(null);
                                   setModelSvgFileName("");
-                                  showToastMsg("기본 모델 정보를 로드했습니다. SVG 파일을 업로드해주세요.", "success");
                                 }
 
                                 const sides = getDeviceViewSides(tmpl.modelName);
@@ -1677,23 +1890,31 @@ export const ModelRegistrationModal: React.FC = () => {
                                   setRearSvgFileName(rearSvgContent ? `[${tmpl.uSize}U] ${tmpl.modelName} back.svg` : "");
                                 }
                               }}
-                              title="모델 폼에 로드"
-                              style={{ display: "inline-flex", gap: 6, flex: 1, justifyContent: "center" }}
+                              title="모델 수정"
+                              aria-label="모델 수정"
                             >
-                              <Icon icon="material-symbols:edit" style={{ width: 14, height: 14 }} />
-                              폼에 복사
+                              <Icon icon="material-symbols:edit" style={{ width: 16, height: 16 }} />
                             </button>
                             <button
-                              className="comm-btn comm-btn-danger comm-btn-sm"
+                              className="action-icon-btn delete-btn"
                               onClick={() => {
-                                removeDefaultTemplate(tmpl.modelName);
-                                showToastMsg(`기본 모델 "[${tmpl.uSize}U] ${tmpl.modelName}" 삭제됨`, "success");
+                                if (overrideModel) {
+                                  updateCustomModel(overrideModel.modelId, {
+                                    modelSvgRaw: undefined as any,
+                                    modelPngRaw: undefined as any,
+                                    rearSvgRaw: undefined as any,
+                                    baseEquipmentViewSvgRaw: undefined as any,
+                                  });
+                                  showToastMsg(`기본 모델 "[${tmpl.uSize}U] ${tmpl.modelName}" 이미지가 초기화되었습니다 (카드 영역 및 타입은 유지됨)`, "success");
+                                } else {
+                                  removeDefaultTemplate(tmpl.modelName);
+                                  showToastMsg(`기본 모델 "[${tmpl.uSize}U] ${tmpl.modelName}" 숨김 처리됨`, "success");
+                                }
                               }}
-                              title="기본 모델 삭제"
-                              aria-label="기본 모델 삭제"
-                              style={{ display: "inline-flex", gap: 6 }}
+                              title={overrideModel ? "수정 내용 초기화" : "기본 모델 숨기기"}
+                              aria-label={overrideModel ? "수정 내용 초기화" : "기본 모델 숨기기"}
                             >
-                              <Icon icon="material-symbols:delete" style={{ width: 14, height: 14 }} />
+                              <Icon icon="material-symbols:delete" style={{ width: 16, height: 16 }} />
                             </button>
                           </div>
                         </div>
@@ -1711,21 +1932,58 @@ export const ModelRegistrationModal: React.FC = () => {
                   padding: "8px 0 6px", borderBottom: "1px solid var(--border-weak)",
                   marginBottom: 8,
                 }}>
-                  커스텀 모델 ({customModels.length})
+                  커스텀 모델 ({customModels.filter(m => !DEVICE_TEMPLATES.some(t => t.modelName === m.modelName)).length})
                 </div>
-                {customModels.length > 0 ? (
+                {customModels.filter(m => !DEVICE_TEMPLATES.some(t => t.modelName === m.modelName)).length > 0 ? (
                   <div className="mrm-models-list">
-                    {customModels.map((model) => (
+                    {customModels.filter(m => !DEVICE_TEMPLATES.some(t => t.modelName === m.modelName)).map((model) => (
                       <div key={model.modelId} className="mrm-model-row">
                         <span className={`model-type-tag ${model.modelType}`}>
                           {model.modelType === "normal" ? "고정형" : "섀시형"}
                         </span>
                         <div
                           className="model-thumb"
-                          dangerouslySetInnerHTML={{
-                            __html: (model.defaultViewSide === "rear" && model.rearSvgRaw ? model.rearSvgRaw : model.modelSvgRaw)
+                          onMouseEnter={(e) => {
+                            let svgFallback = (model.defaultViewSide === "rear" && model.rearSvgRaw ? model.rearSvgRaw : (model.modelSvgRaw || model.baseEquipmentViewSvgRaw)) || undefined;
+                            let pngFallback = model.modelPngRaw;
+                            if (model.variants) {
+                              const defaultVariant = model.variants.find(v => v.variantName === "기본타입");
+                              if (defaultVariant && defaultVariant.variantPngRaw) {
+                                pngFallback = defaultVariant.variantPngRaw;
+                                svgFallback = undefined;
+                              }
+                            }
+                            setHoveredListThumb({ pngRaw: pngFallback, svgRaw: svgFallback, name: model.modelName });
+                            setHoveredListThumbPos({ x: e.clientX, y: e.clientY });
                           }}
-                        />
+                          onMouseMove={(e) => {
+                            setHoveredListThumbPos({ x: e.clientX, y: e.clientY });
+                          }}
+                          onMouseLeave={() => {
+                            setHoveredListThumb(null);
+                          }}
+                        >
+                          {(() => {
+                            let pngRaw = model.modelPngRaw;
+                            let svgRaw = (model.defaultViewSide === "rear" && model.rearSvgRaw ? model.rearSvgRaw : (model.modelSvgRaw || model.baseEquipmentViewSvgRaw)) || "";
+                            if (model.variants) {
+                              const defaultVariant = model.variants.find(v => v.variantName === "기본타입");
+                              if (defaultVariant && defaultVariant.variantPngRaw) {
+                                pngRaw = defaultVariant.variantPngRaw;
+                                svgRaw = "";
+                              }
+                            }
+                            if (pngRaw) {
+                              return <img src={pngRaw} alt={model.modelName} style={{ width: "100%", height: "100%", objectFit: "contain" }} />;
+                            }
+                            return (
+                              <div
+                                style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}
+                                dangerouslySetInnerHTML={{ __html: svgRaw }}
+                              />
+                            );
+                          })()}
+                        </div>
                         <div className="model-info-wrapper">
                           <div className="model-info-header">
                             <div className="model-info">
@@ -1743,7 +2001,7 @@ export const ModelRegistrationModal: React.FC = () => {
                                 {model.modelType === "card-based" && (
                                   <>
                                     <span>·</span>
-                                    <span>카드 {model.assignedCardIds.length}개</span>
+                                    <span>타입 {model.variants?.length || 0}개</span>
                                   </>
                                 )}
                                 {model.rearSvgRaw && (
@@ -1757,22 +2015,20 @@ export const ModelRegistrationModal: React.FC = () => {
                           </div>
                           <div className="model-actions">
                             <button
-                              className="comm-btn comm-btn-secondary comm-btn-sm"
+                              className="action-icon-btn edit-btn"
                               onClick={() => loadModelForEdit(model.modelId)}
-                              title="모델 폼에 로드"
-                              style={{ display: "inline-flex", gap: 6, flex: 1, justifyContent: "center" }}
+                              title="모델 수정"
+                              aria-label="모델 수정"
                             >
-                              <Icon icon="material-symbols:edit" style={{ width: 14, height: 14 }} />
-                              폼에 복사
+                              <Icon icon="material-symbols:edit" style={{ width: 16, height: 16 }} />
                             </button>
                             <button
-                              className="comm-btn comm-btn-danger comm-btn-sm"
+                              className="action-icon-btn delete-btn"
                               onClick={() => handleDeleteModel(model.modelId)}
                               title="커스텀 모델 삭제"
                               aria-label="커스텀 모델 삭제"
-                              style={{ display: "inline-flex", gap: 6 }}
                             >
-                              <Icon icon="material-symbols:delete" style={{ width: 14, height: 14 }} />
+                              <Icon icon="material-symbols:delete" style={{ width: 16, height: 16 }} />
                             </button>
                           </div>
                         </div>
@@ -1796,6 +2052,34 @@ export const ModelRegistrationModal: React.FC = () => {
             </div>
           </>
         )}
+
+        {hoveredTooltipCard && (
+          <div
+            style={{
+              position: "fixed",
+              left: hoveredTooltipPos.x + 15,
+              top: hoveredTooltipPos.y + 15,
+              zIndex: 100000,
+              background: "var(--bg-secondary)",
+              padding: "8px",
+              borderRadius: "8px",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.6)",
+              pointerEvents: "none",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: hoveredTooltipCard.widthType === "full" ? "800px" : "400px",
+              maxWidth: "80vw"
+            }}
+          >
+            <CardThumbnail
+              svgUrl={hoveredTooltipCard.isBuiltIn ? hoveredTooltipCard.svgUrl : undefined}
+              svgRaw={!hoveredTooltipCard.isBuiltIn ? hoveredTooltipCard.svgRaw : undefined}
+              alt={hoveredTooltipCard.name}
+              style={{ width: "100%", height: "auto", objectFit: "contain" }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Card Registration Sub-Modal */}
@@ -1805,6 +2089,206 @@ export const ModelRegistrationModal: React.FC = () => {
         onSave={handleAddNewCard}
         maxColumns={maxColumns}
       />
+
+      {/* Equipment Assembly Sub-Modal for Type configuration */}
+      {isAssemblyOpen && (
+        <EquipmentAssemblyModal
+          open={isAssemblyOpen}
+          onClose={() => setIsAssemblyOpen(false)}
+          initialModelName={modelName || "새 장비"}
+          inlineModel={{
+            modelId: "temp",
+            modelName: modelName || "새 장비",
+            unit: unit,
+            rackUnit: `${unit}U`,
+            modelSvgRaw: baseChassisRaw || "",
+            baseEquipmentViewSvgRaw: baseChassisRaw || "",
+            baseSvgUrl: baseChassisFileName || "",
+            modelType: "card-based",
+            equipmentSize: parseSvgDimensions(baseChassisRaw || ""),
+            assignedCardIds: assignedCardIds,
+            cardArea: { x: caX, y: caY, width: caWidth, height: caHeight, columns: caColumns, columnWidth: caColWidth },
+            _rowHeights: rowHeights.map(r => parseFloat(r) || defaultRowHeight),
+            _rowColumns: rowColumnsArr.map(c => parseInt(c) || caColumns),
+            _rowGaps: rowGapsArr.map(g => parseFloat(g) || 0),
+            gridMerges: gridMerges,
+            gridColWidths: gridColWidths,
+            gridRowHeights: gridRowHeights
+          } as any}
+          initialCards={editingVariantIndex !== null ? variants[editingVariantIndex].insertedCards : []}
+          onSave={async (res) => {
+            let variantName = prompt("타입 이름을 입력하세요 (예: 기본타입, A타입)", editingVariantIndex !== null ? variants[editingVariantIndex].variantName : (variants.length === 0 ? "기본타입" : "A타입"));
+            if (!variantName) return false;
+            
+            variantName = variantName.trim();
+            const nameExists = variants.some((v, idx) => v.variantName === variantName && idx !== editingVariantIndex);
+            if (nameExists) {
+              alert(`"${variantName}" 타입이 이미 존재합니다. 다른 이름을 사용해주세요.`);
+              return false;
+            }
+
+            const next = [...variants];
+            if (editingVariantIndex !== null) {
+              next[editingVariantIndex] = { ...next[editingVariantIndex], variantName, insertedCards: res.cards };
+            } else {
+              next.push({ variantId: `var-${Date.now()}`, variantName, isDefault: next.length === 0, insertedCards: res.cards });
+            }
+            setVariants(next);
+
+            // Auto-save to store
+              const dims = parseSvgDimensions(modelSvgRaw || "");
+              const parsedRowHeights = rowHeights.map((h) => parseFloat(h) || defaultRowHeight);
+              const parsedRowColumns = rowColumnsArr.map((c) => parseInt(c) || caColumns);
+              const parsedRowGaps = rowGapsArr.map((g) => parseFloat(g) || 0);
+              const effectiveMaxCols = parsedRowColumns.length > 0 ? Math.max(...parsedRowColumns, 1) : caColumns;
+              const effectiveColWidth = caWidth / effectiveMaxCols;
+
+              let finalModelSvgRaw = modelType === "card-based" ? "" : modelSvgRaw || "";
+              let finalModelPngRaw: string | undefined = undefined;
+
+              if (modelType === "card-based") {
+                const generateVariantImage = async (variant: any) => {
+                  try {
+                    const composed = await generateComposedSvgAsync(
+                      modelName.trim(),
+                      {
+                        modelId: editingModelId || "temp",
+                        modelName: modelName.trim(),
+                        rackUnit: `${unit}U`,
+                        baseSvgUrl: baseChassisFileName || "",
+                        baseEquipmentViewSvgRaw: baseChassisRaw || "",
+                        equipmentSize: { width: dims.width, height: dims.height },
+                        cardArea: { x: caX, y: caY, width: caWidth, height: caHeight, columns: effectiveMaxCols, columnWidth: effectiveColWidth },
+                        _rowHeights: parsedRowHeights,
+                        _rowColumns: parsedRowColumns,
+                        _rowGaps: parsedRowGaps,
+                        gridMerges: gridMerges,
+                        gridColWidths: gridColWidths,
+                        gridRowHeights: gridRowHeights,
+                      } as any,
+                      variant.insertedCards,
+                      [],
+                      "front"
+                    );
+                    if (composed) {
+                      const png = await convertSvgToPngAsync(composed, dims.width || 860, dims.height || 200);
+                      return { svg: composed, png };
+                    }
+                  } catch (err) {
+                    console.error("Failed to generate variant image", err);
+                  }
+                  return null;
+                };
+
+                const savedVariantIndex = editingVariantIndex !== null ? editingVariantIndex : next.length - 1;
+                const savedVariant = next[savedVariantIndex];
+                const savedRes = await generateVariantImage(savedVariant);
+                if (savedRes) {
+                  savedVariant.variantPngRaw = savedRes.png;
+                }
+
+                const defaultVariant = next.find(v => v.isDefault) || next[0];
+                let defaultRes = savedRes;
+                if (defaultVariant && defaultVariant.variantId !== savedVariant.variantId) {
+                  defaultRes = await generateVariantImage(defaultVariant);
+                  if (defaultRes) {
+                    defaultVariant.variantPngRaw = defaultRes.png;
+                  }
+                } else if (defaultVariant && defaultVariant.variantId === savedVariant.variantId && savedRes) {
+                  defaultVariant.variantPngRaw = savedRes.png;
+                }
+
+                setVariants([...next]);
+
+                if (defaultRes) {
+                  finalModelSvgRaw = defaultRes.svg;
+                  setModelSvgRaw(defaultRes.svg);
+                  finalModelPngRaw = defaultRes.png;
+                }
+              }
+
+              if (!finalModelPngRaw && finalModelSvgRaw) {
+                try {
+                  finalModelPngRaw = await convertSvgToPngAsync(finalModelSvgRaw, dims.width || 860, dims.height || 200);
+                } catch (err) {
+                  console.error("Failed to generate fallback PNG on variant save", err);
+                }
+              }
+
+              const payload: Omit<import("../../types/equipment").CustomEquipmentModel, "modelId"> = {
+                modelName: modelName.trim(),
+                vendor: vendor,
+                unit,
+                displayName: `[${unit}U] ${modelName.trim()}`,
+                modelSvgRaw: finalModelSvgRaw,
+                modelPngRaw: finalModelPngRaw,
+                rearSvgRaw: useDualView ? rearSvgRaw || undefined : undefined,
+                defaultViewSide: useDualView ? defaultViewSide : "front",
+                modelType,
+                baseEquipmentViewSvgRaw: modelType === "card-based" ? baseChassisRaw || undefined : undefined,
+                cardArea: modelType === "card-based" ? { x: caX, y: caY, width: caWidth, height: caHeight, columns: effectiveMaxCols, columnWidth: effectiveColWidth } : undefined,
+                rowHeights: undefined,
+                rowColumns: undefined,
+                rowGaps: undefined,
+                gridMerges: modelType === "card-based" && gridMerges.length > 0 ? gridMerges : undefined,
+                gridColWidths: modelType === "card-based" && gridColWidths.length > 0 ? gridColWidths : undefined,
+                gridRowHeights: modelType === "card-based" && gridRowHeights.length > 0 ? gridRowHeights : undefined,
+                equipmentSize: { width: dims.width, height: dims.height },
+                assignedCardIds: modelType === "card-based" ? assignedCardIds : [],
+                variants: modelType === "card-based" ? next : undefined,
+                createdAt: editingModelId ? (customModels.find((m) => m.modelId === editingModelId)?.createdAt || new Date().toISOString()) : new Date().toISOString(),
+              };
+
+              if (editingModelId) {
+                updateCustomModel(editingModelId, payload);
+                showToastMsg(`타입 "${variantName}" 저장 및 모델 적용 완료!`, "success");
+              } else {
+                const existing = customModels.find(m => m.modelName === payload.modelName);
+                if (existing) {
+                  updateCustomModel(existing.modelId, payload);
+                  setEditingModelId(existing.modelId);
+                  showToastMsg(`타입 "${variantName}" 저장 및 모델 적용 완료!`, "success");
+                } else {
+                  const newId = addCustomModel(payload);
+                  setEditingModelId(newId);
+                  showToastMsg(`타입 "${variantName}" 저장 및 모델 적용 완료!`, "success");
+                }
+              }
+            setIsAssemblyOpen(false);
+          }}
+        />
+      )}
+
+      {hoveredListThumb && (
+        <div
+          style={{
+            position: "fixed",
+            left: hoveredListThumbPos.x + 15,
+            top: hoveredListThumbPos.y + 15,
+            zIndex: 100000,
+            background: "var(--bg-secondary)",
+            padding: "8px",
+            borderRadius: "8px",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.6)",
+            pointerEvents: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "500px",
+            maxWidth: "80vw"
+          }}
+        >
+          {hoveredListThumb.pngRaw ? (
+            <img src={hoveredListThumb.pngRaw} alt={hoveredListThumb.name} style={{ width: "100%", height: "auto", objectFit: "contain" }} />
+          ) : hoveredListThumb.svgRaw ? (
+            <div dangerouslySetInnerHTML={{ __html: hoveredListThumb.svgRaw }} style={{ width: "100%", height: "auto", display: "flex", alignItems: "center", justifyContent: "center" }} />
+          ) : hoveredListThumb.imgUrl ? (
+            <img src={hoveredListThumb.imgUrl} alt={hoveredListThumb.name} style={{ width: "100%", height: "auto", objectFit: "contain" }} />
+          ) : (
+            <span style={{ fontSize: 24, color: "var(--text-tertiary)" }}>🖥️</span>
+          )}
+        </div>
+      )}
 
       {/* Toast */}
       {toast &&

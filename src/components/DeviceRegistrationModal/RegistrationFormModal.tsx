@@ -62,8 +62,7 @@ export const RegistrationFormModal = ({
   // Equipment Assembly State
   const [insertedCards, setInsertedCards] = useState<InsertedCard[]>([]);
   const [generatedPorts, setGeneratedPorts] = useState<GeneratedPort[]>([]);
-  const [dashboardThumbnailUrl, setDashboardThumbnailUrl] =
-    useState<string>("");
+
   const [isAssemblyOpen, setIsAssemblyOpen] = useState(false);
 
   // Module State
@@ -108,7 +107,7 @@ export const RegistrationFormModal = ({
           if (device.vendor) setVendor(device.vendor);
           setInsertedCards(device.insertedCards || []);
           setInsertedModules(device.insertedModules || []);
-          setDashboardThumbnailUrl(device.dashboardThumbnailUrl || "");
+
           setDefaultViewSide(device.defaultViewSide || "front");
         }
       } else {
@@ -119,10 +118,11 @@ export const RegistrationFormModal = ({
         setMac("");
         setVendor(effectiveTemplates[0]?.vendor || "Nokia");
         setErrors({});
-        setInsertedCards([]);
+        const initialTemplate = effectiveTemplates[0];
+        setInsertedCards(initialTemplate?.variant?.insertedCards || []);
         setInsertedModules([]);
         setGeneratedPorts([]);
-        setDashboardThumbnailUrl("");
+
         setDefaultViewSide("front");
       }
     });
@@ -163,17 +163,23 @@ export const RegistrationFormModal = ({
       payload.modelName = selectedTemplate.modelName;
       payload.type = selectedTemplate.type;
       payload.size = selectedTemplate.uSize;
+      
+      const customModel = customModels.find(m => m.modelName === selectedTemplate.modelName);
+      if (selectedTemplate.variant?.variantPngRaw) {
+        payload.devicePngRaw = selectedTemplate.variant.variantPngRaw;
+      } else if (customModel?.modelPngRaw) {
+        payload.devicePngRaw = customModel.modelPngRaw;
+      }
     }
     payload.defaultViewSide = defaultViewSide;
     if (vendor) payload.vendor = vendor;
 
     if (insertedCards.length > 0) {
       payload.insertedCards = insertedCards;
-      payload.dashboardThumbnailUrl = dashboardThumbnailUrl;
       payload.generatedPorts = generatedPorts;
     } else {
       payload.insertedCards = [];
-      payload.dashboardThumbnailUrl = "";
+
       payload.generatedPorts = [];
     }
     // 모듈 정보 포함
@@ -223,46 +229,27 @@ export const RegistrationFormModal = ({
                   }))}
                   value={selectedModelIdx}
                   onChange={(val) => {
-                    setSelectedModelIdx(Number(val));
-                    setInsertedCards([]);
+                    const idx = Number(val);
+                    setSelectedModelIdx(idx);
+                    const nextTemplate = effectiveTemplates[idx];
+                    if (nextTemplate) {
+                      setVendor(nextTemplate.vendor);
+                      setInsertedCards(nextTemplate?.variant?.insertedCards || []);
+
+                    } else {
+                      setVendor("Nokia");
+                      setInsertedCards([]);
+
+                    }
                     setInsertedModules([]);
-                    setDashboardThumbnailUrl("");
-                    const nextTemplate = effectiveTemplates[Number(val)];
-                    const nextCustom = customModels.find((m) => m.modelName === nextTemplate?.modelName);
-                    if (nextTemplate?.vendor) setVendor(nextTemplate.vendor);
+                    setGeneratedPorts([]);
+                    
+                    const nextCustom = customModels.find((m) => m.modelId === nextTemplate?.customModelId || m.modelName === nextTemplate?.modelName);
                     setDefaultViewSide(nextCustom?.defaultViewSide || "front");
                   }}
                   placeholder="장비 모델 선택"
                 />
               </div>
-              {((Array.isArray(equipmentModels) &&
-                equipmentModels.some(
-                  (m) => m.modelName === selectedTemplate?.modelName,
-                )) ||
-                (Array.isArray(customModels) &&
-                  customModels.some(
-                    (m) =>
-                      m.modelName === selectedTemplate?.modelName &&
-                      m.modelType === "card-based",
-                  ))) && (
-                  <button
-                    style={{
-                      background: "linear-gradient(135deg, var(--theme-primary), #4872d8)",
-                      color: "#fff",
-                      border: "none",
-                      padding: "0 16px",
-                      height: "44px",
-                      borderRadius: "12px",
-                      fontSize: "13px",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      whiteSpace: "nowrap",
-                    }}
-                    onClick={() => setIsAssemblyOpen(true)}
-                  >
-                    장비 구성
-                  </button>
-                )}
             </div>
           </div>
 
@@ -464,9 +451,15 @@ export const RegistrationFormModal = ({
           initialCards={insertedCards}
           onSave={(result) => {
             setInsertedCards(result.cards);
-            setDashboardThumbnailUrl(result.thumbnailDataUrl);
+
             if (result.generatedPorts) {
               setGeneratedPorts(result.generatedPorts);
+            }
+            if (editingDeviceId) {
+              updateRegisteredDevice(editingDeviceId, {
+                insertedCards: result.cards,
+                generatedPorts: result.generatedPorts || []
+              });
             }
           }}
         />

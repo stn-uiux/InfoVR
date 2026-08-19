@@ -14,7 +14,7 @@ import { ImageCropper, type ImageCropperRef } from "./ImageCropper";
 import { motion, AnimatePresence } from "motion/react";
 
 const ai = new GoogleGenAI({
-  apiKey: import.meta.env.VITE_GEMINI_API_KEY || "",
+  apiKey: (import.meta.env.VITE_GEMINI_API_KEY || "").trim().replace(/[^\x20-\x7E]/g, ""),
 });
 
 interface PortData {
@@ -410,6 +410,7 @@ export default function App() {
 
       let result: {
         analysis?: string;
+        modelName?: string;
         ports?: {
           portName?: string;
           portNumber?: string | number;
@@ -434,14 +435,16 @@ export default function App() {
 Task: Analyze the attached image and identify EVERY physical port (Ethernet/RJ45, SFP, SFP+, Console, USB, Management, etc.).
 
 Precision Requirements:
-1. Bounding Boxes: Provide the tightest possible [ymin, xmin, ymax, xmax] coordinates (0-1000 scale). The box must strictly encompass the physical opening of the port and nothing else.
-2. Label Matching: Separate the port into a "portName" and a "portNumber". The "portName" MUST ALWAYS be in lowercase (e.g., "ethernet", "sfp", "mgmt", "console"). If a port only has a number, use "port" as the name. If it only has a name, use "1" as the number or leave it blank if not applicable.
-3. Grid Logic: If ports are grouped in a grid (e.g., 24 ports in 2 rows), ensure each individual port is identified. If labels are hard to read, follow the logical progression of the surrounding labels.
-4. Completeness: Do not miss any ports. Every functional connector port must be mapped.
+1. Systematic Scanning: Scan the device systematically from LEFT to RIGHT, taking note of vertical columns. Do not skip any functional ports.
+2. Bounding Boxes: Provide the tightest possible [ymin, xmin, ymax, xmax] coordinates (0-1000 scale). The box must strictly encompass the physical rectangular/square opening of the port itself, NOT the space between ports and NOT the printed label.
+3. Label Matching: Look for numbers printed directly above, below, or between ports. Separate the port into a "portName" and a "portNumber". The "portName" MUST ALWAYS be in lowercase (e.g., "ethernet", "sfp", "mgmt", "console"). If a port only has a number, use "port" as the name.
+4. Grid & Stack Logic: Network ports are almost always arranged in stacked blocks (e.g., 2 rows of 12 ports). Commonly, the TOP port in a column is an ODD number (1, 3, 5) and the BOTTOM port is an EVEN number (2, 4, 6). Carefully follow this logical numerical progression to avoid mislabeling.
+5. Verification: Double-check that boxes do not heavily overlap unless they are stacked. Ensure the total number of ports matches standard configurations (e.g., 8, 16, 24, 48 ports).
 
 Return the data in this JSON format:
 {
   "analysis": "Brief technical description of the device",
+  "modelName": "Identified device model name (e.g. Cisco Catalyst 9300)",
   "ports": [
     { "portName": "string", "portNumber": "string", "box_2d": [ymin, xmin, ymax, xmax] }
   ]
@@ -465,6 +468,10 @@ Return the data in this JSON format:
                   type: Type.STRING,
                   description: "Brief technical summary of detected hardware",
                 },
+                modelName: {
+                  type: Type.STRING,
+                  description: "The specific hardware model name (e.g. Cisco Catalyst 9300)",
+                },
                 ports: {
                   type: Type.ARRAY,
                   items: {
@@ -478,7 +485,7 @@ Return the data in this JSON format:
                   },
                 },
               },
-              required: ["analysis", "ports"],
+              required: ["analysis", "modelName", "ports"],
             },
           },
         });
@@ -513,7 +520,9 @@ Return the data in this JSON format:
       }
 
       setAnalysis(result.analysis || "Mapping complete. Hardware identified.");
-
+      if (result.modelName) {
+        setDownloadFileName(result.modelName.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase());
+      }
       if (result.ports && Array.isArray(result.ports)) {
         if (result.ports.length === 0) {
           throw new Error(
@@ -909,7 +918,14 @@ ${paths}
     );
   }, []);
 
-  const handlePortMouseEnter = useCallback((i: number) => setActivePort(i), []);
+  const handlePortMouseEnter = useCallback((i: number) => {
+    setActivePort(i);
+    // Auto-scroll to the port list item
+    const el = document.getElementById(`port-list-item-${i}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, []);
   const handlePortMouseLeave = useCallback(() => setActivePort(null), []);
 
   const handleSelectionDrag = (e: React.MouseEvent) => {
@@ -2357,6 +2373,7 @@ ${paths}
                               {items.map(({ port, originalIdx }) => (
                                 <div
                                   key={`reg-${originalIdx}`}
+                                  id={`port-list-item-${originalIdx}`}
                                   className={`wizard-reg-item ${
                                     activePort === originalIdx ||
                                     selectedIndices.includes(originalIdx)

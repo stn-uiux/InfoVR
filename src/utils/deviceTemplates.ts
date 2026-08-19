@@ -1,5 +1,5 @@
 import type { DeviceType, VendorName } from "../types";
-import type { CustomEquipmentModel } from "../types/equipment";
+import type { CustomEquipmentModel, EquipmentVariant } from "../types/equipment";
 
 export interface DeviceTemplate {
   modelName: string;
@@ -10,6 +10,8 @@ export interface DeviceTemplate {
   isCustom?: boolean;
   /** Reference to the custom model ID (only for custom models) */
   customModelId?: string;
+  /** Reference to a specific variant for chassis models */
+  variant?: EquipmentVariant;
 }
 
 /**
@@ -45,15 +47,36 @@ export function getEffectiveTemplates(
   customModels: CustomEquipmentModel[],
   deletedDefaultTemplates: string[] = [],
 ): DeviceTemplate[] {
-  const customTemplates: DeviceTemplate[] = customModels.map((m) => ({
-    modelName: m.modelName,
-    type: "Router" as DeviceType,
-    uSize: m.unit,
-    vendor: "Nokia" as VendorName,
-    isCustom: true,
-    customModelId: m.modelId,
-  }));
+  const customTemplates: DeviceTemplate[] = [];
 
+  for (const m of customModels) {
+    if (m.modelType === "card-based" && m.variants && m.variants.length > 0) {
+      for (const v of m.variants) {
+        const appendedName = v.variantName === "기본타입" ? m.modelName : `${m.modelName} ${v.variantName}`;
+        customTemplates.push({
+          modelName: appendedName,
+          type: "Router" as DeviceType,
+          uSize: m.unit,
+          vendor: (m.vendor || "Nokia") as VendorName,
+          isCustom: true,
+          customModelId: m.modelId,
+          variant: v,
+        });
+      }
+    } else {
+      customTemplates.push({
+        modelName: m.modelName,
+        type: "Router" as DeviceType,
+        uSize: m.unit,
+        vendor: (m.vendor || "Nokia") as VendorName,
+        isCustom: true,
+        customModelId: m.modelId,
+      });
+    }
+  }
+
+  // 기본 모델은 커스텀 모델에 동일 이름(기본타입)이 없을 경우에만 포함.
+  // 커스텀 모델이 생성된(확장된) 모든 modelName들을 Set으로 수집.
   const customModelNames = new Set(customTemplates.map((t) => t.modelName));
   const filteredDefaults = DEVICE_TEMPLATES.filter(
     (t) => !deletedDefaultTemplates.includes(t.modelName) && !customModelNames.has(t.modelName),

@@ -122,13 +122,13 @@ export const NodePicker = ({
                 const isExpanded = expandedIds.has(node.nodeId);
                 const count = pickerEquipCountMap.get(node.nodeId) || 0;
                 const isSelected = selectedNodeId === node.nodeId;
-                
+
                 return (
                   <SharedTreeNodeItem
                     key={node.nodeId}
                     node={node}
                     depth={depth}
-                    childNodes={nodes.filter(n => n.parentId === node.nodeId).sort((a,b) => a.order - b.order)}
+                    childNodes={nodes.filter(n => n.parentId === node.nodeId).sort((a, b) => a.order - b.order)}
                     getAllChildren={(id) => nodes.filter(n => n.parentId === id)}
                     isSelected={isSelected}
                     onSelect={(id) => {
@@ -148,11 +148,11 @@ export const NodePicker = ({
                     count={count}
                     isDraggable={false}
                     draggedNodeId={null}
-                    onDragStart={() => {}}
-                    onDragOver={() => {}}
-                    onDragLeave={() => {}}
-                    onDrop={() => {}}
-                    onContextMenu={() => {}}
+                    onDragStart={() => { }}
+                    onDragOver={() => { }}
+                    onDragLeave={() => { }}
+                    onDrop={() => { }}
+                    onContextMenu={() => { }}
                     renderChild={renderSharedTree}
                   />
                 );
@@ -197,7 +197,6 @@ export const FormSelect = ({
       <div
         className={`drm-node-picker-trigger ${isOpen ? "open" : ""}`}
         onClick={() => setIsOpen(!isOpen)}
-        style={{ height: "44px", borderRadius: "12px" }}
       >
         <span>{selectedLabel}</span>
         <span className="chevron">

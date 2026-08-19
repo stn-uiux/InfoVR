@@ -19,26 +19,24 @@ export type GroupName = "과천" | "대전";
 
 // 제조사 이름
 export type VendorName =
-  | "Cisco (시스코)"
-  | "Ciena (시에나)"
-  | "Coweaver (코위버)"
-  | "Dasan (다산네트웍스)"
-  | "Dell (델)"
-  | "Juniper (주니퍼)"
-  | "Nokia (노키아)"
-  | "Rebellions (리벨리온)"
-  | "Ubiquoss (유비쿼스)"
-  | "Woorinet (우리넷)"
+  | "AXGATE"
+  | "Cisco"
+  | "Ciena"
+  | "Coweaver"
+  | "Dasan"
+  | "Dell"
+  | "Edgecore"
+  | "Juniper"
+  | "Nokia"
+  | "Rebellions"
+  | "Supermicro"
+  | "Ubiquoss"
+  | "Woorinet"
   // Legacy mappings for existing templates/data
   | "코위버PTN"
   | "CISCO"
   | "Huawei"
-  | "Nokia"
   | "유비쿼스"
-  | "AXGATE"
-  | "Dell"
-  | "Edgecore"
-  | "Supermicro"
   | string;
 
 // 장비 타입
@@ -68,8 +66,9 @@ export interface Device {
   portStates: PortState[];
   insertedCards?: import("./equipment").InsertedCard[];
   insertedModules?: import("./equipment").InsertedModule[];
-  dashboardThumbnailUrl?: string;
+
   defaultViewSide?: import("./equipment").EquipmentViewSide;
+  devicePngRaw?: string;
 }
 
 /** [VITE_CACHE_BREAKER_PORT] */
@@ -193,8 +192,8 @@ export interface RegisteredDevice {
   insertedCards?: import("./equipment").InsertedCard[];
   insertedModules?: import("./equipment").InsertedModule[];
   generatedPorts?: import("./equipment").GeneratedPort[];
-  dashboardThumbnailUrl?: string;
   defaultViewSide?: import("./equipment").EquipmentViewSide;
+  devicePngRaw?: string;
 }
 
 // 렉 방향

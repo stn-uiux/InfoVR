@@ -4,7 +4,9 @@ import { useStore, checkFrontClearanceViolation } from "../store/useStore";
 import type { Device, PortState, RegisteredDevice } from "../types";
 import type { GeneratedPort } from "../types/equipment";
 import { getHighestError } from "../utils/errorHelpers";
-import { isUsableDashboardThumbnail, resolveDeviceImage } from "../utils/deviceAssets";
+import { resolveDeviceImage } from "../utils/deviceAssets";
+import { generatePortMap } from "../utils/portUtils";
+import { useSvgComposer } from "../hooks/useSvgComposer";
 import { getNodeName } from "../utils/nodeUtils";
 
 /* ---------- Device Tile Image with loading / fallback ---------- */
@@ -232,7 +234,6 @@ export const DevicePanel = () => {
             })) || [],
       insertedCards: regDevice.insertedCards,
       insertedModules: regDevice.insertedModules,
-      dashboardThumbnailUrl: regDevice.dashboardThumbnailUrl,
       defaultViewSide: regDevice.defaultViewSide,
     } satisfies Omit<Device, "itemId">;
 
@@ -299,12 +300,7 @@ export const DevicePanel = () => {
             ? regDev.title || regDev.modelName
             : (device.modelName ?? device.title)) || "Device";
         const viewSide = regDev?.defaultViewSide || device.defaultViewSide || "front";
-        const dashboardThumbnailUrl = regDev?.dashboardThumbnailUrl || device.dashboardThumbnailUrl;
-        const imageSrc =
-          (viewSide === "front" && isUsableDashboardThumbnail(dashboardThumbnailUrl)
-            ? dashboardThumbnailUrl
-            : "") ||
-          resolveDeviceImage(regDev?.modelName ?? device.modelName, viewSide);
+        const imageSrc = resolveDeviceImage(regDev?.modelName ?? device.modelName, viewSide);
         const hasImage = !!imageSrc;
 
         const errorInfo = getHighestError(device.portStates);
@@ -736,11 +732,25 @@ export const DevicePanel = () => {
                         }
                       });
                       return sorted.map((rd) => {
-                        const thumb =
-                          (rd.defaultViewSide !== "rear" && isUsableDashboardThumbnail(rd.dashboardThumbnailUrl)
-                            ? rd.dashboardThumbnailUrl
-                            : "") ||
-                          resolveDeviceImage(rd.modelName, rd.defaultViewSide || "front");
+                        const needsComposer = (rd.insertedCards?.length || 0) > 0;
+                        const SvgComposerFallback = ({ device }: { device: any }) => {
+                          const { composedHtml } = useSvgComposer(
+                            needsComposer ? device.modelName : undefined,
+                            needsComposer ? (device.insertedCards || []) : [],
+                            needsComposer ? (device.insertedModules || []) : [],
+                            [],
+                            needsComposer ? (device.defaultViewSide || "front") : "front"
+                          );
+                          const thumbUrl = useMemo(() => {
+                            if (composedHtml) {
+                              return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(composedHtml)))}`;
+                            }
+                            return resolveDeviceImage(device.modelName, device.defaultViewSide || "front");
+                          }, [device.defaultViewSide, device.modelName, composedHtml]);
+                          
+                          return <img src={thumbUrl} alt="Device Thumb" />;
+                        };
+                        const thumb = resolveDeviceImage(rd.modelName, rd.defaultViewSide || "front");
                         const isSelected = selectedRegDeviceId === rd.deviceId;
                         const placeable = canPlace(rd.size || 1);
                         const existingMount = findExistingMount(rd.deviceId);
@@ -772,10 +782,18 @@ export const DevicePanel = () => {
                             }}
                           >
                             <div className="reg-device-item-thumb">
-                              {thumb ? (
+                              {needsComposer ? (
+                                <SvgComposerFallback device={rd} />
+                              ) : thumb ? (
                                 <img
                                   src={thumb}
-                                  alt={rd.modelName}
+                                  alt={rd.title || rd.modelName}
+                                  style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    objectFit: "contain",
+                                    display: "block",
+                                  }}
                                   onError={(e) => {
                                     (
                                       e.target as HTMLImageElement

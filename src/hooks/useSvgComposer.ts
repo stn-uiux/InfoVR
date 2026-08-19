@@ -24,10 +24,27 @@ const PORT_STATUS_COLORS: Record<string, string> = {
 };
 
 const CARD_ROW_HEIGHT = 46;
-type ComposerEquipmentModel = EquipmentModel & { _rowHeights?: number[]; _rowGaps?: number[]; _rowColumns?: number[] };
+type ComposerEquipmentModel = EquipmentModel & { 
+  _rowHeights?: number[]; 
+  _rowGaps?: number[]; 
+  _rowColumns?: number[];
+  gridMerges?: { r: number; c: number; rs: number; cs: number }[];
+  gridColWidths?: number[];
+  gridRowHeights?: number[];
+  baseEquipmentViewSvgRaw?: string;
+};
 
 function getRowColumnCount(row: number, defaultColumns: number, customRowColumns?: number[]): number {
   return Math.max(1, customRowColumns?.[row] ?? defaultColumns);
+}
+
+function getGridPositionIndex(row: number, col: number, defaultColumns: number, customRowColumns?: number[]): number {
+  if (!customRowColumns || customRowColumns.length === 0) return row * defaultColumns + col;
+  let index = 0;
+  for (let r = 0; r < row; r += 1) {
+    index += getRowColumnCount(r, defaultColumns, customRowColumns);
+  }
+  return index + col;
 }
 
 function getGridPositionFromIndex(positionIndex: number, defaultColumns: number, customRowColumns?: number[]): { row: number; col: number; columns: number } {
@@ -96,19 +113,39 @@ export function useSvgComposer(
   const customModels = useStore((s) => s.customModels);
 
   const allEquipmentModels = useMemo(() => {
-    const customMapped: ComposerEquipmentModel[] = customModels
+    const customMapped: ComposerEquipmentModel[] = [];
+    customModels
       .filter((m) => m.modelType === "card-based")
-      .map((m) => ({
-        modelId: m.modelId,
-        modelName: m.modelName,
-        rackUnit: `${m.unit}U`,
-        baseSvgUrl: `custom-model-base-${m.modelId}`,
-        equipmentSize: m.equipmentSize,
-        cardArea: m.cardArea,
-        _rowHeights: m.rowHeights,
-        _rowGaps: m.rowGaps,
-        _rowColumns: m.rowColumns,
-      }));
+      .forEach((m) => {
+        const baseProps = {
+          modelId: m.modelId,
+          rackUnit: `${m.unit}U`,
+          baseSvgUrl: `custom-model-base-${m.modelId}`,
+          equipmentSize: m.equipmentSize,
+          cardArea: m.cardArea,
+          _rowHeights: m.rowHeights,
+          _rowGaps: m.rowGaps,
+          _rowColumns: m.rowColumns,
+          gridMerges: m.gridMerges,
+          gridColWidths: m.gridColWidths,
+          gridRowHeights: m.gridRowHeights,
+        };
+        
+        if (m.variants && m.variants.length > 0) {
+          m.variants.forEach((v) => {
+            const appendedName = v.variantName === "기본타입" ? m.modelName : `${m.modelName} ${v.variantName}`;
+            customMapped.push({
+              ...baseProps,
+              modelName: appendedName,
+            });
+          });
+        } else {
+          customMapped.push({
+            ...baseProps,
+            modelName: m.modelName,
+          });
+        }
+      });
     return [...customMapped, ...equipmentModels] as ComposerEquipmentModel[];
   }, [customModels]);
 
@@ -139,7 +176,12 @@ export function useSvgComposer(
     else setComposedHtml("");
   }, [_cacheKey]);
 
-  const isModularDevice = viewSide === "front" && !!equipModel && insertedCards.length > 0;
+  const isModularDevice = useMemo(() => {
+    return viewSide === "front" && (
+      insertedCards.length > 0 || 
+      Boolean(equipModel && (equipModel.cardArea || equipModel.slots || equipModel.rows))
+    );
+  }, [viewSide, insertedCards.length, equipModel]);
 
   // ─── 카드 SVG raw text 캐시 ───
   const [cardSvgMap, setCardSvgMap] = useState<Map<string, string>>(() => {
@@ -214,9 +256,14 @@ export function useSvgComposer(
           const h = baseSvgEl.getAttribute('height') || '200';
           baseSvgEl.setAttribute('viewBox', `0 0 ${parseInt(w, 10)} ${parseInt(h, 10)}`);
         }
-        baseSvgEl.setAttribute("width", "100%");
-        baseSvgEl.setAttribute("height", "auto");
-        baseSvgEl.setAttribute("style", "max-width:880px;display:block;");
+        // Three.js TextureLoader requires explicit width/height attributes, not percentages.
+        // We use CSS to scale it responsively in the DOM.
+        if (!baseSvgEl.getAttribute('width')) baseSvgEl.setAttribute('width', '984');
+        if (!baseSvgEl.getAttribute('height')) baseSvgEl.setAttribute('height', '200');
+        baseSvgEl.setAttribute("style", "max-width:100%; height:auto; display:block; margin: 0 auto;");
+
+        // ─── 빈 슬롯 영역 배경 덮기 ───
+        drawBlankSlots(baseSvgEl, baseDoc, equipModel);
 
         // ─── 카드 합성 ───
         composeCards(baseSvgEl, baseDoc, parser, insertedCards, cardSvgMap, equipModel);
@@ -284,7 +331,7 @@ function composeCards(
     const cardSvgEl = cardDoc.querySelector("svg");
     if (!cardSvgEl) continue;
 
-    let x: number, y: number, cardW: number, cardH: number;
+    let x: number = 0, y: number = 0, cardW: number = 0, cardH: number = 0;
 
     if (equipModel.slots && card.slotId) {
       const slotDef = equipModel.slots.find((s) => s.slotId === card.slotId);
@@ -303,28 +350,77 @@ function composeCards(
       cardW = subDef.width;
       cardH = subDef.height;
     } else if (equipModel.cardArea) {
-      const { row, col, columns: rowColumns } = getGridPositionFromIndex(
-        card.positionIndex,
-        equipModel.cardArea.columns,
-        equipModel._rowColumns,
-      );
-      const rowColumnWidth = equipModel.cardArea.width / rowColumns;
-      x = equipModel.cardArea.x + col * rowColumnWidth;
-      const currentRowHeights = equipModel._rowHeights;
-      const currentRowGaps = equipModel._rowGaps;
-      if ((currentRowHeights && currentRowHeights.length > 0) || (currentRowGaps && currentRowGaps.length > 0)) {
-        let yOff = 0;
-        for (let r = 0; r < row; r++) {
-          yOff += (currentRowHeights?.[r] ?? CARD_ROW_HEIGHT);
-          yOff += currentRowGaps?.[r] ?? 0;
+      if (equipModel.gridColWidths && equipModel.gridRowHeights && equipModel.gridColWidths.length > 0 && equipModel.gridRowHeights.length > 0) {
+        const covered = new Set<string>();
+        if (equipModel.gridMerges) {
+          for (const merge of equipModel.gridMerges) {
+            for (let r = merge.r; r < merge.r + merge.rs; r++) {
+              for (let c = merge.c; c < merge.c + merge.cs; c++) {
+                if (r === merge.r && c === merge.c) continue;
+                covered.add(`${r},${c}`);
+              }
+            }
+          }
         }
-        y = equipModel.cardArea.y + yOff;
-        cardH = currentRowHeights?.[row] ?? CARD_ROW_HEIGHT;
+        let found = false;
+        let currentY = equipModel.cardArea.y;
+        for (let r = 0; r < equipModel.gridRowHeights.length; r++) {
+          const rowH = equipModel.gridRowHeights[r] || CARD_ROW_HEIGHT;
+          const rowGap = equipModel._rowGaps?.[r] ?? 0;
+          let currentX = equipModel.cardArea.x;
+          for (let c = 0; c < equipModel.gridColWidths.length; c++) {
+            const colW = equipModel.gridColWidths[c] || 0;
+            const idx = getGridPositionIndex(r, c, equipModel.cardArea.columns, equipModel._rowColumns);
+            if (idx === card.positionIndex && !covered.has(`${r},${c}`)) {
+              const merge = equipModel.gridMerges?.find((m: any) => m.r === r && m.c === c);
+              let slotW = colW;
+              let slotH = rowH;
+              if (merge) {
+                slotW = 0;
+                for (let mc = merge.c; mc < merge.c + merge.cs; mc++) slotW += equipModel.gridColWidths![mc] || 0;
+                slotH = 0;
+                for (let mr = merge.r; mr < merge.r + merge.rs; mr++) {
+                  slotH += equipModel.gridRowHeights![mr] || 0;
+                  if (mr < merge.r + merge.rs - 1) slotH += equipModel._rowGaps?.[mr] ?? 0;
+                }
+              }
+              x = currentX;
+              y = currentY;
+              cardW = slotW;
+              cardH = slotH;
+              found = true;
+              break;
+            }
+            currentX += colW;
+          }
+          if (found) break;
+          currentY += rowH + rowGap;
+        }
+        if (!found) continue;
       } else {
-        y = equipModel.cardArea.y + row * CARD_ROW_HEIGHT;
-        cardH = CARD_ROW_HEIGHT;
+        const { row, col, columns: rowColumns } = getGridPositionFromIndex(
+          card.positionIndex,
+          equipModel.cardArea.columns,
+          equipModel._rowColumns,
+        );
+        const rowColumnWidth = equipModel.cardArea.width / rowColumns;
+        x = equipModel.cardArea.x + col * rowColumnWidth;
+        const currentRowHeights = equipModel._rowHeights;
+        const currentRowGaps = equipModel._rowGaps;
+        if ((currentRowHeights && currentRowHeights.length > 0) || (currentRowGaps && currentRowGaps.length > 0)) {
+          let yOff = 0;
+          for (let r = 0; r < row; r++) {
+            yOff += (currentRowHeights?.[r] ?? CARD_ROW_HEIGHT);
+            yOff += currentRowGaps?.[r] ?? 0;
+          }
+          y = equipModel.cardArea.y + yOff;
+          cardH = currentRowHeights?.[row] ?? CARD_ROW_HEIGHT;
+        } else {
+          y = equipModel.cardArea.y + row * CARD_ROW_HEIGHT;
+          cardH = CARD_ROW_HEIGHT;
+        }
+        cardW = rowColumnWidth * getColSpan(card.widthType, rowColumns);
       }
-      cardW = rowColumnWidth * getColSpan(card.widthType, rowColumns);
     } else {
       continue;
     }
@@ -442,4 +538,179 @@ function resolveTargetHitbox(hbs: SVGElement[], module: InsertedModule): SVGElem
   });
 
   return typeMatch || hbs[0];
+}
+
+export function drawBlankSlots(
+  baseSvgEl: SVGSVGElement,
+  baseDoc: Document,
+  equipModel: ComposerEquipmentModel | undefined
+) {
+  if (!equipModel) return;
+
+  const drawRect = (x: number, y: number, w: number, h: number) => {
+    const rect = baseDoc.createElementNS("http://www.w3.org/2000/svg", "rect");
+    rect.setAttribute("x", x.toString());
+    rect.setAttribute("y", y.toString());
+    rect.setAttribute("width", w.toString());
+    rect.setAttribute("height", h.toString());
+    rect.setAttribute("fill", "#666666"); // 연한 회색 (섀시의 빈 공간임을 명확하게 표시)
+    rect.setAttribute("stroke", "#444444");
+    rect.setAttribute("stroke-width", "1");
+    baseSvgEl.appendChild(rect);
+  };
+
+  if (equipModel.slots) {
+    for (const slot of equipModel.slots) {
+      drawRect(
+        (equipModel.cardArea?.x ?? 0) + slot.x,
+        (equipModel.cardArea?.y ?? 0) + slot.y,
+        slot.width,
+        slot.height
+      );
+    }
+  } else if (equipModel.rows) {
+    for (const row of equipModel.rows) {
+      for (const sub of row.subSlots) {
+        drawRect(
+          row.x + sub.x,
+          row.y + sub.y,
+          sub.width,
+          sub.height
+        );
+      }
+    }
+  } else if (equipModel.cardArea) {
+    const area = equipModel.cardArea;
+    const numRows = (equipModel.gridRowHeights && equipModel.gridRowHeights.length > 0) ? equipModel.gridRowHeights.length : (equipModel._rowHeights?.length ?? Math.max(1, Math.floor(area.height / CARD_ROW_HEIGHT)));
+    
+    if (equipModel.gridRowHeights && equipModel.gridColWidths && equipModel.gridRowHeights.length > 0 && equipModel.gridColWidths.length > 0) {
+      const covered = new Set<string>();
+      
+      if (equipModel.gridMerges) {
+        for (const merge of equipModel.gridMerges) {
+          let x = area.x;
+          for (let c = 0; c < merge.c; c++) x += equipModel.gridColWidths[c] || 0;
+          let y = area.y;
+          for (let r = 0; r < merge.r; r++) {
+            y += equipModel.gridRowHeights[r] || 0;
+            y += equipModel._rowGaps?.[r] ?? 0;
+          }
+          
+          let w = 0;
+          for (let c = merge.c; c < merge.c + merge.cs; c++) w += equipModel.gridColWidths[c] || 0;
+          let h = 0;
+          for (let r = merge.r; r < merge.r + merge.rs; r++) {
+            h += equipModel.gridRowHeights[r] || 0;
+            if (r < merge.r + merge.rs - 1) h += equipModel._rowGaps?.[r] ?? 0;
+          }
+          
+          drawRect(x, y, w, h);
+          
+          for (let r = merge.r; r < merge.r + merge.rs; r++) {
+            for (let c = merge.c; c < merge.c + merge.cs; c++) {
+              covered.add(`${r},${c}`);
+            }
+          }
+        }
+      }
+      
+      let currentY = area.y;
+      for (let r = 0; r < numRows; r++) {
+        const rowHeight = equipModel.gridRowHeights[r] || CARD_ROW_HEIGHT;
+        const rowGap = equipModel._rowGaps?.[r] ?? 0;
+        
+        let currentX = area.x;
+        for (let c = 0; c < equipModel.gridColWidths.length; c++) {
+          const colWidth = equipModel.gridColWidths[c] || 0;
+          
+          if (!covered.has(`${r},${c}`)) {
+            drawRect(currentX, currentY, colWidth, rowHeight);
+          }
+          
+          currentX += colWidth;
+        }
+        currentY += rowHeight + rowGap;
+      }
+    } else {
+      let currentY = area.y;
+      for (let r = 0; r < numRows; r++) {
+        const cols = getRowColumnCount(r, area.columns, equipModel._rowColumns);
+        const colWidth = area.width / cols;
+        const rowHeight = equipModel._rowHeights?.[r] ?? CARD_ROW_HEIGHT;
+        const rowGap = equipModel._rowGaps?.[r] ?? 0;
+
+        for (let c = 0; c < cols; c++) {
+          drawRect(
+            area.x + c * colWidth,
+            currentY,
+            colWidth,
+            rowHeight
+          );
+        }
+        currentY += rowHeight + rowGap;
+      }
+    }
+  }
+}
+
+export async function generateComposedSvgAsync(
+  modelName: string | undefined,
+  equipModel: ComposerEquipmentModel | undefined,
+  insertedCards: InsertedCard[],
+  insertedModules: InsertedModule[] = [],
+  viewSide: EquipmentViewSide = "front"
+): Promise<string | null> {
+  if (!equipModel) return null;
+  const isModularDevice = viewSide === "front" && (insertedCards.length > 0 || Boolean(equipModel.cardArea || equipModel.slots || equipModel.rows));
+  
+  const cardSvgMap = new Map<string, string>();
+  if (isModularDevice) {
+    const uniqueFileNames = [...new Set(insertedCards.map((c) => c.cardFileName))];
+    await Promise.all(uniqueFileNames.map(async (fn) => {
+      const raw = await loadCardSvgRaw(fn);
+      if (raw) cardSvgMap.set(fn, raw);
+    }));
+  }
+  
+  let baseSvg: string | undefined = equipModel.baseEquipmentViewSvgRaw;
+  if (!baseSvg) {
+    if (isModularDevice && equipModel.baseSvgUrl && equipModel.baseSvgUrl.startsWith("custom-model-base-")) {
+      baseSvg = await loadBaseEquipmentSvgRaw(equipModel.baseSvgUrl);
+    } else {
+      const targetModelName = isModularDevice && equipModel.baseSvgUrl
+        ? equipModel.baseSvgUrl.replace(/\.svg$/i, "").replace(/^\[\d+U\]\s*/, "")
+        : modelName;
+      if (targetModelName) {
+        baseSvg = await resolveDeviceSvgContent(targetModelName, viewSide);
+      }
+    }
+  }
+  if (!baseSvg) return null;
+  
+  const parser = new DOMParser();
+  const baseDoc = parser.parseFromString(baseSvg, "image/svg+xml");
+  const baseSvgEl = baseDoc.querySelector("svg");
+  if (!baseSvgEl) return baseSvg;
+  
+  if (!baseSvgEl.getAttribute('viewBox')) {
+    const w = baseSvgEl.getAttribute('width') || '984';
+    const h = baseSvgEl.getAttribute('height') || '200';
+    baseSvgEl.setAttribute('viewBox', `0 0 ${parseInt(w, 10)} ${parseInt(h, 10)}`);
+  }
+  if (!baseSvgEl.getAttribute('width')) baseSvgEl.setAttribute('width', '984');
+  if (!baseSvgEl.getAttribute('height')) baseSvgEl.setAttribute('height', '200');
+  baseSvgEl.setAttribute("style", "max-width:100%; height:auto; display:block; margin: 0 auto;");
+  
+  drawBlankSlots(baseSvgEl, baseDoc, equipModel);
+  composeCards(baseSvgEl, baseDoc, parser, insertedCards, cardSvgMap, equipModel);
+  composeModules(baseSvgEl, baseDoc, insertedModules);
+  
+  const allPortEls = filterPortElements(Array.from(baseSvgEl.querySelectorAll(PORT_SELECTOR)));
+  allPortEls.forEach((el) => {
+    let styleStr = "fill: transparent; stroke: none;";
+    styleStr += " pointer-events: all; cursor: pointer;";
+    el.setAttribute("style", styleStr);
+  });
+  
+  return new XMLSerializer().serializeToString(baseDoc);
 }
