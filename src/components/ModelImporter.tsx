@@ -619,13 +619,21 @@ export const ModelImporter = () => {
             </button>
           ))}
         </div>
-        <div style={{ borderTop: "1px solid var(--border-color)", marginTop: "12px" }}>
+        <div style={{ borderTop: "1px solid var(--border-color)", marginTop: "12px", paddingTop: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
           <button
             className="comm-btn comm-btn-md comm-btn-primary comm-w-full"
             onClick={() => window.open('/arcVRoom/', '_blank')}
           >
             <Icon icon="mdi:cube-outline" className="icon" style={{ marginRight: '6px' }} />
             3D공간 제작
+          </button>
+          <button
+            className="comm-btn comm-btn-md comm-btn-secondary comm-w-full"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isLoading}
+          >
+            <Icon icon="mdi:file-upload-outline" className="icon" style={{ marginRight: '6px' }} />
+            에셋 가져오기
           </button>
         </div>
       </div>

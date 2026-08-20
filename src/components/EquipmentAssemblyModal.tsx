@@ -476,17 +476,30 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
 
   // Base SVG 로드
   useEffect(() => {
+    const processRawSvg = (raw: string) => {
+      let modified = raw.replace(/width="[^"]*"/, '').replace(/\sheight="[^"]*"/, '');
+      const svgMatch = modified.match(/<svg[^>]*>/);
+      if (svgMatch) {
+        let svgTag = svgMatch[0];
+        svgTag = svgTag.replace(/preserveAspectRatio="[^"]*"/, '');
+        svgTag = svgTag.replace(/<svg/, `<svg preserveAspectRatio="xMidYMid meet" style="width:100%; height:100%; display:block;"`);
+        modified = modified.replace(svgMatch[0], svgTag);
+      }
+      return modified;
+    };
+
     if (!selectedModel) { setBaseSvgHtml(null); return; }
 
     // Custom inline models provide their own raw SVG
     if (selectedModel.baseEquipmentViewSvgRaw) {
-      setBaseSvgHtml(selectedModel.baseEquipmentViewSvgRaw);
+      setBaseSvgHtml(processRawSvg(selectedModel.baseEquipmentViewSvgRaw));
       return;
     }
 
     let m = true;
     loadBaseEquipmentSvgRaw(selectedModel.baseSvgUrl).then((raw) => {
-      if (m) setBaseSvgHtml(raw ?? null);
+      if (m && raw) setBaseSvgHtml(processRawSvg(raw));
+      else if (m) setBaseSvgHtml(null);
     });
     return () => { m = false; };
   }, [selectedModel]);
@@ -1050,7 +1063,14 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
                 </div>
 
                 <div className="eam-canvas-area">
-                  <div className="eam-equip-wrap" ref={equipRef}>
+                  <div 
+                    className="eam-equip-wrap" 
+                    ref={equipRef}
+                    style={{
+                      width: selectedModel?.equipmentSize?.width,
+                      height: selectedModel?.equipmentSize?.height,
+                    }}
+                  >
                     {/* Base SVG */}
                     {baseSvgHtml && (
                       <div

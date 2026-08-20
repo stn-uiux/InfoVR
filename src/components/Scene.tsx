@@ -19,6 +19,7 @@ import { CyberSpaceEnvironment } from "./CyberSpaceEnvironment";
 import { calculateDynamicRoomSize } from "../utils/rackGeometry";
 import { GRID_SPACING } from "./constants";
 import { useTheme } from "../contexts/ThemeContext";
+import { GlobalFocusLights } from "./GlobalFocusLights";
 
 /** Error boundary that silently catches Environment HDR load failures (e.g. offline) */
 class EnvironmentErrorBoundary extends React.Component<
@@ -370,6 +371,9 @@ export const Scene = () => {
           />
         </>
       )}
+
+      {/* Global Focus Lights to avoid Shader recompilation freezes on selection */}
+      <GlobalFocusLights />
 
       {!selectedRackId && (
         <GizmoHelper alignment="top-right" margin={[gizmoMarginX, 140]} renderPriority={isEditMode ? undefined : 2}>

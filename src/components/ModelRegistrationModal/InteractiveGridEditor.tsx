@@ -15,11 +15,13 @@ interface InteractiveGridEditorProps {
   baseY: number;
   colWidths: number[];
   rowHeights: number[];
+  rowGaps?: number[];
   merges: GridMerge[];
   toolbarContainer?: HTMLElement | null;
   onGridChange: (data: {
     colWidths: number[];
     rowHeights: number[];
+    rowGaps?: number[];
     merges: GridMerge[];
     baseX?: number;
     baseY?: number;
@@ -74,10 +76,25 @@ function colX(c: number, colWidths: number[], baseX: number): number {
 }
 
 /** Get pixel position of row r start */
-function rowY(r: number, rowHeights: number[], baseY: number): number {
+function rowY(r: number, rowHeights: number[], baseY: number, rowGaps?: number[]): number {
   let y = baseY;
-  for (let i = 0; i < r; i++) y += rowHeights[i];
+  for (let i = 0; i < r; i++) {
+    y += rowHeights[i];
+    if (rowGaps && rowGaps[i]) {
+      y += rowGaps[i];
+    }
+  }
   return y;
+}
+
+function getTotalH(rowHeights: number[], rowGaps?: number[]): number {
+  let h = rowHeights.reduce((a, b) => a + b, 0);
+  if (rowGaps) {
+    for (let i = 0; i < rowHeights.length - 1; i++) {
+      if (rowGaps[i]) h += rowGaps[i];
+    }
+  }
+  return h;
 }
 
 /** Check if selected cells form a valid rectangle */
@@ -108,6 +125,7 @@ export default function InteractiveGridEditor({
   baseY,
   colWidths,
   rowHeights,
+  rowGaps,
   merges,
   toolbarContainer,
   onGridChange,
@@ -119,11 +137,45 @@ export default function InteractiveGridEditor({
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
   const [dragStartGrid, setDragStartGrid] = useState({ baseX: 0, baseY: 0, colWidths: [] as number[], rowHeights: [] as number[] });
   const isDragging = useRef(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; r: number } | null>(null);
+
+  const [invScale, setInvScale] = useState(1);
+
+  React.useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    window.addEventListener("click", handleClick);
+    return () => window.removeEventListener("click", handleClick);
+  }, []);
+
+  React.useLayoutEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+
+    const updateScale = () => {
+      const vb = svg.viewBox.baseVal;
+      if (!vb || vb.width === 0 || vb.height === 0) return;
+      const rect = svg.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        const scaleX = rect.width / vb.width;
+        const scaleY = rect.height / vb.height;
+        const scale = Math.min(scaleX, scaleY);
+        setInvScale(1 / scale);
+      }
+    };
+
+    updateScale();
+    const resizeObserver = new ResizeObserver(() => {
+      updateScale();
+    });
+    resizeObserver.observe(svg);
+
+    return () => resizeObserver.disconnect();
+  }, [svgRef]);
 
   const rows = rowHeights.length;
   const cols = colWidths.length;
   const totalW = colWidths.reduce((a, b) => a + b, 0);
-  const totalH = rowHeights.reduce((a, b) => a + b, 0);
+  const totalH = getTotalH(rowHeights, rowGaps);
 
   // ── Divider dragging ──
   // ── Divider & Edge & Move dragging ──
@@ -163,7 +215,7 @@ export default function InteractiveGridEditor({
 
       if (dragType === "move") {
         const totalW = colWidths.reduce((a, b) => a + b, 0);
-        const totalH = rowHeights.reduce((a, b) => a + b, 0);
+        const totalH = getTotalH(rowHeights, rowGaps);
         let newX = dragStartGrid.baseX + dx;
         let newY = dragStartGrid.baseY + dy;
         
@@ -182,7 +234,7 @@ export default function InteractiveGridEditor({
 
       if (dragType.startsWith("edge-")) {
         const totalW = dragStartGrid.colWidths.reduce((a, b) => a + b, 0);
-        const totalH = dragStartGrid.rowHeights.reduce((a, b) => a + b, 0);
+        const totalH = getTotalH(dragStartGrid.rowHeights, rowGaps);
         let newBaseX = dragStartGrid.baseX;
         let newBaseY = dragStartGrid.baseY;
         let newW = totalW;
@@ -220,7 +272,9 @@ export default function InteractiveGridEditor({
             baseX: newBaseX
           });
         } else {
-          const scale = newH / totalH;
+          const baseH = dragStartGrid.rowHeights.reduce((a, b) => a + b, 0);
+          const totalGaps = totalH - baseH;
+          const scale = baseH > 0 ? Math.max(0.1, newH - totalGaps) / baseH : 1;
           onGridChange({ 
             colWidths, 
             rowHeights: dragStartGrid.rowHeights.map(h => Math.round(h * scale)), 
@@ -330,6 +384,12 @@ export default function InteractiveGridEditor({
     []
   );
 
+  const handleContextMenu = useCallback((e: React.MouseEvent, r: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, r });
+  }, []);
+
   // ── Merge ──
   const handleMerge = useCallback(() => {
     const rect = getSelectionRect(selectedCells);
@@ -372,7 +432,7 @@ export default function InteractiveGridEditor({
 
   // ── Add row ──
   const handleAddRow = useCallback(() => {
-    const totalH = rowHeights.reduce((a, b) => a + b, 0) || 46;
+    const totalH = getTotalH(rowHeights, rowGaps) || 46;
     const newCount = rowHeights.length + 1;
     const newH = Array.from({ length: newCount }, () => Math.round(totalH / newCount));
     onGridChange({ colWidths, rowHeights: newH, merges });
@@ -389,7 +449,7 @@ export default function InteractiveGridEditor({
   // ── Delete row ──
   const handleDeleteRow = useCallback(() => {
     if (rowHeights.length <= 1) return;
-    const totalH = rowHeights.reduce((a, b) => a + b, 0);
+    const totalH = getTotalH(rowHeights, rowGaps);
     const newCount = rowHeights.length - 1;
     const newH = Array.from({ length: newCount }, () => Math.round(totalH / newCount));
     
@@ -451,7 +511,7 @@ export default function InteractiveGridEditor({
       const cs = merge ? merge.cs : 1;
 
       const x = colX(c, colWidths, baseX);
-      const y = rowY(r, rowHeights, baseY);
+      const y = rowY(r, rowHeights, baseY, rowGaps);
       let w = 0;
       for (let ci = c; ci < c + cs && ci < cols; ci++) w += colWidths[ci];
       let h = 0;
@@ -489,20 +549,30 @@ export default function InteractiveGridEditor({
       );
 
       // Cell label (dimensions)
+      const cellText = (merge && (merge.rs > 1 || merge.cs > 1)) ? `${merge.rs}×${merge.cs} · ${Math.round(w)}×${Math.round(h)}` : `${Math.round(w)}×${Math.round(h)}`;
+      const approxW = cellText.length * 6.5 * invScale + 12 * invScale;
       cellRects.push(
-        <text
-          key={`cell-label-${r}-${c}`}
-          x={x + w / 2}
-          y={y + h / 2 + 4}
-          textAnchor="middle"
-          fill="rgba(0,200,255,0.8)"
-          fontSize="10"
-          fontWeight="600"
-          fontFamily="sans-serif"
-          style={{ pointerEvents: "none" }}
-        >
-          {(merge && (merge.rs > 1 || merge.cs > 1)) ? `${merge.rs}×${merge.cs} · ` : ""}{Math.round(w)}×{Math.round(h)}
-        </text>
+        <g key={`cell-label-${r}-${c}`} style={{ pointerEvents: "none" }}>
+          <rect
+            x={x + w / 2 - approxW / 2}
+            y={y + h / 2 - 8 * invScale}
+            width={approxW}
+            height={18 * invScale}
+            fill="rgba(0,0,0,0.6)"
+            rx={4 * invScale}
+          />
+          <text
+            x={x + w / 2}
+            y={y + h / 2 + 4.5 * invScale}
+            textAnchor="middle"
+            fill="rgba(0,200,255,0.9)"
+            fontSize={10 * invScale}
+            fontWeight="600"
+            fontFamily="sans-serif"
+          >
+            {cellText}
+          </text>
+        </g>
       );
     }
   }
@@ -519,7 +589,7 @@ export default function InteractiveGridEditor({
       if (m1 && m2 && m1 === m2) {
         continue; // skip line inside merge
       }
-      const yStart = rowY(r, rowHeights, baseY);
+      const yStart = rowY(r, rowHeights, baseY, rowGaps);
       const yEnd = yStart + rowHeights[r];
       lineSegments.push(
         <line
@@ -556,7 +626,7 @@ export default function InteractiveGridEditor({
   // ── Render horizontal dividers (row) ──
   const rowDividers: React.ReactNode[] = [];
   for (let r = 0; r < rows - 1; r++) {
-    const y = rowY(r + 1, rowHeights, baseY);
+    const y = rowY(r, rowHeights, baseY, rowGaps) + rowHeights[r];
     const lineSegments = [];
     for (let c = 0; c < cols; c++) {
       const m1 = getMergeAt(r, c, merges);
@@ -593,6 +663,7 @@ export default function InteractiveGridEditor({
           onPointerDown={(e) => handleDragStart(e, "row", r)}
           onPointerMove={handleDragMove}
           onPointerUp={handleDragEnd}
+          onContextMenu={(e) => handleContextMenu(e, r)}
         />
       </React.Fragment>
     );
@@ -626,19 +697,29 @@ export default function InteractiveGridEditor({
   );
 
   // ── Info label ──
+  const infoText = `카드 영역 (${cols}열×${rows}행)${merges.length > 0 ? ` · 병합 ${merges.length}개` : ""} | 크기: ${Math.round(totalW)}×${Math.round(totalH)} | 좌표: X:${Math.round(baseX)} Y:${Math.round(baseY)}`;
+  const approxInfoW = infoText.length * 6.5 * invScale + 12 * invScale;
   const infoLabel = (
-    <text
-      x={baseX + 5}
-      y={baseY - 6}
-      fill="rgba(0,200,255,0.9)"
-      fontSize="10"
-      fontWeight="700"
-      fontFamily="sans-serif"
-      style={{ pointerEvents: "none" }}
-    >
-      카드 영역 ({cols}열×{rows}행)
-      {merges.length > 0 ? ` · 병합 ${merges.length}개` : ""} | 크기: {Math.round(totalW)}×{Math.round(totalH)} | 좌표: X:{Math.round(baseX)} Y:{Math.round(baseY)}
-    </text>
+    <g style={{ pointerEvents: "none" }}>
+      <rect
+        x={baseX + 2 * invScale}
+        y={baseY - 20 * invScale}
+        width={approxInfoW}
+        height={18 * invScale}
+        fill="rgba(0,0,0,0.6)"
+        rx={4 * invScale}
+      />
+      <text
+        x={baseX + 8 * invScale}
+        y={baseY - 6.5 * invScale}
+        fill="rgba(0,200,255,0.9)"
+        fontSize={10 * invScale}
+        fontWeight="700"
+        fontFamily="sans-serif"
+      >
+        {infoText}
+      </text>
+    </g>
   );
 
   // ── Tooltip for resizing & moving ──
@@ -648,43 +729,45 @@ export default function InteractiveGridEditor({
   let tooltipWidth = 110;
 
   if (dragType === "col") {
-    tooltipX = colX(dragIndex + 1, colWidths, baseX) + 48;
-    tooltipY = baseY - 12;
+    tooltipX = colX(dragIndex + 1, colWidths, baseX) + 48 * invScale;
+    tooltipY = baseY - 12 * invScale;
     tooltipText = `${Math.round(colWidths[dragIndex])}px / ${Math.round(colWidths[dragIndex + 1])}px`;
     tooltipWidth = 80;
   } else if (dragType === "row") {
     tooltipX = baseX + totalW / 2;
-    tooltipY = rowY(dragIndex + 1, rowHeights, baseY) - 12;
+    tooltipY = rowY(dragIndex, rowHeights, baseY, rowGaps) + rowHeights[dragIndex] - 12 * invScale;
     tooltipText = `${Math.round(rowHeights[dragIndex])}px / ${Math.round(rowHeights[dragIndex + 1])}px`;
     tooltipWidth = 80;
   } else if (dragType === "move") {
     tooltipX = baseX + totalW / 2;
-    tooltipY = baseY - 12;
+    tooltipY = baseY - 12 * invScale;
     tooltipText = `X: ${Math.round(baseX)} / Y: ${Math.round(baseY)}`;
   } else if (dragType?.startsWith("edge-")) {
     tooltipX = baseX + totalW / 2;
-    tooltipY = baseY - 12;
+    tooltipY = baseY - 12 * invScale;
     tooltipText = `W: ${Math.round(totalW)} / H: ${Math.round(totalH)}`;
   }
 
   const resizeTooltip = (isDragging.current && dragType !== null && tooltipText) ? (
     <g style={{ pointerEvents: "none" }}>
       <rect
-        x={tooltipX - tooltipWidth / 2}
-        y={tooltipY - 14}
-        width={tooltipWidth}
-        height="20"
+        x={tooltipX - (tooltipWidth * invScale) / 2}
+        y={tooltipY - 14 * invScale}
+        width={tooltipWidth * invScale}
+        height={20 * invScale}
         fill="rgba(0,0,0,0.75)"
-        rx="4"
+        rx={4 * invScale}
       />
       <text
         x={tooltipX}
-        y={tooltipY}
+        y={tooltipY - 4 * invScale}
         fill="#fff"
-        fontSize="11"
+        fontSize={11 * invScale}
         fontWeight="bold"
         fontFamily="sans-serif"
         textAnchor="middle"
+        dominantBaseline="middle"
+        style={{ pointerEvents: "none" }}
       >
         {tooltipText}
       </text>
@@ -704,12 +787,144 @@ export default function InteractiveGridEditor({
     lineHeight: "1.4",
   };
 
+  // ── Render Gap Overlays ──
+  const gapOverlays: React.ReactNode[] = [];
+  if (rowGaps) {
+    for (let r = 0; r < rows; r++) {
+      const gap = rowGaps[r];
+      if (gap) {
+        const yBottom = rowY(r, rowHeights, baseY, rowGaps) + rowHeights[r];
+        if (gap > 0) {
+          gapOverlays.push(
+            <g key={`gap-overlay-${r}`}>
+              <rect
+                x={baseX}
+                y={yBottom}
+                width={totalW}
+                height={gap}
+                fill="rgba(255, 165, 0, 0.2)"
+                stroke="orange"
+                strokeWidth="1.5"
+                strokeDasharray="4 2"
+                style={{ pointerEvents: "auto", cursor: "context-menu" }}
+                onContextMenu={(e) => handleContextMenu(e, r)}
+              />
+              <rect
+                x={baseX + totalW + 2 * invScale}
+                y={yBottom + gap / 2 - 8 * invScale}
+                width={65 * invScale}
+                height={18 * invScale}
+                fill="rgba(0,0,0,0.6)"
+                rx={4 * invScale}
+                style={{ pointerEvents: "none" }}
+              />
+              <text
+                x={baseX + totalW + 6 * invScale}
+                y={yBottom + gap / 2 + 5 * invScale}
+                textAnchor="start"
+                fill="orange"
+                fontSize={11 * invScale}
+                fontWeight="bold"
+                style={{ pointerEvents: "none" }}
+              >
+                간격 {gap}px
+              </text>
+            </g>
+          );
+        } else {
+          const absGap = Math.abs(gap);
+          gapOverlays.push(
+            <g key={`gap-overlay-${r}`}>
+              <rect
+                x={baseX}
+                y={yBottom - absGap}
+                width={totalW}
+                height={absGap}
+                fill="rgba(255, 0, 0, 0.2)"
+                stroke="red"
+                strokeWidth="1.5"
+                strokeDasharray="4 2"
+                style={{ pointerEvents: "auto", cursor: "context-menu" }}
+                onContextMenu={(e) => handleContextMenu(e, r)}
+              />
+              <rect
+                x={baseX + totalW + 2 * invScale}
+                y={yBottom - absGap / 2 - 8 * invScale}
+                width={65 * invScale}
+                height={18 * invScale}
+                fill="rgba(0,0,0,0.6)"
+                rx={4 * invScale}
+                style={{ pointerEvents: "none" }}
+              />
+              <text
+                x={baseX + totalW + 6 * invScale}
+                y={yBottom - absGap / 2 + 5 * invScale}
+                textAnchor="start"
+                fill="red"
+                fontSize={11 * invScale}
+                fontWeight="bold"
+                style={{ pointerEvents: "none" }}
+              >
+                겹침 {absGap}px
+              </text>
+            </g>
+          );
+        }
+      }
+    }
+  }
+
+  const renderContextMenu = () => {
+    if (!contextMenu) return null;
+    return createPortal(
+      <div
+        style={{
+          position: "fixed",
+          top: contextMenu.y,
+          left: contextMenu.x,
+          background: "var(--panel-bg, #1a202c)",
+          border: "1px solid var(--border-medium, #4a5568)",
+          borderRadius: "8px",
+          padding: "8px",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+          zIndex: 9999,
+          display: "flex",
+          flexDirection: "column",
+          gap: "4px"
+        }}
+        onClick={(e) => e.stopPropagation()}
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        <button
+          className="comm-btn comm-btn-sm comm-btn-secondary"
+          onClick={() => {
+            const currentGap = rowGaps ? rowGaps[contextMenu.r] || 0 : 0;
+            const input = window.prompt(`[행 ${contextMenu.r + 1} 아래 간격 설정 (px)]\n양수: 간격 추가, 음수: 겹침 허용`, currentGap.toString());
+            if (input !== null) {
+              const val = parseInt(input, 10);
+              if (!isNaN(val)) {
+                const newGaps = rowGaps ? [...rowGaps] : new Array(rowHeights.length).fill(0);
+                newGaps[contextMenu.r] = val;
+                onGridChange({ colWidths, rowHeights, merges, rowGaps: newGaps });
+              }
+            }
+            setContextMenu(null);
+          }}
+        >
+          간격 설정 (Gap)
+        </button>
+      </div>,
+      document.body
+    );
+  };
+
   return (
     <>
       <g className="interactive-grid-editor" shapeRendering="geometricPrecision">
         {cellRects}
         {colDividers}
         {rowDividers}
+        {gapOverlays}
         {outerBorder}
         {edgeHandles}
         {infoLabel}
@@ -804,6 +1019,7 @@ export default function InteractiveGridEditor({
         </div>,
         toolbarContainer
       )}
+      {renderContextMenu()}
     </>
   );
 }

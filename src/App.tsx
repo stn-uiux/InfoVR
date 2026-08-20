@@ -648,7 +648,7 @@ const FitToModelsButton = () => {
           letterSpacing: "0.02em",
         }}
       >
-        FIT MODELS
+        전체보기
       </span>
     </div>
   );

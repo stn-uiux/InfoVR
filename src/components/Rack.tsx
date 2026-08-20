@@ -653,28 +653,19 @@ export const Rack = memo(({
               <boxGeometry args={[width - 0.08, 0.005, 0.005]} />
               <meshBasicMaterial color="#ffffff" />
             </mesh>
-            {/* Top Blue Glow Lights - 3 lights for a wide, soft spread */}
-            <pointLight position={[-width / 3, height / 2 - 0.05, 0]} intensity={0.4} distance={2} decay={2} color="#00bfff" />
-            <pointLight position={[0, height / 2 - 0.05, 0]} intensity={0.4} distance={2} decay={2} color="#00bfff" />
-            <pointLight position={[width / 3, height / 2 - 0.05, 0]} intensity={0.4} distance={2} decay={2} color="#00bfff" />
-
+            {/* Top Blue Glow Lights extracted to GlobalFocusLights */}
+            
             {/* Bottom Blue LED Line (Core) */}
             <mesh position={[0, -height / 2 + 0.03, 0]}>
               <boxGeometry args={[width - 0.08, 0.005, 0.005]} />
               <meshBasicMaterial color="#ffffff" />
             </mesh>
-            {/* Bottom Blue Glow Lights - 3 lights for a wide, soft spread */}
-            <pointLight position={[-width / 3, -height / 2 + 0.05, 0]} intensity={0.4} distance={2} decay={2} color="#00bfff" />
-            <pointLight position={[0, -height / 2 + 0.05, 0]} intensity={0.4} distance={2} decay={2} color="#00bfff" />
-            <pointLight position={[width / 3, -height / 2 + 0.05, 0]} intensity={0.4} distance={2} decay={2} color="#00bfff" />
+            {/* Bottom Blue Glow Lights extracted to GlobalFocusLights */}
           </group>
         )}
 
         <group position={[0, 0, depth / 2 - 0.07]}>
-          {/* Only add light to the focused rack to preserve performance while improving visibility */}
-          {isInternalFocused && !isEditMode && (
-            <pointLight position={[0, 0, 1.5]} intensity={4.0} distance={10} decay={1.5} color="#ffffff" />
-          )}
+          {/* Main White Light extracted to GlobalFocusLights */}
           {devices.map((device) => (
             <MemoDeviceMesh
               key={device.itemId}
@@ -684,7 +675,6 @@ export const Rack = memo(({
               rackId={rackId}
               isObstructing={isObstructing}
               rackTitle={rackTitle}
-              isRackFocused={isInternalFocused}
             />
           ))}
         </group>
@@ -728,8 +718,8 @@ const PerforatedPanel = memo(({ xOff, rotY, panelW, panelH, color, texture }: {
 ));
 
 // Phase 1: MemoDeviceMesh — onSelect를 내부에서 안정화
-const MemoDeviceMesh = memo(({ device, rackHeight, rackWidth, rackId, isObstructing, rackTitle, isRackFocused }: {
-  device: Device; rackHeight: number; rackWidth: number; rackId: string; isObstructing: boolean; rackTitle?: string; isRackFocused: boolean;
+const MemoDeviceMesh = memo(({ device, rackHeight, rackWidth, rackId, isObstructing, rackTitle }: {
+  device: Device; rackHeight: number; rackWidth: number; rackId: string; isObstructing: boolean; rackTitle?: string;
 }) => {
   const onSelect = useCallback(() => {
     const { focusRack, selectDevice, isEditMode } = useStore.getState();
@@ -750,7 +740,6 @@ const MemoDeviceMesh = memo(({ device, rackHeight, rackWidth, rackId, isObstruct
       isObstructing={isObstructing}
       rackTitle={rackTitle}
       rackId={rackId}
-      isRackFocused={isRackFocused}
     />
   );
 });
@@ -772,7 +761,6 @@ const DeviceMesh = ({
   isObstructing?: boolean;
   rackTitle?: string;
   rackId: string;
-  isRackFocused: boolean;
 }) => {
   const meshRef = useRef<Mesh>(null);
   const faceplateRef = useRef<Mesh>(null);
