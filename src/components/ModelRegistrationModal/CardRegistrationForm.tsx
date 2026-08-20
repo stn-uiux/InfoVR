@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import type { CardWidthType } from "../../types/equipment";
-import { colSpanToWidthType, getColSpan } from "../../types/equipment";
+import { getColSpan } from "../../types/equipment";
 
 interface Props {
   open: boolean;
@@ -55,45 +55,67 @@ export const CardRegistrationForm: React.FC<Props> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // 최대 열 수에 따른 옵션 생성
-  const widthOptions = useMemo(() => {
-    const effectiveMax = Math.max(maxColumns, 1);
-    const opts: { value: CardWidthType; label: string }[] = [];
-    for (let i = 1; i <= effectiveMax; i++) {
-      const wt = colSpanToWidthType(i, effectiveMax);
-      let label: string;
-      if (wt === "half") label = `${i}열 (Half)`;
-      else if (wt === "full") label = `${i}열 (Full)`;
-      else label = `${i}열`;
-      opts.push({ value: wt, label });
+
+
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const processFile = useCallback((file: File) => {
+    if (!file.name.toLowerCase().endsWith(".svg")) {
+      setErrors((prev) => ({ ...prev, file: "SVG 파일만 지원합니다." }));
+      return;
     }
-    return opts;
-  }, [maxColumns]);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const raw = reader.result as string;
+      setSvgRaw(raw);
+      setSvgFileName(file.name);
+      
+      const nameWithoutExt = file.name.replace(/\.svg$/i, "");
+      setCardName(nameWithoutExt);
+
+      const dims = parseSvgDimensions(raw);
+      setSvgDims(dims);
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.file;
+        delete next.cardName;
+        return next;
+      });
+    };
+    reader.readAsText(file);
+  }, []);
 
   const handleFileChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      if (!file.name.toLowerCase().endsWith(".svg")) {
-        setErrors((prev) => ({ ...prev, file: "SVG 파일만 지원합니다." }));
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => {
-        const raw = reader.result as string;
-        setSvgRaw(raw);
-        setSvgFileName(file.name);
-        const dims = parseSvgDimensions(raw);
-        setSvgDims(dims);
-        setErrors((prev) => {
-          const next = { ...prev };
-          delete next.file;
-          return next;
-        });
-      };
-      reader.readAsText(file);
+      processFile(file);
     },
-    [],
+    [processFile],
+  );
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragOver(false);
+      const file = e.dataTransfer.files?.[0];
+      if (!file) return;
+      processFile(file);
+    },
+    [processFile],
   );
 
   const handleSubmit = () => {
@@ -146,18 +168,17 @@ export const CardRegistrationForm: React.FC<Props> = ({
           )}
         </div>
 
-        <div className="mrm-field">
-          <label>카드 폭 타입 (점유 열 수: {getColSpan(widthType, maxColumns)}열)</label>
-          <select
-            value={widthType}
-            onChange={(e) => setWidthType(e.target.value as CardWidthType)}
-          >
-            {widthOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+        <div className="mrm-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <input
+            type="checkbox"
+            id="full-type-checkbox"
+            checked={widthType === "full"}
+            onChange={(e) => setWidthType(e.target.checked ? "full" : "half")}
+            style={{ width: "auto" }}
+          />
+          <label htmlFor="full-type-checkbox" style={{ margin: 0, cursor: "pointer", display: "inline" }}>
+            FULL 타입 (체크 시 해당 슬롯의 모든 열 점유)
+          </label>
         </div>
 
         <div className="mrm-field full-width">
@@ -172,8 +193,11 @@ export const CardRegistrationForm: React.FC<Props> = ({
             onChange={handleFileChange}
           />
           <div
-            className={`mrm-file-upload ${svgRaw ? "has-file" : ""}`}
+            className={`mrm-file-upload ${svgRaw ? "has-file" : ""} ${isDragOver ? "drag-over" : ""}`}
             onClick={() => fileRef.current?.click()}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
           >
             {svgRaw ? (
               <>

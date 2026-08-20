@@ -25,6 +25,7 @@ import { SharedTreeNodeItem } from "./SharedTreeNodeItem";
 import { RegistrationFormModal } from "./DeviceRegistrationModal/RegistrationFormModal";
 import { ChildMultiPicker } from "./DeviceRegistrationModal/ChildMultiPicker";
 import { DeviceRow } from "./DeviceRegistrationModal/DeviceRow";
+import { StnModal } from "./StnModal";
 
 interface ToastState {
   message: string;
@@ -598,45 +599,15 @@ export const DeviceRegistrationModal = () => {
   return (
     <>
       {/* Modal */}
-      {isOpen &&
-        createPortal(
-          <div
-            className="drm-overlay"
-            onClick={() => {
-              if (!nodeDeleteConfirm) setOpen(false);
-            }}
-          >
-            <div className="drm-modal" onClick={(e) => e.stopPropagation()}>
-              {/* Header */}
-              <div className="drm-header">
-                <h2>
-                  <div className="icon-wrap">
-                    <Icon icon="material-symbols:archive" className="icon" style={{ width: 20, height: 20 }} />
-                  </div>
-                  장비 관리
-                </h2>
-                <button
-                  className="drm-close"
-                  onClick={() => setOpen(false)}
-                  aria-label="Close"
-                >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                  </svg>
-                </button>
-              </div>
-
-              {/* Body */}
+      <StnModal
+        isOpen={isOpen}
+        onClose={() => {
+          if (!nodeDeleteConfirm) setOpen(false);
+        }}
+        title="장비 관리"
+        icon="mdi:server"
+      >
+        {/* Body */}
               <div className="drm-body">
                 {/* Left Sidebar: Node Hierarchy */}
                 <div className="drm-sidebar">
@@ -644,7 +615,7 @@ export const DeviceRegistrationModal = () => {
                     <div className="comm-flex-center-10-flex1">
                       <span className="comm-flex-center-8-noshrink">
                         <span className="comm-icon-primary-lg">
-                          <Icon icon="material-symbols:grid-view" className="icon comm-icon-md" />
+                          <Icon icon="icon-park-solid:network-tree" className="icon comm-icon-md" />
                         </span>
                         <span className="tree-node-header-text">구조</span>
                       </span>
@@ -744,24 +715,28 @@ export const DeviceRegistrationModal = () => {
                       style={{ top: contextMenu.y, left: contextMenu.x }}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <div
-                        className="tree-context-item"
-                        onClick={() => {
-                          handleAddGroup(contextMenu.nodeId);
-                          setContextMenu(null);
-                        }}
-                      >
-                        <Icon icon="material-symbols:create-new-folder" className="icon comm-icon-mr8" /> 그룹 추가
-                      </div>
-                      <div
-                        className="tree-context-item"
-                        onClick={() => {
-                          handleAddRoom(contextMenu.nodeId);
-                          setContextMenu(null);
-                        }}
-                      >
-                        <Icon icon="mdi:server" className="icon comm-icon-mr8" /> 전산실 추가
-                      </div>
+                      {nodes.find((n) => n.nodeId === contextMenu.nodeId)?.type !== "room" && (
+                        <>
+                          <div
+                            className="tree-context-item"
+                            onClick={() => {
+                              handleAddGroup(contextMenu.nodeId);
+                              setContextMenu(null);
+                            }}
+                          >
+                            <Icon icon="material-symbols:create-new-folder" className="icon comm-icon-mr8" /> 그룹 추가
+                          </div>
+                          <div
+                            className="tree-context-item"
+                            onClick={() => {
+                              handleAddRoom(contextMenu.nodeId);
+                              setContextMenu(null);
+                            }}
+                          >
+                            <Icon icon="mdi:server" className="icon comm-icon-mr8" /> 전산실 추가
+                          </div>
+                        </>
+                      )}
                       <div
                         className="tree-context-item"
                         onClick={() => {
@@ -1054,10 +1029,7 @@ export const DeviceRegistrationModal = () => {
                   </div>
                 </div>
               </div>
-            </div>
-          </div>,
-          document.body,
-        )}
+      </StnModal>
 
       {/* Processing Overlay */}
       {isProcessing &&

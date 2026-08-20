@@ -1486,7 +1486,7 @@ ${paths}
                         <button
                           onClick={() => setIsCropping(false)}
                           className="wizard-zoom__fit-btn"
-                          style={{ background: 'var(--theme-secondary)', color: 'var(--bg-primary)', border: 'none', padding: '0.6rem 1.2rem', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
+                          style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', padding: '0.6rem 1.2rem', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
                         >
                           <span style={{ fontWeight: 600 }}>취소</span>
                         </button>
@@ -1603,21 +1603,25 @@ ${paths}
                     onDragStart={(e) => e.preventDefault()}
                     onMouseDown={(e) => {
                       // Start pan or selection drag
+                      const target = e.target as HTMLElement;
+                      const isValidTarget = 
+                        target === e.currentTarget ||
+                        target === imageRef.current ||
+                        target.closest('.wizard-cropper__svg') ||
+                        target.classList.contains('wizard-image') ||
+                        target.classList.contains('wizard-cropper__image-container');
+
                       if (
                         editMode &&
                         (e.ctrlKey || e.metaKey) &&
-                        (e.target === e.currentTarget ||
-                          e.target === imageRef.current)
+                        isValidTarget
                       ) {
                         e.preventDefault();
                         handleSelectionDrag(e);
                         return;
                       }
 
-                      if (
-                        e.target === e.currentTarget ||
-                        e.target === imageRef.current
-                      ) {
+                      if (isValidTarget) {
                         e.preventDefault();
                         const container = containerRef.current;
                         if (!container) return;
@@ -2176,9 +2180,13 @@ ${paths}
                                     {selectedIndices.length}
                                   </span>
                                   <button
-                                    onClick={() => setSelectedIndices([])}
+                                    onClick={() => {
+                                      saveHistory();
+                                      setPorts((prev) => prev.filter((_, i) => !selectedIndices.includes(i)));
+                                      setSelectedIndices([]);
+                                    }}
                                     className="wizard-actions__clear-btn"
-                                    title="선택 해제"
+                                    title="포트 삭제"
                                   >
                                     <Icon icon="lucide:x" />
                                   </button>

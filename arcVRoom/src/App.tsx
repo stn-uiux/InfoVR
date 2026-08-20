@@ -104,6 +104,18 @@ export default function App() {
     syncThemeColors();
   }, []);
 
+  // 초기 샘플 데이터 로드
+  useEffect(() => {
+    fetch('/models/office_sample.json')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.items) {
+          setState(data);
+        }
+      })
+      .catch(err => console.error("Failed to load office_sample.json", err));
+  }, []);
+
   const [shiftPressed, setShiftPressed] = useState(false);
   const [ctrlPressed, setCtrlPressed] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);

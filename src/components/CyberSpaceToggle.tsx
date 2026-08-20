@@ -25,9 +25,9 @@ export const CyberSpaceToggle = () => {
     >
       <div className="cyber-space-toggle-knob">
         {csIsVisible ? (
-          <Icon icon="mdi:server" width="13" height="13" />
+          <Icon icon="ri:box-3-fill" width="13" height="13" />
         ) : (
-          <Icon icon="mdi:server-off" width="13" height="13" />
+          <Icon icon="mdi:cube-off-outline" width="13" height="13" />
         )}
       </div>
     </div>

@@ -867,27 +867,8 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
 
         <div className="eam-body">
           {!selectedModel ? (
-            /* ─── 모델 선택 화면 ─── */
-            <div className="eam-model-grid">
-              {allEquipmentModels.map((m) => (
-                <div
-                  key={m.modelId}
-                  className="eam-model-card"
-                  onClick={() => handleSelectModel(m)}
-                >
-                  <div className="model-name">{m.modelName}</div>
-                  <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 4 }}>
-                    {m.slots
-                      ? `${m.slots.length}개 슬롯 (Mixed)`
-                      : m.rows
-                        ? `${m.rows.length}개 행 (Row-based)`
-                        : m.cardArea
-                          ? `${m.cardArea.columns}열 × ${Math.floor(m.cardArea.height / CARD_ROW_HEIGHT)}행 슬롯`
-                          : ""
-                    }
-                  </div>
-                </div>
-              ))}
+            <div style={{ padding: 40, textAlign: "center", color: "var(--text-tertiary)" }}>
+              장비 모델이 선택되지 않았습니다.
             </div>
           ) : (
             <>
@@ -914,7 +895,7 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
                         <CardThumbnail svgUrl={cd.svgUrl} alt={cd.cardType} style={{ width: cd.widthType === "full" ? 80 : 50 }} />
                         <div className="info">
                           <div className="name">{cd.cardType}</div>
-                          <span className={`tag ${cd.widthType}`}>{cd.widthType === "full" ? "FULL" : "HALF"}</span>
+                                {cd.widthType === "full" && <span className={`tag ${cd.widthType}`}>FULL</span>}
                         </div>
                       </div>
                     ));
@@ -946,7 +927,7 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
                               <CardThumbnail svgUrl={cd.svgUrl} alt={cd.cardType} style={{ width: cd.widthType === "full" ? 80 : 50 }} />
                               <div className="info">
                                 <div className="name">{cd.cardType}</div>
-                                <span className={`tag ${cd.widthType}`}>{cd.widthType === "full" ? "FULL" : "HALF"}</span>
+                                {cd.widthType === "full" && <span className={`tag ${cd.widthType}`}>FULL</span>}
                               </div>
                             </div>
                           ))}
@@ -994,9 +975,9 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
                               <CardThumbnail svgUrl={cd.svgUrl} alt={cd.cardType} style={{ width: cd.widthType === "full" ? 80 : 50 }} />
                               <div className="info">
                                 <div className="name">{cd.cardType}</div>
-                                <span className={`tag ${cd.widthType === "full" ? "standard" : cd.widthType}`}>
-                                  {cd.widthType === "full" ? "FULL" : "HALF"}
-                                </span>
+                                {cd.widthType === "full" && (
+                                  <span className="tag standard">FULL</span>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -1020,9 +1001,9 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
                               <CardThumbnail svgUrl={cd.svgUrl} alt={cd.cardType} style={{ width: cd.widthType === "full" ? 80 : 50 }} />
                               <div className="info">
                                 <div className="name">{cd.cardType}</div>
-                                <span className={`tag ${cd.widthType === "full" ? "standard" : cd.widthType}`}>
-                                  {cd.widthType === "full" ? "FULL" : "HALF"}
-                                </span>
+                                {cd.widthType === "full" && (
+                                  <span className="tag standard">FULL</span>
+                                )}
                               </div>
                             </div>
                           ))}

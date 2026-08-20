@@ -443,7 +443,7 @@ export const HierarchyTree = React.memo(() => {
               <span
                 className="comm-icon-primary-lg"
               >
-                <Icon icon="material-symbols:grid-view" className="icon comm-icon-md" />
+                <Icon icon="icon-park-solid:network-tree" className="icon comm-icon-md" />
               </span>
               <span className="tree-node-header-text">구조</span>
             </span>

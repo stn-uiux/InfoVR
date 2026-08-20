@@ -405,8 +405,9 @@ export const Scene = () => {
           <group>
             {/* Server Room Bounds Wireframe */}
             {cyberSpaceEnabled && (
-              <PivotControls
-                visible={csCustomSpaceSize && isRoomSelected}
+              <group userData={{ isGizmo: true }}>
+                <PivotControls
+                  visible={csCustomSpaceSize && isRoomSelected}
                 activeAxes={csCustomSpaceSize && isRoomSelected ? [true, false, true] : [false, false, false]}
                 scale={100}
                 anchor={[0, -1, 0]}
@@ -438,16 +439,17 @@ export const Scene = () => {
                   });
                 }}
               >
-                <group position={[0, 2.0, 0]}>
-                  <mesh>
+                <group position={[0, 2.0, 0]} userData={{ isInnerContent: true }}>
+                  <mesh raycast={() => null}>
                     <boxGeometry args={[dynamicWidth, 4.0, dynamicLength]} />
                     <meshBasicMaterial transparent opacity={0} depthWrite={false} />
                     <Edges 
                       scale={1.0} 
-                      color={isDarkMode ? (isRoomSelected ? "#10b981" : "#38bdf8") : (isRoomSelected ? "#059669" : "#0ea5e9")} 
+                      color={isDarkMode ? (isRoomSelected ? "#10b981" : "#38bdf8") : (isRoomSelected ? "#059669" : "#0ea5e9")}
+                      raycast={() => null}
                     />
                     {wallLinesGeometry.attributes.position && (
-                      <lineSegments geometry={wallLinesGeometry}>
+                      <lineSegments geometry={wallLinesGeometry} raycast={() => null}>
                         <lineBasicMaterial 
                           color={isDarkMode ? (isRoomSelected ? "#10b981" : "#38bdf8") : (isRoomSelected ? "#059669" : "#0ea5e9")} 
                           transparent 
@@ -494,7 +496,8 @@ export const Scene = () => {
                     </mesh>
                   )}
                 </group>
-              </PivotControls>
+                </PivotControls>
+              </group>
             )}
             <Grid
               position={[0, -0.01, 0]}

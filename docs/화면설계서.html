@@ -152,7 +152,7 @@
     }
 
     .page-left {
-      flex: 4.2;
+      flex: 2.2;
       min-width: 0;
     }
 
@@ -233,9 +233,10 @@
     }
 
     .badge {
-      padding: 0.02rem 0.3rem;
+      padding: 0.1rem 0.35rem;
       border-radius: 3px;
       font-size: 0.7rem;
+      font-family: monospace;
     }
 
     .badge-blue {
@@ -435,51 +436,6 @@
       margin-top: 4px;
       padding-top: 8px;
     }
-
-    .sidebar-nav {
-      transition: transform 0.3s ease;
-      z-index: 1000;
-    }
-
-    body.sidebar-collapsed .sidebar-nav {
-      transform: translateX(-100%);
-    }
-
-    .main-content {
-      transition: margin-left 0.3s ease, width 0.3s ease;
-    }
-
-    body.sidebar-collapsed .main-content {
-      margin-left: 0;
-      width: 100%;
-    }
-
-    .sidebar-toggle-btn {
-      position: fixed;
-      top: 0.5rem;
-      left: 240px;
-      z-index: 1001;
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: var(--text-light);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0.2rem;
-      border-radius: 4px;
-      transition: left 0.3s ease, background 0.2s, transform 0.3s ease;
-    }
-
-    .sidebar-toggle-btn:hover {
-      background: #e2e8f0;
-      color: var(--primary-color);
-    }
-
-    body.sidebar-collapsed .sidebar-toggle-btn {
-      left: 0.5rem;
-      transform: rotate(180deg);
-    }
   </style>
 </head>
 
@@ -497,15 +453,6 @@
       초기화</button>
     <button id="editToggleBtn" onclick="toggleEditMode()" style="background:#3b82f6; color:white;">✏️ 마커 편집 켜기</button>
   </div>
-
-  <button id="sidebarToggleBtn" class="sidebar-toggle-btn" title="사이드바 열기/닫기" onclick="toggleSidebar()">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-      stroke-linecap="round" stroke-linejoin="round">
-      <polyline points="11 17 6 12 11 7"></polyline>
-      <polyline points="18 17 13 12 18 7"></polyline>
-    </svg>
-  </button>
-
   <nav class="sidebar-nav">
     <h2>📋 목차</h2>
     <ul>
@@ -530,6 +477,8 @@
           <li><a href="#page-2-5">2-5. 씬 오브젝트 관리 & 내보내기</a></li>
           <li><a href="#page-2-6">2-6. 랙 생성/삭제/설정</a></li>
           <li><a href="#page-2-7">2-7. 랙 장비 배치 (Edit Mode)</a></li>
+          <li><a href="#page-2-8">2-8. 환경 내보내기/불러오기</a></li>
+          <li><a href="#page-2-9">2-9. 데이터 초기화 & 샘플</a></li>
         </ul>
       </li>
       <li><strong>3장. 통합 장비 관리 모달</strong>
@@ -548,46 +497,33 @@
           <li><a href="#page-4-3">4-3. 새 모델 등록 폼 — 기본 정보</a></li>
           <li><a href="#page-4-4">4-4. 새 모델 등록 폼 — SVG 업로드</a></li>
           <li><a href="#page-4-5">4-5. 카드 기반 장비 — 섀시 설정</a></li>
-          <li><a href="#page-4-6">4-6. 카드 기반 장비 — 행별 설정</a></li>
+          <li><a href="#page-4-6">4-6. 카드 할당 & 카드 등록</a></li>
           <li><a href="#page-4-7">4-7. 타입(Variant) 관리</a></li>
-          <li><a href="#page-4-8">4-8. 카드 할당 & 카드 등록</a></li>
+          <li><a href="#page-4-8">4-8. 장비 구성 모달</a></li>
         </ul>
       </li>
-      <li><strong>5장. 장비 조립 모달 (Equipment Assembly)</strong>
+      <li><strong>5장. 포트맵핑 마법사</strong>
         <ul>
-          <li><a href="#page-5-1">5-1. Step 1: 모델 선택</a></li>
-          <li><a href="#page-5-2">5-2. Step 2: 카드 삽입 캔버스</a></li>
-          <li><a href="#page-5-3">5-3. 카드 삽입 인터랙션</a></li>
-          <li><a href="#page-5-4">5-4. 슬롯 레이아웃 유형별</a></li>
-          <li><a href="#page-5-5">5-5. Step 3: 저장 & 자동 생성</a></li>
+          <li><a href="#page-5-1">5-1. 초기 화면 & 이미지 업로드</a></li>
+          <li><a href="#page-5-2">5-2. 이미지 자르기</a></li>
+          <li><a href="#page-5-3">5-3. AI 자동 분석 (Neural Analysis)</a></li>
+          <li><a href="#page-5-4">5-4. 포트 편집 모드 — 전체 레이아웃</a></li>
+          <li><a href="#page-5-5">5-5. 포트 박스 조작</a></li>
+          <li><a href="#page-5-6">5-6. 포트 속성 편집 패널</a></li>
+          <li><a href="#page-5-7">5-7. 다중 선택 & 정렬 도구</a></li>
+          <li><a href="#page-5-8">5-8. 포트 복제</a></li>
+          <li><a href="#page-5-9">5-9. Object Registry 사이드바</a></li>
+          <li><a href="#page-5-10">5-10. SVG 내보내기</a></li>
         </ul>
       </li>
-      <li><strong>6장. 포트맵핑 마법사</strong>
+      <li><strong>6장. arcVRoom (3D공간제작)</strong>
         <ul>
-          <li><a href="#page-6-1">6-1. 초기 화면 & 이미지 업로드</a></li>
-          <li><a href="#page-6-2">6-2. AI 자동 분석 (Neural Analysis)</a></li>
-          <li><a href="#page-6-3">6-3. 포트 편집 모드 — 전체 레이아웃</a></li>
-          <li><a href="#page-6-4">6-4. 포트 박스 조작</a></li>
-          <li><a href="#page-6-5">6-5. 포트 속성 편집 패널</a></li>
-          <li><a href="#page-6-6">6-6. 다중 선택 & 정렬 도구</a></li>
-          <li><a href="#page-6-7">6-7. 포트 복제</a></li>
-          <li><a href="#page-6-8">6-8. Object Registry 사이드바</a></li>
-          <li><a href="#page-6-9">6-9. SVG 내보내기</a></li>
-        </ul>
-      </li>
-      <li><strong>7장. arcVRoom (3D공간제작)</strong>
-        <ul>
-          <li><a href="#page-7-1">7-1. arcVRoom 메인 화면</a></li>
-          <li><a href="#page-7-2">7-2. 조명 & 렌더링 설정</a></li>
-          <li><a href="#page-7-3">7-3. 에셋 배치 & Gizmo</a></li>
-        </ul>
-      </li>
-      <li><strong>8장. 데이터 관리 & 공통 기능</strong>
-        <ul>
-          <li><a href="#page-8-1">8-1. 환경 내보내기/불러오기</a></li>
-          <li><a href="#page-8-2">8-2. Undo/Redo & 저장</a></li>
-          <li><a href="#page-8-3">8-3. 데이터 초기화 & 샘플</a></li>
-          <li><a href="#page-8-4">8-4. 토스트 알림 시스템</a></li>
+          <li><a href="#page-6-1">6-1. 메인 화면 (오브젝트)</a></li>
+          <li><a href="#page-6-2">6-2. 오브젝트 다중 선택 및 속성 편집</a></li>
+          <li><a href="#page-6-3">6-3. 씬 라이트 (조명 설정)</a></li>
+          <li><a href="#page-6-4">6-4. 재질(Material) 편집</a></li>
+          <li><a href="#page-6-5">6-5. 씬 관리 (설정 탭)</a></li>
+          <li><a href="#page-6-6">6-6. GLB 압축 최적화 도구</a></li>
         </ul>
       </li>
     </ul>
@@ -614,7 +550,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <img src="images/1_main_view.png" alt="메인 3D 뷰 (초기 화면)" class="screenshot" draggable="false">
+              <img src="images/1_1.png" alt="메인 3D 뷰 (초기 화면)" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -669,7 +605,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <img src="images/2_sample_data.png" alt="계층 구조 트리 (Hierarchy Tree)" class="screenshot" draggable="false">
+              <img src="images/1_2.png" alt="계층 구조 트리 (Hierarchy Tree)" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -730,7 +666,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <img src="images/3_rack_focus.png" alt="랙 자동 포커싱 & 캐러셀" class="screenshot" draggable="false">
+              <img src="images/1_3.png" alt="랙 자동 포커싱 & 캐러셀" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -783,8 +719,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 위젯 전체, Drill-down 상태, 크로스-노드 포커싱
-              </div>
+              <img src="images/1_4.png" alt="에러 상태 대시보드 위젯" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -848,7 +783,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 위젯 전체</div>
+              <img src="images/1_5.png" alt="환경 센서 모니터링 위젯" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -902,7 +837,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 패널 전체, 장비 장착 상태</div>
+              <img src="images/1_6.png" alt="랙 정보 패널 (Device Panel)" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -964,7 +899,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <img src="images/4_device_modal.png" alt="장비 상세 모달 (Device Modal)" class="screenshot" draggable="false">
+              <img src="images/1_7.png" alt="장비 상세 모달 (Device Modal)" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -1034,7 +969,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 다크모드, 라이트모드 비교</div>
+              <img src="images/1_8.png" alt="다크/라이트 테마 전환" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -1080,7 +1015,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <img src="images/7_edit_mode.png" alt="수정 모드 진입 & 툴바" class="screenshot" draggable="false">
+              <img src="images/2_1.png" alt="수정 모드 진입 & 툴바" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -1144,7 +1079,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 패널 UI, 가이드 라인이 보이는 3D 뷰</div>
+              <img src="images/2_2.png" alt="가상 공간 (CyberSpace) 설정" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -1198,7 +1133,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 모델 목록, 기즈모 활성 상태</div>
+              <img src="images/2_3.png" alt="오브젝트 배치 & 기즈모 조작" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -1262,7 +1197,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 파일 업로드 UI, 속성 편집 패널</div>
+              <img src="images/2_4.png" alt="커스텀 3D 모델 임포트" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -1317,7 +1252,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 리스트 UI, Export/Import 버튼</div>
+              <img src="images/2_5.png" alt="씬 오브젝트 관리 & 내보내기" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -1372,7 +1307,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 랙 생성 UI, 방향 설정 패널, 삭제 확인 모달</div>
+              <img src="images/2_6.png" alt="랙 생성/삭제/설정" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -1414,6 +1349,15 @@
               </div>
               <div class="ui-item-desc">랙 삭제 시 확인 모달 표시. 장비가 배치된 랙은 경고 메시지와 함께 확인 요구.</div>
             </div>
+            <div class="ui-item">
+              <div class="ui-item-header">
+                <span class="element-number">5</span>
+                <span class="ui-item-name">Undo/Redo</span>
+                <span class="badge badge-gray">Shortcut</span>
+              </div>
+              <div class="ui-item-desc"><mark>Ctrl+Z</mark>로 이전 상태 복원, <mark>Ctrl+Shift+Z</mark>로 다시 적용. 위치 변경·배치 이력 모두
+                지원.</div>
+            </div>
           </div>
         </div>
       </div>
@@ -1434,7 +1378,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 장비 추가 모달, 재배치 확인 모달</div>
+              <img src="images/2_7.png" alt="랙 장비 배치 (Edit Mode)" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -1479,6 +1423,104 @@
         </div>
       </div>
     </div>
+    <div id="page-2-8" class="page">
+      <h2 class="page-title"><span class="page-id">2-8</span> 환경 내보내기/불러오기</h2>
+      <h3>화면 설명</h3>
+      <p>본 화면은 <strong>환경 내보내기/불러오기</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [전체 환경 엑셀 Export/Import, 파일 선택 UI] 등을 포함하고
+        있습니다.</p>
+
+      <div class="page-content-split">
+        <div class="page-left">
+          <div class="screenshot-container">
+            <div class="editor-toolbar">
+              <button onclick="addCircle(this)">+ 숫자 마커 추가</button>
+              <button onclick="addBox(this)">+ 영역 박스 추가</button>
+              <span style="font-size: 0.85rem; color: #64748b; margin-left: auto;">마커 드래그 이동 / 리사이징 (박스 우측 하단) / 삭제
+                (우클릭)</span>
+            </div>
+            <div class="image-wrapper">
+              <img src="images/2_8.png" alt="환경 내보내기/불러오기" class="screenshot" draggable="false">
+            </div>
+          </div>
+        </div>
+
+        <div class="page-right">
+          <h3>UI 요소 설명</h3>
+          <div class="ui-list">
+
+            <div class="ui-item">
+              <div class="ui-item-header">
+                <span class="element-number">1</span>
+                <span class="ui-item-name">전체 환경 Export</span>
+                <span class="badge badge-blue">Button</span>
+              </div>
+              <div class="ui-item-desc">랙 위치, 장비 배치, 계층 노드 등 <mark>전체 인프라 데이터를 엑셀(.xlsx)</mark>로 한 번에 내보내기.</div>
+            </div>
+            <div class="ui-item">
+              <div class="ui-item-header">
+                <span class="element-number">2</span>
+                <span class="ui-item-name">전체 환경 Import</span>
+                <span class="badge badge-blue">Button</span>
+              </div>
+              <div class="ui-item-desc">백업된 엑셀 파일을 불러와 <mark>전체 인프라 환경을 동일하게 복원</mark>.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="page-2-9" class="page">
+      <h2 class="page-title"><span class="page-id">2-9</span> 데이터 초기화 & 샘플</h2>
+      <h3>화면 설명</h3>
+      <p>본 화면은 <strong>데이터 초기화 & 샘플</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [초기화 버튼, 초기화 확인 모달, Sample 버튼, 초기화 보호 대상
+        설명] 등을 포함하고 있습니다.</p>
+
+      <div class="page-content-split">
+        <div class="page-left">
+          <div class="screenshot-container">
+            <div class="editor-toolbar">
+              <button onclick="addCircle(this)">+ 숫자 마커 추가</button>
+              <button onclick="addBox(this)">+ 영역 박스 추가</button>
+              <span style="font-size: 0.85rem; color: #64748b; margin-left: auto;">마커 드래그 이동 / 리사이징 (박스 우측 하단) / 삭제
+                (우클릭)</span>
+            </div>
+            <div class="image-wrapper">
+              <img src="images/2_9.png" alt="데이터 초기화 & 샘플" class="screenshot" draggable="false">
+            </div>
+          </div>
+        </div>
+
+        <div class="page-right">
+          <h3>UI 요소 설명</h3>
+          <div class="ui-list">
+
+            <div class="ui-item">
+              <div class="ui-item-header">
+                <span class="element-number">1</span>
+                <span class="ui-item-name">초기화 버튼 (Reset)</span>
+                <span class="badge badge-blue">Button</span>
+              </div>
+              <div class="ui-item-desc">저장 데이터를 삭제하고 시스템을 초기 상태로 복원. <mark>장비 모델 데이터(섀시·타입)는 보호</mark>되어 유지됨.</div>
+            </div>
+            <div class="ui-item">
+              <div class="ui-item-header">
+                <span class="element-number">2</span>
+                <span class="ui-item-name">초기화 확인 모달</span>
+                <span class="badge badge-purple">Modal</span>
+              </div>
+              <div class="ui-item-desc">초기화 실행 전 <mark>되돌릴 수 없음</mark>을 경고하고 최종 확인 요구.</div>
+            </div>
+            <div class="ui-item">
+              <div class="ui-item-header">
+                <span class="element-number">3</span>
+                <span class="ui-item-name">Sample 버튼</span>
+                <span class="badge badge-blue">Button</span>
+              </div>
+              <div class="ui-item-desc">미리 구성된 샘플 랙/장비/노드 데이터를 즉시 로드하여 시스템 시연용 환경 구성.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
     <div id="page-3-1" class="page">
       <h2 class="page-title"><span class="page-id">3-1</span> 모달 전체 레이아웃</h2>
       <h3>화면 설명</h3>
@@ -1495,7 +1537,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <img src="images/9_device_mgmt.png" alt="모달 전체 레이아웃" class="screenshot" draggable="false">
+              <img src="images/3_1.png" alt="모달 전체 레이아웃" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -1556,7 +1598,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 노드 편집 상태</div>
+              <img src="images/3_2.png" alt="계층 노드 관리" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -1609,7 +1651,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 등록 폼 전체</div>
+              <img src="images/3_3.png" alt="장비 등록 폼" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -1670,7 +1712,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 수정 UI, 삭제 확인 모달</div>
+              <img src="images/3_4.png" alt="장비 수정/삭제" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -1715,7 +1757,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: Export 선택 UI, Import 결과</div>
+              <img src="images/3_5.png" alt="엑셀 Import/Export" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -1755,8 +1797,8 @@
     <div id="page-4-1" class="page">
       <h2 class="page-title"><span class="page-id">4-1</span> 등록된 모델 목록 (리스트 뷰)</h2>
       <h3>화면 설명</h3>
-      <p>본 화면은 <strong>등록된 모델 목록</strong> 기능과 관련된 동작 및 상태를 표시합니다. 탭 방식에서 <strong>리스트 형태</strong>로 개편되어 직관적인 탐색이 가능하며 주요
-        기능으로 [기본 장비 모델 리스트(18종), 커스텀 모델 리스트, 모델 타입 태그(고정형/섀시형), 수정됨 뱃지, 썸네일] 등을 포함하고 있습니다.</p>
+      <p>본 화면은 <strong>등록된 모델 목록 (리스트 뷰)</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [기본 장비 모델 리스트(18종), 커스텀 모델 리스트, 모델 타입
+        태그(고정형/섀시형), 수정됨 뱃지, 썸네일] 등을 포함하고 있습니다.</p>
 
       <div class="page-content-split">
         <div class="page-left">
@@ -1768,7 +1810,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <img src="images/11_model_list.png" alt="등록된 모델 목록 리스트" class="screenshot" draggable="false">
+              <img src="images/4_1.png" alt="등록된 모델 목록 (리스트 뷰)" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -1832,7 +1874,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 숨기기 전/후, 복구 UI</div>
+              <img src="images/4_2.png" alt="숨김/복구 기능" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -1885,7 +1927,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <img src="images/12_new_model_form.png" alt="새 모델 등록 폼 — 기본 정보" class="screenshot" draggable="false">
+              <img src="images/4_3.png" alt="새 모델 등록 폼 — 기본 정보" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -1948,7 +1990,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: SVG 프리뷰, 양면 설정</div>
+              <img src="images/4_4.png" alt="새 모델 등록 폼 — SVG 업로드" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -1986,10 +2028,10 @@
       </div>
     </div>
     <div id="page-4-5" class="page">
-      <h2 class="page-title"><span class="page-id">4-5</span> 카드 기반 장비 — 섀시 설정 및 그리드 에디터</h2>
+      <h2 class="page-title"><span class="page-id">4-5</span> 카드 기반 장비 — 섀시 설정</h2>
       <h3>화면 설명</h3>
-      <p>본 화면은 <strong>카드 기반 장비 — 섀시 설정 및 인터랙티브 그리드 에디터</strong> 기능과 관련된 동작을 표시합니다. 레거시 입력 폼 대신 완전히 직관적인 마우스 조작 기반으로
-        변경되었으며 주요 기능으로 [기본 섀시 SVG 업로드, <strong>인터랙티브 섀시 그리드 생성</strong>, 엣지 핸들 드래그 리사이징, 행/열 디바이더 조절] 등을 포함하고 있습니다.</p>
+      <p>본 화면은 <strong>카드 기반 장비 — 섀시 설정</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [인터랙티브 섀시 그리드 생성, 리사이징, 병합/나누기, 간격(Gap)
+        설정] 등을 포함하고 있습니다.</p>
 
       <div class="page-content-split">
         <div class="page-left">
@@ -2001,7 +2043,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <img src="images/12_new_model_form.png" alt="새 모델 등록 폼" class="screenshot" draggable="false">
+              <img src="images/4_5.png" alt="카드 기반 장비 — 섀시 설정" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -2016,160 +2058,40 @@
                 <span class="ui-item-name">기본 섀시 SVG 업로드</span>
                 <span class="badge badge-yellow">Input / Form</span>
               </div>
-              <div class="ui-item-desc">카드가 꽂힐 빈 섀시 바디의 원본 SVG 파일을 업로드합니다.</div>
+              <div class="ui-item-desc">카드 미삽입 빈 장비 바디 SVG 업로드. 장비 조립 캔버스의 <mark>배경</mark>으로 사용됨.</div>
             </div>
             <div class="ui-item">
               <div class="ui-item-header">
                 <span class="element-number">2</span>
-                <span class="ui-item-name">인터랙티브 그리드 캔버스 (Drag & Drop)</span>
-                <span class="badge badge-indigo">Panel</span>
+                <span class="ui-item-name">인터랙티브 카드 영역 드로잉</span>
+                <span class="badge badge-orange">Interaction</span>
               </div>
-              <div class="ui-item-desc">마우스를 드래그하여 카드 삽입 영역을 지정하면 파란색의 <strong>반응형 섀시 그리드</strong>가 자동 생성됩니다. 기존의 레거시 좌표
-                수동 입력 폼 방식은 완전히 제거되었습니다.</div>
+              <div class="ui-item-desc">섀시 SVG 위에서 마우스 <mark>드래그로 사각형 영역</mark>을 그려 카드 삽입 바운딩 박스(X, Y, W, H) 설정.</div>
             </div>
             <div class="ui-item">
               <div class="ui-item-header">
                 <span class="element-number">3</span>
-                <span class="ui-item-name">외곽선 엣지(Edge) 핸들 조절</span>
-                <span class="badge badge-indigo">Interactive</span>
+                <span class="ui-item-name">행별 높이·열 수·간격 설정</span>
+                <span class="badge badge-yellow">Input / Form</span>
               </div>
-              <div class="ui-item-desc">그리드의 4면 가장자리 및 모서리에 위치한 <strong>엣지 핸들</strong>을 마우스로 드래그하여 섀시 영역 전체의 크기를 실시간으로
-                확대/축소할 수 있습니다.</div>
+              <div class="ui-item-desc">각 행(Row)별로 <mark>높이</mark>(px), <mark>열 수</mark>, <mark>간격(Gap)</mark>을 개별 설정
+                가능. 열 너비는 자동 계산 표시.</div>
             </div>
             <div class="ui-item">
               <div class="ui-item-header">
                 <span class="element-number">4</span>
-                <span class="ui-item-name">내부 디바이더(Divider) 리사이징</span>
-                <span class="badge badge-indigo">Interactive</span>
+                <span class="ui-item-name">Gap 시각화</span>
+                <span class="badge badge-pink">Graphics</span>
               </div>
-              <div class="ui-item-desc">그리드 내부의 수평선(행 구분) 및 수직선(열 구분) 위에 마우스를 올리고 드래그하여 각각의 <strong>행 높이와 열 너비</strong>를
-                직관적으로 조절합니다. 각 셀 내부에는 실시간으로 폭과 높이가 렌더링됩니다.</div>
+              <div class="ui-item-desc">양수 간격은 <mark>주황색</mark>(Warning) 영역, 음수 간격(겹침)은 <mark>빨간색</mark>(Danger) 영역으로
+                프리뷰에 오버레이 표시.</div>
             </div>
           </div>
         </div>
       </div>
     </div>
     <div id="page-4-6" class="page">
-      <h2 class="page-title"><span class="page-id">4-6</span> 카드 기반 장비 — 툴바 및 마우스 액션 (병합/간격)</h2>
-      <h3>화면 설명</h3>
-      <p>본 화면은 인터랙티브 그리드 에디터의 <strong>셀 단위 조작 및 간격(Gap) 오버레이</strong> 동작을 표시합니다. 레거시 폼 입력 방식 대신 마우스 툴바와 우클릭 메뉴를 제공합니다.
-      </p>
-
-      <div class="page-content-split">
-        <div class="page-left">
-          <div class="screenshot-container">
-            <div class="editor-toolbar">
-              <button onclick="addCircle(this)">+ 숫자 마커 추가</button>
-              <button onclick="addBox(this)">+ 영역 박스 추가</button>
-              <span style="font-size: 0.85rem; color: #64748b; margin-left: auto;">마커 드래그 이동 / 리사이징 (박스 우측 하단) / 삭제
-                (우클릭)</span>
-            </div>
-            <div class="image-wrapper">
-              <img src="images/7_edit_mode.png" alt="에디터 조작 모드" class="screenshot" draggable="false">
-            </div>
-          </div>
-        </div>
-
-        <div class="page-right">
-          <h3>UI 요소 설명</h3>
-          <div class="ui-list">
-
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">1</span>
-                <span class="ui-item-name">셀 선택 및 병합/나누기 툴바</span>
-                <span class="badge badge-blue">Button Group</span>
-              </div>
-              <div class="ui-item-desc"><mark>Shift + 클릭</mark>으로 인접한 여러 셀을 선택한 뒤 툴바의 <strong>[병합]</strong> 버튼을 누르거나,
-                병합된 셀을 <strong>[나누기]</strong> 할 수 있습니다. 툴바는 선택된 셀의 상태에 따라 버튼 활성화(Disabled) 여부를 동적으로 제어합니다.</div>
-            </div>
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">2</span>
-                <span class="ui-item-name">우클릭 간격 추가 메뉴</span>
-                <span class="badge badge-purple">Context Menu</span>
-              </div>
-              <div class="ui-item-desc">그리드의 구분선 위에서 <strong>마우스 우클릭</strong> 시 커스텀 팝업 메뉴가 나타나며, 해당 구분선에 적용할 간격 픽셀 값을 직접
-                입력받아 처리합니다.</div>
-            </div>
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">3</span>
-                <span class="ui-item-name">간격 및 겹침 시각화 오버레이</span>
-                <span class="badge badge-red">Overlay</span>
-              </div>
-              <div class="ui-item-desc">입력받은 값이 <strong>양수(간격)</strong>일 경우 주황색 점선 박스와 텍스트가, <strong>음수(겹침)</strong>일 경우
-                빨간색 점선 박스와 텍스트가 그리드 바운더리를 해치지 않고 캔버스 위에 실시간 오버레이로 렌더링됩니다.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div id="page-4-7" class="page">
-      <h2 class="page-title"><span class="page-id">4-7</span> 타입(Variant) 관리</h2>
-      <h3>화면 설명</h3>
-      <p>본 화면은 <strong>타입(Variant) 관리</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [타입 목록, + 새 타입 추가 → 조립 모달 연동, 타입명 설정, 중복
-        검증 경고, 타입 수정/삭제] 등을 포함하고 있습니다.</p>
-
-      <div class="page-content-split">
-        <div class="page-left">
-          <div class="screenshot-container">
-            <div class="editor-toolbar">
-              <button onclick="addCircle(this)">+ 숫자 마커 추가</button>
-              <button onclick="addBox(this)">+ 영역 박스 추가</button>
-              <span style="font-size: 0.85rem; color: #64748b; margin-left: auto;">마커 드래그 이동 / 리사이징 (박스 우측 하단) / 삭제
-                (우클릭)</span>
-            </div>
-            <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 타입 목록, 중복 경고 토스트</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="page-right">
-          <h3>UI 요소 설명</h3>
-          <div class="ui-list">
-
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">1</span>
-                <span class="ui-item-name">타입(Variant) 목록</span>
-                <span class="badge badge-green">List</span>
-              </div>
-              <div class="ui-item-desc">해당 모델에 등록된 모든 타입/변형 리스트. 각 항목에 <mark>타입명</mark>·<mark>합성 썸네일</mark>·수정/삭제 버튼 표시.
-              </div>
-            </div>
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">2</span>
-                <span class="ui-item-name">+ 새 타입 추가 버튼</span>
-                <span class="badge badge-blue">Button</span>
-              </div>
-              <div class="ui-item-desc">클릭 시 <mark>장비 조립 모달</mark>이 열려 해당 섀시에 카드를 삽입하고 새로운 타입 구성을 생성.</div>
-            </div>
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">3</span>
-                <span class="ui-item-name">타입명 설정 & 중복 검증</span>
-                <span class="badge badge-yellow">Input / Form</span>
-              </div>
-              <div class="ui-item-desc">타입에 고유 이름 부여. 동일 모델 내 <mark>중복 타입명</mark>이 있으면 경고 토스트 표시 + 저장 차단.</div>
-            </div>
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">4</span>
-                <span class="ui-item-name">타입 수정/삭제</span>
-                <span class="badge badge-blue">Button</span>
-              </div>
-              <div class="ui-item-desc"><mark>✏️ 수정</mark>으로 기존 타입의 카드 구성 편집, <mark>🗑️ 삭제</mark>로 타입 제거. 기본타입 삭제 시 썸네일이
-                기본 SVG로 복원.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div id="page-4-8" class="page">
-      <h2 class="page-title"><span class="page-id">4-8</span> 카드 할당 & 카드 등록</h2>
+      <h2 class="page-title"><span class="page-id">4-6</span> 카드 할당 & 카드 등록</h2>
       <h3>화면 설명</h3>
       <p>본 화면은 <strong>카드 할당 & 카드 등록</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [카드 할당 그리드(토글 선택/해제), 새 카드 등록 서브 모달(카드명, 폭
         타입, SVG 업로드)] 등을 포함하고 있습니다.</p>
@@ -2184,7 +2106,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 카드 그리드, 등록 서브 모달</div>
+              <img src="images/4_6.png" alt="카드 할당 & 카드 등록" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -2223,11 +2145,11 @@
         </div>
       </div>
     </div>
-    <div id="page-5-1" class="page">
-      <h2 class="page-title"><span class="page-id">5-1</span> Step 1: 모델 선택</h2>
+    <div id="page-4-7" class="page">
+      <h2 class="page-title"><span class="page-id">4-7</span> 타입(Variant) 관리</h2>
       <h3>화면 설명</h3>
-      <p>본 화면은 <strong>Step 1: 모델 선택</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [모델 그리드 카드(모델명, 슬롯 구조 요약), 선택 상태 하이라이트] 등을
-        포함하고 있습니다.</p>
+      <p>본 화면은 <strong>타입(Variant) 관리</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [타입 목록, + 새 타입 추가 버튼, 타입명 설정, 중복 검증 경고,
+        타입 수정/삭제] 등을 포함하고 있습니다.</p>
 
       <div class="page-content-split">
         <div class="page-left">
@@ -2239,7 +2161,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 모델 선택 그리드</div>
+              <img src="images/4_7.png" alt="타입(Variant) 관리" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -2251,29 +2173,46 @@
             <div class="ui-item">
               <div class="ui-item-header">
                 <span class="element-number">1</span>
-                <span class="ui-item-name">모델 선택 그리드</span>
-                <span class="badge badge-indigo">Panel</span>
+                <span class="ui-item-name">타입(Variant) 목록</span>
+                <span class="badge badge-green">List</span>
               </div>
-              <div class="ui-item-desc">등록된 장비 모델이 카드 형태로 표시. 각 카드에 <mark>모델명</mark>, <mark>슬롯 구조 요약</mark>(열×행, Mixed
-                등) 포함.</div>
+              <div class="ui-item-desc">해당 모델에 등록된 모든 타입/변형 리스트. 각 항목에 <mark>타입명</mark>·<mark>합성 썸네일</mark>·수정/삭제 버튼 표시.
+              </div>
             </div>
             <div class="ui-item">
               <div class="ui-item-header">
                 <span class="element-number">2</span>
-                <span class="ui-item-name">모델 카드 선택 하이라이트</span>
-                <span class="badge badge-orange">Interaction</span>
+                <span class="ui-item-name">+ 새 타입 추가 버튼</span>
+                <span class="badge badge-blue">Button</span>
               </div>
-              <div class="ui-item-desc">모델 카드 클릭 시 <mark>테두리 하이라이트</mark>로 선택 상태 표시. 더블클릭 시 다음 Step으로 이동.</div>
+              <div class="ui-item-desc">클릭 시 <mark>장비 구성 모달</mark>이 열려 해당 섀시에 카드를 삽입하고 새로운 타입 구성을 생성.</div>
+            </div>
+            <div class="ui-item">
+              <div class="ui-item-header">
+                <span class="element-number">3</span>
+                <span class="ui-item-name">타입명 설정 & 중복 검증</span>
+                <span class="badge badge-yellow">Input / Form</span>
+              </div>
+              <div class="ui-item-desc">타입에 고유 이름 부여. 동일 모델 내 <mark>중복 타입명</mark>이 있으면 경고 토스트 표시 + 저장 차단.</div>
+            </div>
+            <div class="ui-item">
+              <div class="ui-item-header">
+                <span class="element-number">4</span>
+                <span class="ui-item-name">타입 수정/삭제</span>
+                <span class="badge badge-blue">Button</span>
+              </div>
+              <div class="ui-item-desc"><mark>✏️ 수정</mark>으로 기존 타입의 카드 구성 편집, <mark>🗑️ 삭제</mark>로 타입 제거. 기본타입 삭제 시 썸네일이
+                기본 SVG로 복원.</div>
             </div>
           </div>
         </div>
       </div>
     </div>
-    <div id="page-5-2" class="page">
-      <h2 class="page-title"><span class="page-id">5-2</span> Step 2: 카드 삽입 캔버스</h2>
+    <div id="page-4-8" class="page">
+      <h2 class="page-title"><span class="page-id">4-8</span> 장비 구성 모달</h2>
       <h3>화면 설명</h3>
-      <p>본 화면은 <strong>Step 2: 카드 삽입 캔버스</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [섀시 SVG 배경, 슬롯 오버레이(점선), 좌측 카드 라이브러리
-        사이드바(그룹별 분류)] 등을 포함하고 있습니다.</p>
+      <p>본 화면은 <strong>장비 구성 모달</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [섀시 SVG 바탕에 슬롯 오버레이 렌더링, 좌측 할당된 카드 라이브러리(FULL
+        뱃지), 드래그/클릭 카드 삽입, 전체 제거/저장 기능] 등을 포함하고 있습니다.</p>
 
       <div class="page-content-split">
         <div class="page-left">
@@ -2285,7 +2224,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 캔버스 전체 레이아웃</div>
+              <img src="images/4_8.png" alt="장비 구성 모달" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -2297,7 +2236,7 @@
             <div class="ui-item">
               <div class="ui-item-header">
                 <span class="element-number">1</span>
-                <span class="ui-item-name">섀시 SVG 캔버스</span>
+                <span class="ui-item-name">장비 구성 캔버스</span>
                 <span class="badge badge-pink">Graphics</span>
               </div>
               <div class="ui-item-desc">선택 모델의 <mark>원본 섀시 SVG</mark>가 중앙에 렌더링. 카드 삽입 가능한 슬롯이 <mark>점선 오버레이</mark>로 표시됨.
@@ -2309,8 +2248,7 @@
                 <span class="ui-item-name">좌측 카드 라이브러리</span>
                 <span class="badge badge-indigo">Sidebar</span>
               </div>
-              <div class="ui-item-desc">삽입 가능한 카드를 <mark>그룹별</mark>(CPIOM, Standard, IXR 등)로 분류 표시. 카드 SVG 프리뷰·이름·폭 타입
-                포함.</div>
+              <div class="ui-item-desc">삽입 가능한 카드를 할당된 카드 위주로 표시. FULL 폭 카드의 경우 <mark>FULL 뱃지</mark> 표시.</div>
             </div>
             <div class="ui-item">
               <div class="ui-item-header">
@@ -2318,185 +2256,23 @@
                 <span class="ui-item-name">슬롯 클릭 → 카드 삽입</span>
                 <span class="badge badge-orange">Interaction</span>
               </div>
-              <div class="ui-item-desc">좌측에서 카드를 선택한 뒤 빈 슬롯을 클릭하면 해당 위치에 <mark>카드가 즉시 삽입</mark>됨.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div id="page-5-3" class="page">
-      <h2 class="page-title"><span class="page-id">5-3</span> 카드 삽입 인터랙션</h2>
-      <h3>화면 설명</h3>
-      <p>본 화면은 <strong>카드 삽입 인터랙션</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [카드 선택 → 슬롯 클릭 → 삽입 애니메이션, 삽입 가능/불가 시각
-        피드백(하이라이트/Dim), 삽입된 카드 호버 → × 제거] 등을 포함하고 있습니다.</p>
-
-      <div class="page-content-split">
-        <div class="page-left">
-          <div class="screenshot-container">
-            <div class="editor-toolbar">
-              <button onclick="addCircle(this)">+ 숫자 마커 추가</button>
-              <button onclick="addBox(this)">+ 영역 박스 추가</button>
-              <span style="font-size: 0.85rem; color: #64748b; margin-left: auto;">마커 드래그 이동 / 리사이징 (박스 우측 하단) / 삭제
-                (우클릭)</span>
-            </div>
-            <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 삽입 전/후, 불가 상태</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="page-right">
-          <h3>UI 요소 설명</h3>
-          <div class="ui-list">
-
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">1</span>
-                <span class="ui-item-name">삽입 가능/불가 시각 피드백</span>
-                <span class="badge badge-orange">Interaction</span>
-              </div>
-              <div class="ui-item-desc">삽입 가능한 슬롯은 <mark>하이라이트 애니메이션</mark>으로 강조, 불가능한 슬롯은 <mark>Dim 처리</mark> + 경고 토스트.
-              </div>
-            </div>
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">2</span>
-                <span class="ui-item-name">삽입된 카드 호버 → 제거</span>
-                <span class="badge badge-orange">Interaction</span>
-              </div>
-              <div class="ui-item-desc">삽입된 카드에 마우스 호버 시 <mark>× 버튼</mark> 표시. 클릭하면 해당 카드가 슬롯에서 제거됨.</div>
-            </div>
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">3</span>
-                <span class="ui-item-name">카드 삽입 애니메이션</span>
-                <span class="badge badge-pink">3D Effect</span>
-              </div>
-              <div class="ui-item-desc">카드가 슬롯에 삽입될 때 <mark>슬라이드-인 애니메이션</mark>과 함께 인라인 SVG로 실시간 렌더링.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div id="page-5-4" class="page">
-      <h2 class="page-title"><span class="page-id">5-4</span> 슬롯 레이아웃 유형별</h2>
-      <h3>화면 설명</h3>
-      <p>본 화면은 <strong>슬롯 레이아웃 유형별</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [Uniform Grid / Mixed Layout / Row-based 각각의
-        슬롯 렌더링 비교] 등을 포함하고 있습니다.</p>
-
-      <div class="page-content-split">
-        <div class="page-left">
-          <div class="screenshot-container">
-            <div class="editor-toolbar">
-              <button onclick="addCircle(this)">+ 숫자 마커 추가</button>
-              <button onclick="addBox(this)">+ 영역 박스 추가</button>
-              <span style="font-size: 0.85rem; color: #64748b; margin-left: auto;">마커 드래그 이동 / 리사이징 (박스 우측 하단) / 삭제
-                (우클릭)</span>
-            </div>
-            <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 3가지 레이아웃 비교</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="page-right">
-          <h3>UI 요소 설명</h3>
-          <div class="ui-list">
-
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">1</span>
-                <span class="ui-item-name">Uniform Grid 레이아웃</span>
-                <span class="badge badge-indigo">Panel</span>
-              </div>
-              <div class="ui-item-desc">고정 열×행 그리드 방식. <mark>Half/Full</mark> 카드 너비 지원, Full 카드는 한 행 전체 점유.</div>
-            </div>
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">2</span>
-                <span class="ui-item-name">Mixed Layout</span>
-                <span class="badge badge-indigo">Panel</span>
-              </div>
-              <div class="ui-item-desc">모델별 명시적 슬롯 위치·크기 정의. <mark>allowedCardGroups</mark>로 CPIOM 전용 슬롯 등 카드 그룹 제한 적용.
-              </div>
-            </div>
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">3</span>
-                <span class="ui-item-name">Row-based Layout</span>
-                <span class="badge badge-indigo">Panel</span>
-              </div>
-              <div class="ui-item-desc">행(Row) 단위 서브 슬롯 구조. 행 라벨(R1, R2…) 표시, 카드 SVG 너비 초과 시 삽입 차단.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div id="page-5-5" class="page">
-      <h2 class="page-title"><span class="page-id">5-5</span> Step 3: 저장 & 자동 생성</h2>
-      <h3>화면 설명</h3>
-      <p>본 화면은 <strong>Step 3: 저장 & 자동 생성</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [저장 버튼, 썸네일 합성 결과, 포트 맵 자동 생성 결과, 전체
-        제거 버튼] 등을 포함하고 있습니다.</p>
-
-      <div class="page-content-split">
-        <div class="page-left">
-          <div class="screenshot-container">
-            <div class="editor-toolbar">
-              <button onclick="addCircle(this)">+ 숫자 마커 추가</button>
-              <button onclick="addBox(this)">+ 영역 박스 추가</button>
-              <span style="font-size: 0.85rem; color: #64748b; margin-left: auto;">마커 드래그 이동 / 리사이징 (박스 우측 하단) / 삭제
-                (우클릭)</span>
-            </div>
-            <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 저장 결과 피드백</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="page-right">
-          <h3>UI 요소 설명</h3>
-          <div class="ui-list">
-
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">1</span>
-                <span class="ui-item-name">저장 버튼</span>
-                <span class="badge badge-blue">Button</span>
-              </div>
-              <div class="ui-item-desc">클릭 시 <mark>썸네일 자동 합성</mark>(WebP)과 <mark>포트 맵 자동 생성</mark>(port-hitbox 파싱)이 동시
-                수행됨.</div>
-            </div>
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">2</span>
-                <span class="ui-item-name">합성 결과 프리뷰</span>
-                <span class="badge badge-pink">Graphics</span>
-              </div>
-              <div class="ui-item-desc">베이스 SVG + 삽입 카드 SVG가 좌표 기반으로 합성된 최종 장비 외관 이미지 프리뷰.</div>
-            </div>
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">3</span>
-                <span class="ui-item-name">포트 맵 자동 생성 결과</span>
-                <span class="badge badge-green">List</span>
-              </div>
-              <div class="ui-item-desc">각 카드의 port-hitbox를 파싱하여 <mark>shelfNo/slotNo/localPort</mark> 형식 포트 목록 자동 생성.
-              </div>
+              <div class="ui-item-desc">좌측에서 카드를 선택한 뒤 빈 슬롯을 클릭하거나 드래그하여 <mark>카드가 즉시 삽입</mark>됨.</div>
             </div>
             <div class="ui-item">
               <div class="ui-item-header">
                 <span class="element-number">4</span>
-                <span class="ui-item-name">전체 제거 버튼</span>
+                <span class="ui-item-name">저장 및 자동 생성</span>
                 <span class="badge badge-blue">Button</span>
               </div>
-              <div class="ui-item-desc">삽입된 모든 카드를 일괄 초기화하여 빈 섀시 상태로 복원.</div>
+              <div class="ui-item-desc">클릭 시 <mark>썸네일 자동 합성</mark>(WebP)과 장비 등록 시 사용할 <mark>카드 조합 SVG 자동 생성</mark>이
+                수행됨.</div>
             </div>
           </div>
         </div>
       </div>
     </div>
-    <div id="page-6-1" class="page">
-      <h2 class="page-title"><span class="page-id">6-1</span> 초기 화면 & 이미지 업로드</h2>
+    <div id="page-5-1" class="page">
+      <h2 class="page-title"><span class="page-id">5-1</span> 초기 화면 & 이미지 업로드</h2>
       <h3>화면 설명</h3>
       <p>본 화면은 <strong>초기 화면 & 이미지 업로드</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [빈 캔버스 상태, 이미지 드래그 앤 드롭 영역, Process
         Telemetry(Null Vector Array)] 등을 포함하고 있습니다.</p>
@@ -2511,7 +2287,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 초기 화면</div>
+              <img src="images/5_1.png" alt="초기 화면 & 이미지 업로드" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -2548,8 +2324,64 @@
         </div>
       </div>
     </div>
-    <div id="page-6-2" class="page">
-      <h2 class="page-title"><span class="page-id">6-2</span> AI 자동 분석 (Neural Analysis)</h2>
+    <div id="page-5-2" class="page">
+      <h2 class="page-title"><span class="page-id">5-2</span> 이미지 자르기</h2>
+      <h3>화면 설명</h3>
+      <p>본 화면은 <strong>이미지 자르기</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [자르기 토글, 4포인트 핸들(돋보기 프리뷰), 자르기 완료/취소] 등을 포함하고
+        있습니다.</p>
+
+      <div class="page-content-split">
+        <div class="page-left">
+          <div class="screenshot-container">
+            <div class="editor-toolbar">
+              <button onclick="addCircle(this)">+ 숫자 마커 추가</button>
+              <button onclick="addBox(this)">+ 영역 박스 추가</button>
+              <span style="font-size: 0.85rem; color: #64748b; margin-left: auto;">마커 드래그 이동 / 리사이징 (박스 우측 하단) / 삭제
+                (우클릭)</span>
+            </div>
+            <div class="image-wrapper">
+              <img src="images/5_2.png" alt="이미지 자르기" class="screenshot" draggable="false">
+            </div>
+          </div>
+        </div>
+
+        <div class="page-right">
+          <h3>UI 요소 설명</h3>
+          <div class="ui-list">
+
+            <div class="ui-item">
+              <div class="ui-item-header">
+                <span class="element-number">1</span>
+                <span class="ui-item-name">이미지 자르기 토글</span>
+                <span class="badge badge-blue">Button</span>
+              </div>
+              <div class="ui-item-desc">이미지 업로드 후 캔버스 좌측 상단의 <mark>이미지 자르기</mark> 버튼을 클릭하여 자르기 모드로 진입.</div>
+            </div>
+            <div class="ui-item">
+              <div class="ui-item-header">
+                <span class="element-number">2</span>
+                <span class="ui-item-name">자르기 4포인트 핸들</span>
+                <span class="badge badge-orange">Interaction</span>
+              </div>
+              <div class="ui-item-desc">이미지 모서리 4개의 핸들을 드래그하여 자르기 영역을 설정. 핸들 드래그 시 우측 하단에 정밀 조정을 위한 <mark>돋보기
+                  프리뷰</mark>가 표시됨.</div>
+            </div>
+            <div class="ui-item">
+              <div class="ui-item-header">
+                <span class="element-number">3</span>
+                <span class="ui-item-name">자르기 적용/취소</span>
+                <span class="badge badge-blue">Button</span>
+              </div>
+              <div class="ui-item-desc"><mark>자르기 완료</mark> 클릭 시 지정한 4포인트 영역 외곽이 잘리며 원근(Perspective) 보정 적용.
+                <mark>취소</mark> 클릭 시 원본 상태 유지.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="page-5-3" class="page">
+      <h2 class="page-title"><span class="page-id">5-3</span> AI 자동 분석 (Neural Analysis)</h2>
       <h3>화면 설명</h3>
       <p>본 화면은 <strong>AI 자동 분석 (Neural Analysis)</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [Initiate Neural Analysis 버튼,
         분석 진행 중 로그/프로그레스 바, 분석 완료 결과] 등을 포함하고 있습니다.</p>
@@ -2564,7 +2396,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 분석 중, 분석 완료</div>
+              <img src="images/5_3.png" alt="AI 자동 분석 (Neural Analysis)" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -2603,8 +2435,8 @@
         </div>
       </div>
     </div>
-    <div id="page-6-3" class="page">
-      <h2 class="page-title"><span class="page-id">6-3</span> 포트 편집 모드 — 전체 레이아웃</h2>
+    <div id="page-5-4" class="page">
+      <h2 class="page-title"><span class="page-id">5-4</span> 포트 편집 모드 — 전체 레이아웃</h2>
       <h3>화면 설명</h3>
       <p>본 화면은 <strong>포트 편집 모드 — 전체 레이아웃</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [캔버스 + 포트 박스 오버레이, 상단 툴바(Lock/Unlock,
         Manual Port, PRT, GRP_CPY, Export), 우측 Object Registry] 등을 포함하고 있습니다.</p>
@@ -2619,7 +2451,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 편집 모드 전체</div>
+              <img src="images/5_4.png" alt="포트 편집 모드 — 전체 레이아웃" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -2658,8 +2490,8 @@
         </div>
       </div>
     </div>
-    <div id="page-6-4" class="page">
-      <h2 class="page-title"><span class="page-id">6-4</span> 포트 박스 조작</h2>
+    <div id="page-5-5" class="page">
+      <h2 class="page-title"><span class="page-id">5-5</span> 포트 박스 조작</h2>
       <h3>화면 설명</h3>
       <p>본 화면은 <strong>포트 박스 조작</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [드래그 이동, 리사이즈 핸들, 키보드 미세 조정, 수동 포트 추가, 삭제] 등을
         포함하고 있습니다.</p>
@@ -2674,7 +2506,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 조작 중 상태</div>
+              <img src="images/5_5.png" alt="포트 박스 조작" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -2727,8 +2559,8 @@
         </div>
       </div>
     </div>
-    <div id="page-6-5" class="page">
-      <h2 class="page-title"><span class="page-id">6-5</span> 포트 속성 편집 패널</h2>
+    <div id="page-5-6" class="page">
+      <h2 class="page-title"><span class="page-id">5-6</span> 포트 속성 편집 패널</h2>
       <h3>화면 설명</h3>
       <p>본 화면은 <strong>포트 속성 편집 패널</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [Tag/Seq/Icon/W/H 인라인 편집 패널, 아이콘
         오버레이(Ethernet/SFP)] 등을 포함하고 있습니다.</p>
@@ -2743,7 +2575,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 편집 패널 활성 상태</div>
+              <img src="images/5_6.png" alt="포트 속성 편집 패널" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -2789,8 +2621,8 @@
         </div>
       </div>
     </div>
-    <div id="page-6-6" class="page">
-      <h2 class="page-title"><span class="page-id">6-6</span> 다중 선택 & 정렬 도구</h2>
+    <div id="page-5-7" class="page">
+      <h2 class="page-title"><span class="page-id">5-7</span> 다중 선택 & 정렬 도구</h2>
       <h3>화면 설명</h3>
       <p>본 화면은 <strong>다중 선택 & 정렬 도구</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [Shift/Ctrl 다중 선택, Lasso 영역 선택, 정렬
         팝업(8가지), 일괄 속성 편집] 등을 포함하고 있습니다.</p>
@@ -2805,7 +2637,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 다중 선택 상태, 정렬 팝업</div>
+              <img src="images/5_7.png" alt="다중 선택 & 정렬 도구" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -2844,8 +2676,8 @@
         </div>
       </div>
     </div>
-    <div id="page-6-7" class="page">
-      <h2 class="page-title"><span class="page-id">6-7</span> 포트 복제</h2>
+    <div id="page-5-8" class="page">
+      <h2 class="page-title"><span class="page-id">5-8</span> 포트 복제</h2>
       <h3>화면 설명</h3>
       <p>본 화면은 <strong>포트 복제</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [Ctrl+D 개별 복제, Ctrl+G 그룹 복제, 번호 자동 부여] 등을 포함하고
         있습니다.</p>
@@ -2860,7 +2692,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 복제 전/후</div>
+              <img src="images/5_8.png" alt="포트 복제" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -2889,8 +2721,8 @@
         </div>
       </div>
     </div>
-    <div id="page-6-8" class="page">
-      <h2 class="page-title"><span class="page-id">6-8</span> Object Registry 사이드바</h2>
+    <div id="page-5-9" class="page">
+      <h2 class="page-title"><span class="page-id">5-9</span> Object Registry 사이드바</h2>
       <h3>화면 설명</h3>
       <p>본 화면은 <strong>Object Registry 사이드바</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [카테고리 그룹핑, 접기/펼치기, 포트 상세 정보, 캔버스
         연동(클릭/호버)] 등을 포함하고 있습니다.</p>
@@ -2905,7 +2737,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 레지스트리 전체</div>
+              <img src="images/5_9.png" alt="Object Registry 사이드바" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -2943,8 +2775,8 @@
         </div>
       </div>
     </div>
-    <div id="page-6-9" class="page">
-      <h2 class="page-title"><span class="page-id">6-9</span> SVG 내보내기</h2>
+    <div id="page-5-10" class="page">
+      <h2 class="page-title"><span class="page-id">5-10</span> SVG 내보내기</h2>
       <h3>화면 설명</h3>
       <p>본 화면은 <strong>SVG 내보내기</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [Export 버튼, 파일명 입력 모달, 출력 SVG 구조 설명] 등을 포함하고
         있습니다.</p>
@@ -2959,7 +2791,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 내보내기 모달</div>
+              <img src="images/5_10.png" alt="SVG 내보내기" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -2997,11 +2829,11 @@
         </div>
       </div>
     </div>
-    <div id="page-7-1" class="page">
-      <h2 class="page-title"><span class="page-id">7-1</span> arcVRoom 메인 화면</h2>
+    <div id="page-6-1" class="page">
+      <h2 class="page-title"><span class="page-id">6-1</span> 메인 화면 (오브젝트)</h2>
       <h3>화면 설명</h3>
-      <p>본 화면은 <strong>arcVRoom 메인 화면</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [독립 에디터 전체 레이아웃, 3D 캔버스, 좌측 패널] 등을 포함하고
-        있습니다.</p>
+      <p>본 화면은 <strong>메인 화면 (오브젝트)</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [3D 캔버스 전경, 오브젝트 탭(도형, 에셋 라이브러리, 씬 오브젝트),
+        SVG 평면도 생성 버튼] 등을 포함하고 있습니다.</p>
 
       <div class="page-content-split">
         <div class="page-left">
@@ -3013,7 +2845,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 전체 화면</div>
+              <img src="images/6_1.png" alt="메인 화면 (오브젝트)" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -3025,27 +2857,88 @@
             <div class="ui-item">
               <div class="ui-item-header">
                 <span class="element-number">1</span>
-                <span class="ui-item-name">3D 캔버스 (독립 에디터)</span>
+                <span class="ui-item-name">3D 캔버스 & 뷰포트 컨트롤</span>
                 <span class="badge badge-pink">3D Canvas</span>
               </div>
-              <div class="ui-item-desc">서버실 관제와 별개로 동작하는 독립형 3D 씬 에디터. <mark>/arcVRoom</mark> 경로로 진입.</div>
+              <div class="ui-item-desc">arcVRoom 메인 에디터 화면. 줌, 패닝, 3D 뷰 큐브를 활용하여 공간 탐색.</div>
             </div>
             <div class="ui-item">
               <div class="ui-item-header">
                 <span class="element-number">2</span>
-                <span class="ui-item-name">좌측 에셋 패널</span>
+                <span class="ui-item-name">오브젝트 탭</span>
                 <span class="badge badge-indigo">Sidebar</span>
               </div>
-              <div class="ui-item-desc">배치 가능한 에셋 목록과 씬 오브젝트 관리. GLB/GLTF 파일 Import 기능 포함.</div>
+              <div class="ui-item-desc">도형 생성(Box/Sphere), 에셋 라이브러리(가구/기기), 현재 배치된 씬 오브젝트 목록 제공.</div>
+            </div>
+            <div class="ui-item">
+              <div class="ui-item-header">
+                <span class="element-number">3</span>
+                <span class="ui-item-name">SVG 평면도 생성</span>
+                <span class="badge badge-blue">Button</span>
+              </div>
+              <div class="ui-item-desc">현재 3D 씬을 기반으로 2D 평면도 SVG를 자동 추출.</div>
             </div>
           </div>
         </div>
       </div>
     </div>
-    <div id="page-7-2" class="page">
-      <h2 class="page-title"><span class="page-id">7-2</span> 조명 & 렌더링 설정</h2>
+    <div id="page-6-2" class="page">
+      <h2 class="page-title"><span class="page-id">6-2</span> 오브젝트 다중 선택 및 속성 편집</h2>
       <h3>화면 설명</h3>
-      <p>본 화면은 <strong>조명 & 렌더링 설정</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [다중 조명 추가/제어, 그림자, Bloom/Vignette 후처리 설정 패널]
+      <p>본 화면은 <strong>오브젝트 다중 선택 및 속성 편집</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [여러 오브젝트 다중 선택(ALIGNMENT 위젯),
+        위치/크기/회전 정밀 편집, CULLING/SHADOWS 속성 제어] 등을 포함하고 있습니다.</p>
+
+      <div class="page-content-split">
+        <div class="page-left">
+          <div class="screenshot-container">
+            <div class="editor-toolbar">
+              <button onclick="addCircle(this)">+ 숫자 마커 추가</button>
+              <button onclick="addBox(this)">+ 영역 박스 추가</button>
+              <span style="font-size: 0.85rem; color: #64748b; margin-left: auto;">마커 드래그 이동 / 리사이징 (박스 우측 하단) / 삭제
+                (우클릭)</span>
+            </div>
+            <div class="image-wrapper">
+              <img src="images/6_2.png" alt="오브젝트 다중 선택 및 속성 편집" class="screenshot" draggable="false">
+            </div>
+          </div>
+        </div>
+
+        <div class="page-right">
+          <h3>UI 요소 설명</h3>
+          <div class="ui-list">
+
+            <div class="ui-item">
+              <div class="ui-item-header">
+                <span class="element-number">1</span>
+                <span class="ui-item-name">다중 선택 (ALIGNMENT)</span>
+                <span class="badge badge-orange">Floating UI</span>
+              </div>
+              <div class="ui-item-desc">여러 오브젝트 선택 시 정렬 위젯 활성화(X/Y/Z 축 정렬 및 등간격 분배).</div>
+            </div>
+            <div class="ui-item">
+              <div class="ui-item-header">
+                <span class="element-number">2</span>
+                <span class="ui-item-name">위치/크기/회전 편집</span>
+                <span class="badge badge-yellow">Input / Form</span>
+              </div>
+              <div class="ui-item-desc">선택된 객체의 트랜스폼 수치를 정밀 제어. 기즈모와 양방향 연동.</div>
+            </div>
+            <div class="ui-item">
+              <div class="ui-item-header">
+                <span class="element-number">3</span>
+                <span class="ui-item-name">고급 속성 토글</span>
+                <span class="badge badge-teal">Toggle</span>
+              </div>
+              <div class="ui-item-desc">CULLING, INVERSION, SHADOWS 등 개별 오브젝트의 렌더링 속성 설정.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="page-6-3" class="page">
+      <h2 class="page-title"><span class="page-id">6-3</span> 씬 라이트 (조명 설정)</h2>
+      <h3>화면 설명</h3>
+      <p>본 화면은 <strong>씬 라이트 (조명 설정)</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [점/스포트/직사 조명 추가, 광도/그림자/색도 설정, 조명 기즈모 시각화]
         등을 포함하고 있습니다.</p>
 
       <div class="page-content-split">
@@ -3058,7 +2951,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 설정 패널</div>
+              <img src="images/6_3.png" alt="씬 라이트 (조명 설정)" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -3070,37 +2963,36 @@
             <div class="ui-item">
               <div class="ui-item-header">
                 <span class="element-number">1</span>
-                <span class="ui-item-name">다중 조명 제어</span>
-                <span class="badge badge-indigo">Panel</span>
+                <span class="ui-item-name">조명 유형 선택</span>
+                <span class="badge badge-blue">Button</span>
               </div>
-              <div class="ui-item-desc">Ambient Light 외 <mark>추가 조명을 생성/제어</mark>. 강도, 색상, 그림자 여부, 해상도 개별 설정.</div>
+              <div class="ui-item-desc">점(Point), 스포트(Spot), 직사(Directional), 주변(Ambient) 조명 생성.</div>
             </div>
             <div class="ui-item">
               <div class="ui-item-header">
                 <span class="element-number">2</span>
-                <span class="ui-item-name">후처리 렌더링 설정</span>
-                <span class="badge badge-indigo">Panel</span>
+                <span class="ui-item-name">씬 라이트 목록</span>
+                <span class="badge badge-green">List</span>
               </div>
-              <div class="ui-item-desc"><mark>Bloom</mark> 강도, <mark>Vignette</mark> 효과 등 Post-processing 옵션으로 렌더링 품질
-                조절.</div>
+              <div class="ui-item-desc">배치된 조명 목록 관리. 전원 ON/OFF 토글 및 잠금 기능.</div>
             </div>
             <div class="ui-item">
               <div class="ui-item-header">
                 <span class="element-number">3</span>
-                <span class="ui-item-name">배경·그리드 토글</span>
-                <span class="badge badge-teal">Switch</span>
+                <span class="ui-item-name">조명 속성 제어</span>
+                <span class="badge badge-yellow">Input / Form</span>
               </div>
-              <div class="ui-item-desc">3D Environment 배경 표시, 배경색 변경, 그리드 가시성을 개별 토글.</div>
+              <div class="ui-item-desc">광도 강도, 빔 거리, 광량 감쇠, 그림자 부드러움, 색도 벡터 등 세부 조명 옵션 제어.</div>
             </div>
           </div>
         </div>
       </div>
     </div>
-    <div id="page-7-3" class="page">
-      <h2 class="page-title"><span class="page-id">7-3</span> 에셋 배치 & Gizmo</h2>
+    <div id="page-6-4" class="page">
+      <h2 class="page-title"><span class="page-id">6-4</span> 재질(Material) 편집</h2>
       <h3>화면 설명</h3>
-      <p>본 화면은 <strong>에셋 배치 & Gizmo</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [다중 선택/그룹화, Translate/Rotate/Scale 기즈모] 등을
-        포함하고 있습니다.</p>
+      <p>본 화면은 <strong>재질(Material) 편집</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [오브젝트 재질 목록, 텍스처 맵(Albedo, Normal 등) 교체,
+        투명도/금속성/거칠기 조절] 등을 포함하고 있습니다.</p>
 
       <div class="page-content-split">
         <div class="page-left">
@@ -3112,7 +3004,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 기즈모 활성 상태</div>
+              <img src="images/6_4.png" alt="재질(Material) 편집" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -3124,222 +3016,132 @@
             <div class="ui-item">
               <div class="ui-item-header">
                 <span class="element-number">1</span>
-                <span class="ui-item-name">다중 선택·그룹화</span>
+                <span class="ui-item-name">재질 목록</span>
+                <span class="badge badge-green">List</span>
+              </div>
+              <div class="ui-item-desc">현재 씬에 로드된 전체 재질(Material) 리스트. 이름 및 색상 틴트 수정.</div>
+            </div>
+            <div class="ui-item">
+              <div class="ui-item-header">
+                <span class="element-number">2</span>
+                <span class="ui-item-name">텍스처 맵 슬롯</span>
+                <span class="badge badge-yellow">Input / Form</span>
+              </div>
+              <div class="ui-item-desc">Albedo, Normal, Metalness 등 PBR 텍스처 맵 이미지를 개별 업로드 및 교체.</div>
+            </div>
+            <div class="ui-item">
+              <div class="ui-item-header">
+                <span class="element-number">3</span>
+                <span class="ui-item-name">재질 파라미터 슬라이더</span>
                 <span class="badge badge-orange">Interaction</span>
               </div>
-              <div class="ui-item-desc">여러 에셋을 동시 선택하여 <mark>한 번에 이동·크기 조절</mark>할 수 있는 그룹핑 기능.</div>
+              <div class="ui-item-desc">투명도, 금속성, 거칠기, 방사 강도를 슬라이더로 직관적 조절하여 실시간 렌더링 반영.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="page-6-5" class="page">
+      <h2 class="page-title"><span class="page-id">6-5</span> 씬 관리 (설정 탭)</h2>
+      <h3>화면 설명</h3>
+      <p>본 화면은 <strong>씬 관리 (설정 탭)</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [JSON 내보내기/불러오기, GLB 내보내기, GLB 압축 진행 상태
+        모달(WebP 변환)] 등을 포함하고 있습니다.</p>
+
+      <div class="page-content-split">
+        <div class="page-left">
+          <div class="screenshot-container">
+            <div class="editor-toolbar">
+              <button onclick="addCircle(this)">+ 숫자 마커 추가</button>
+              <button onclick="addBox(this)">+ 영역 박스 추가</button>
+              <span style="font-size: 0.85rem; color: #64748b; margin-left: auto;">마커 드래그 이동 / 리사이징 (박스 우측 하단) / 삭제
+                (우클릭)</span>
+            </div>
+            <div class="image-wrapper">
+              <img src="images/6_5.png" alt="씬 관리 (설정 탭)" class="screenshot" draggable="false">
+            </div>
+          </div>
+        </div>
+
+        <div class="page-right">
+          <h3>UI 요소 설명</h3>
+          <div class="ui-list">
+
+            <div class="ui-item">
+              <div class="ui-item-header">
+                <span class="element-number">1</span>
+                <span class="ui-item-name">GLB/JSON 내보내기</span>
+                <span class="badge badge-blue">Button</span>
+              </div>
+              <div class="ui-item-desc">현재 씬을 완벽한 3D 모델(.glb)이나 시스템 데이터(.json)로 추출.</div>
             </div>
             <div class="ui-item">
               <div class="ui-item-header">
                 <span class="element-number">2</span>
-                <span class="ui-item-name">Translate/Rotate/Scale 기즈모</span>
+                <span class="ui-item-name">압축 진행 모달</span>
+                <span class="badge badge-purple">Modal</span>
+              </div>
+              <div class="ui-item-desc">고해상도 텍스처를 WebP로 변환하며 최적화하는 진행 상태를 프로그레스 바와 함께 표시.</div>
+            </div>
+            <div class="ui-item">
+              <div class="ui-item-header">
+                <span class="element-number">3</span>
+                <span class="ui-item-name">엔진 상태 요약</span>
+                <span class="badge badge-indigo">Panel</span>
+              </div>
+              <div class="ui-item-desc">현재 활성 노드 수, 렌더링 코어 상태 등 내부 엔진 정보를 표시.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="page-6-6" class="page">
+      <h2 class="page-title"><span class="page-id">6-6</span> GLB 압축 최적화 도구</h2>
+      <h3>화면 설명</h3>
+      <p>본 화면은 <strong>GLB 압축 최적화 도구</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [텍스처 옵션(WebP, 해상도), 드라코 압축, 지오메트리 단순화, 파일
+        드롭존 및 압축률 표시] 등을 포함하고 있습니다.</p>
+
+      <div class="page-content-split">
+        <div class="page-left">
+          <div class="screenshot-container">
+            <div class="editor-toolbar">
+              <button onclick="addCircle(this)">+ 숫자 마커 추가</button>
+              <button onclick="addBox(this)">+ 영역 박스 추가</button>
+              <span style="font-size: 0.85rem; color: #64748b; margin-left: auto;">마커 드래그 이동 / 리사이징 (박스 우측 하단) / 삭제
+                (우클릭)</span>
+            </div>
+            <div class="image-wrapper">
+              <img src="images/6_6.png" alt="GLB 압축 최적화 도구" class="screenshot" draggable="false">
+            </div>
+          </div>
+        </div>
+
+        <div class="page-right">
+          <h3>UI 요소 설명</h3>
+          <div class="ui-list">
+
+            <div class="ui-item">
+              <div class="ui-item-header">
+                <span class="element-number">1</span>
+                <span class="ui-item-name">텍스처 & 압축 옵션</span>
+                <span class="badge badge-yellow">Input / Form</span>
+              </div>
+              <div class="ui-item-desc">WebP 변환 해상도, 드라코(Draco) 압축, 중복 리소스 제거 등 최적화 옵션 제공.</div>
+            </div>
+            <div class="ui-item">
+              <div class="ui-item-header">
+                <span class="element-number">2</span>
+                <span class="ui-item-name">지오메트리 단순화</span>
                 <span class="badge badge-orange">Interaction</span>
               </div>
-              <div class="ui-item-desc">객체 선택 시 <mark>3D 트랜스폼 컨트롤러</mark>가 활성화. 축별 정밀 튜닝 가능.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div id="page-8-1" class="page">
-      <h2 class="page-title"><span class="page-id">8-1</span> 환경 내보내기/불러오기</h2>
-      <h3>화면 설명</h3>
-      <p>본 화면은 <strong>환경 내보내기/불러오기</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [전체 환경 엑셀 Export/Import, 파일 선택 UI] 등을 포함하고
-        있습니다.</p>
-
-      <div class="page-content-split">
-        <div class="page-left">
-          <div class="screenshot-container">
-            <div class="editor-toolbar">
-              <button onclick="addCircle(this)">+ 숫자 마커 추가</button>
-              <button onclick="addBox(this)">+ 영역 박스 추가</button>
-              <span style="font-size: 0.85rem; color: #64748b; margin-left: auto;">마커 드래그 이동 / 리사이징 (박스 우측 하단) / 삭제
-                (우클릭)</span>
-            </div>
-            <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: Export/Import UI</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="page-right">
-          <h3>UI 요소 설명</h3>
-          <div class="ui-list">
-
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">1</span>
-                <span class="ui-item-name">전체 환경 Export</span>
-                <span class="badge badge-blue">Button</span>
-              </div>
-              <div class="ui-item-desc">랙 위치, 장비 배치, 계층 노드 등 <mark>전체 인프라 데이터를 엑셀(.xlsx)</mark>로 한 번에 내보내기.</div>
-            </div>
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">2</span>
-                <span class="ui-item-name">전체 환경 Import</span>
-                <span class="badge badge-blue">Button</span>
-              </div>
-              <div class="ui-item-desc">백업된 엑셀 파일을 불러와 <mark>전체 인프라 환경을 동일하게 복원</mark>.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div id="page-8-2" class="page">
-      <h2 class="page-title"><span class="page-id">8-2</span> Undo/Redo & 저장</h2>
-      <h3>화면 설명</h3>
-      <p>본 화면은 <strong>Undo/Redo & 저장</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [실행 취소/다시 실행 동작, Save 버튼 활성화, Unsaved
-        Changes Dialog] 등을 포함하고 있습니다.</p>
-
-      <div class="page-content-split">
-        <div class="page-left">
-          <div class="screenshot-container">
-            <div class="editor-toolbar">
-              <button onclick="addCircle(this)">+ 숫자 마커 추가</button>
-              <button onclick="addBox(this)">+ 영역 박스 추가</button>
-              <span style="font-size: 0.85rem; color: #64748b; margin-left: auto;">마커 드래그 이동 / 리사이징 (박스 우측 하단) / 삭제
-                (우클릭)</span>
-            </div>
-            <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 저장 알림</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="page-right">
-          <h3>UI 요소 설명</h3>
-          <div class="ui-list">
-
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">1</span>
-                <span class="ui-item-name">Undo/Redo</span>
-                <span class="badge badge-blue">Button</span>
-              </div>
-              <div class="ui-item-desc"><mark>Ctrl+Z</mark>로 이전 상태 복원, <mark>Ctrl+Shift+Z</mark>로 다시 적용. 위치 변경·배치 이력 모두
-                지원.</div>
-            </div>
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">2</span>
-                <span class="ui-item-name">Save 버튼 활성화</span>
-                <span class="badge badge-blue">Button</span>
-              </div>
-              <div class="ui-item-desc">변경 사항 감지 시 Save 버튼이 활성화. <mark>Ctrl+S</mark> 또는 클릭으로 데이터 영구 저장.</div>
+              <div class="ui-item-desc">메시 인스턴싱, 정점 병합 옵션 및 단순화 슬라이더를 통해 폴리곤 수(Draw call) 최적화.</div>
             </div>
             <div class="ui-item">
               <div class="ui-item-header">
                 <span class="element-number">3</span>
-                <span class="ui-item-name">Unsaved Changes Dialog</span>
-                <span class="badge badge-purple">Modal</span>
+                <span class="ui-item-name">파일 드롭존 & 결과 큐</span>
+                <span class="badge badge-indigo">Panel</span>
               </div>
-              <div class="ui-item-desc">저장되지 않은 변경이 있는 상태에서 페이지 이탈 시 <mark>경고 다이얼로그</mark> 표시.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div id="page-8-3" class="page">
-      <h2 class="page-title"><span class="page-id">8-3</span> 데이터 초기화 & 샘플</h2>
-      <h3>화면 설명</h3>
-      <p>본 화면은 <strong>데이터 초기화 & 샘플</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [초기화 버튼, 초기화 확인 모달, Sample 버튼, 초기화 보호 대상
-        설명] 등을 포함하고 있습니다.</p>
-
-      <div class="page-content-split">
-        <div class="page-left">
-          <div class="screenshot-container">
-            <div class="editor-toolbar">
-              <button onclick="addCircle(this)">+ 숫자 마커 추가</button>
-              <button onclick="addBox(this)">+ 영역 박스 추가</button>
-              <span style="font-size: 0.85rem; color: #64748b; margin-left: auto;">마커 드래그 이동 / 리사이징 (박스 우측 하단) / 삭제
-                (우클릭)</span>
-            </div>
-            <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 초기화 확인 모달</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="page-right">
-          <h3>UI 요소 설명</h3>
-          <div class="ui-list">
-
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">1</span>
-                <span class="ui-item-name">초기화 버튼 (Reset)</span>
-                <span class="badge badge-blue">Button</span>
-              </div>
-              <div class="ui-item-desc">저장 데이터를 삭제하고 시스템을 초기 상태로 복원. <mark>장비 모델 데이터(섀시·타입)는 보호</mark>되어 유지됨.</div>
-            </div>
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">2</span>
-                <span class="ui-item-name">초기화 확인 모달</span>
-                <span class="badge badge-purple">Modal</span>
-              </div>
-              <div class="ui-item-desc">초기화 실행 전 <mark>되돌릴 수 없음</mark>을 경고하고 최종 확인 요구.</div>
-            </div>
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">3</span>
-                <span class="ui-item-name">Sample 버튼</span>
-                <span class="badge badge-blue">Button</span>
-              </div>
-              <div class="ui-item-desc">미리 구성된 샘플 랙/장비/노드 데이터를 즉시 로드하여 시스템 시연용 환경 구성.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div id="page-8-4" class="page">
-      <h2 class="page-title"><span class="page-id">8-4</span> 토스트 알림 시스템</h2>
-      <h3>화면 설명</h3>
-      <p>본 화면은 <strong>토스트 알림 시스템</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [성공/경고/에러 토스트 유형별 표시] 등을 포함하고 있습니다.</p>
-
-      <div class="page-content-split">
-        <div class="page-left">
-          <div class="screenshot-container">
-            <div class="editor-toolbar">
-              <button onclick="addCircle(this)">+ 숫자 마커 추가</button>
-              <button onclick="addBox(this)">+ 영역 박스 추가</button>
-              <span style="font-size: 0.85rem; color: #64748b; margin-left: auto;">마커 드래그 이동 / 리사이징 (박스 우측 하단) / 삭제
-                (우클릭)</span>
-            </div>
-            <div class="image-wrapper">
-              <div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: 각 유형 토스트 캡처</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="page-right">
-          <h3>UI 요소 설명</h3>
-          <div class="ui-list">
-
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">1</span>
-                <span class="ui-item-name">성공 토스트 (✅)</span>
-                <span class="badge badge-orange">Floating UI</span>
-              </div>
-              <div class="ui-item-desc">저장 완료·등록 성공 등 긍정 결과를 <mark>초록색 토스트</mark>로 3초간 표시.</div>
-            </div>
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">2</span>
-                <span class="ui-item-name">경고 토스트 (⚠️)</span>
-                <span class="badge badge-orange">Floating UI</span>
-              </div>
-              <div class="ui-item-desc">중복 경고·유효성 경고 등을 <mark>주황색 토스트</mark>로 표시.</div>
-            </div>
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">3</span>
-                <span class="ui-item-name">에러 토스트 (❌)</span>
-                <span class="badge badge-orange">Floating UI</span>
-              </div>
-              <div class="ui-item-desc">실패·오류 발생 시 <mark>빨간색 토스트</mark>로 에러 내용을 즉시 피드백.</div>
+              <div class="ui-item-desc">GLB/GLTF 파일 업로드 및 압축 전후 용량/감소율(%)을 비교 표시하고 결과물 다운로드.</div>
             </div>
           </div>
         </div>
@@ -3556,11 +3358,11 @@
         });
         state[pageId] = markers;
       });
-      localStorage.setItem('storyboard_markers', JSON.stringify(state));
+      localStorage.setItem('storyboard_markers_v4', JSON.stringify(state));
     }
 
     function loadMarkers() {
-      const saved = localStorage.getItem('storyboard_markers');
+      let saved = localStorage.getItem('storyboard_markers_v4');
       if (saved) {
         const state = JSON.parse(saved);
         document.querySelectorAll('.image-wrapper').forEach(wrapper => {
@@ -3592,7 +3394,7 @@
     function clearAllData() {
       if (!isEditMode) return;
       if (confirm('모든 이미지에 추가된 마커와 박스를 초기화하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
-        localStorage.removeItem('storyboard_markers');
+        localStorage.removeItem('storyboard_markers_v4');
         document.querySelectorAll('.marker').forEach(m => m.remove());
       }
     }
@@ -3632,10 +3434,6 @@
       document.querySelectorAll('.page').forEach((page) => {
         observer.observe(page);
       });
-    }
-
-    function toggleSidebar() {
-      document.body.classList.toggle('sidebar-collapsed');
     }
 
     window.onload = () => {

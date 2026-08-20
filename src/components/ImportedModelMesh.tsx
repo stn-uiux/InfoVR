@@ -410,11 +410,36 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
     <group
       userData={{ isInnerContent: true }}
       onClick={handleClick}
-      onPointerOver={() => {
+      onPointerOver={(e) => {
         if (useStore.getState().isGizmoHovered) return;
+        const hitGizmoHelper = e.intersections.some((hit) => {
+          let obj: Object3D | null = hit.object;
+          while (obj) {
+            if (obj.userData?.isGizmoHelper || obj.userData?.isGizmo) return true;
+            obj = obj.parent;
+          }
+          return false;
+        });
+        if (hitGizmoHelper) return;
+
+        e.stopPropagation();
         if (isEditMode) {
           document.body.style.cursor = isMoveEnabled ? "grab" : "pointer";
         }
+      }}
+      onPointerMove={(e) => {
+        if (useStore.getState().isGizmoHovered) return;
+        const hitGizmoHelper = e.intersections.some((hit) => {
+          let obj: Object3D | null = hit.object;
+          while (obj) {
+            if (obj.userData?.isGizmoHelper || obj.userData?.isGizmo) return true;
+            obj = obj.parent;
+          }
+          return false;
+        });
+        if (hitGizmoHelper) return;
+
+        e.stopPropagation();
       }}
       onPointerOut={() => {
         if (
@@ -495,9 +520,9 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
   return (
     <group userData={{ isModelContainer: true, modelId: model.id }}>
       {shouldTransform ? (
-        <PivotControls
-          matrix={matrix}
-          userData={{ isGizmo: true }}
+        <group userData={{ isGizmo: true }}>
+          <PivotControls
+            matrix={matrix}
           anchor={[0, -1, 0]}
           depthTest={false}
           fixed
@@ -542,7 +567,8 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
           }}
         >
           {innerContent}
-        </PivotControls>
+          </PivotControls>
+        </group>
       ) : (
         <group
           position={model.position}

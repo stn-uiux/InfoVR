@@ -217,9 +217,13 @@ const R6_ONLY_CARD_FILENAMES = new Set(["R-series-9-full.svg"]);
  * - uniform grid 모델: R6 전용 카드 제외
  */
 export function getCardsForModel(
-  model: EquipmentModel,
+  model: EquipmentModel & { assignedCardIds?: string[] },
   allCards: CardDefinition[] = cardDefinitions,
 ): CardDefinition[] {
+  if (model.assignedCardIds && model.assignedCardIds.length > 0) {
+    return allCards.filter((cd) => model.assignedCardIds!.includes(cd.cardFileName) || model.assignedCardIds!.includes(cd.cardType));
+  }
+
   if (model.slots) {
     // 모든 슬롯의 accepts와 allowedCardGroups 합산
     const allAccepts = new Set<string>();

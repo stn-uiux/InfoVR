@@ -12,6 +12,7 @@ import type {
 import { CardRegistrationForm } from "./CardRegistrationForm";
 import { EquipmentAssemblyModal } from "../EquipmentAssemblyModal";
 import { CardThumbnail } from "../CardThumbnail";
+import { StnModal } from "../StnModal";
 import { cardDefinitions, equipmentModels, loadBaseEquipmentSvgRaw, getCardsForModel } from "../../utils/cardAssets";
 import { DEVICE_TEMPLATES } from "../../utils/deviceTemplates";
 import { getDeviceViewSides, resolveDeviceImage, resolveDeviceSvgContent } from "../../utils/deviceAssets";
@@ -1003,30 +1004,14 @@ export const ModelRegistrationModal: React.FC = () => {
 
   if (!isOpen) return null;
 
-  return createPortal(
-    <div className="mrm-overlay" onClick={() => setOpen(false)}>
-      <div className="mrm-modal" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
-        <div className="mrm-header">
-          <h2>
-            <div className="icon-box">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="12" y1="18" x2="12" y2="12" />
-                <line x1="9" y1="15" x2="15" y2="15" />
-              </svg>
-            </div>
-            장비 모델 관리
-          </h2>
-          <button
-            className="mrm-close"
-            onClick={() => setOpen(false)}
-            aria-label="Close"
-          >
-            ×
-          </button>
-        </div>
+  return (
+    <>
+      <StnModal
+        isOpen={isOpen}
+        onClose={() => setOpen(false)}
+        title="장비 모델 관리"
+        icon="material-symbols:build-circle"
+      >
 
         {/* Navigation for Register View */}
         {activeTab === "register" && (
@@ -1434,6 +1419,97 @@ export const ModelRegistrationModal: React.FC = () => {
 
                   {/* Legacy Card Area Configuration (Coordinates) removed as requested */}
 
+                  {/* Type/Variant Configuration */}
+                  <div className="mrm-section">
+                    <div className="mrm-section-title">
+                      타입 관리
+                      <span className="badge">미리 구성된 모델 옵션</span>
+                    </div>
+                    <div style={{ padding: "16px", border: "1px solid var(--border-weak)", borderRadius: "10px", background: "var(--bg-secondary)" }}>
+                      <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "12px", lineHeight: 1.5 }}>
+                        이 섀시 모델을 선택했을 때 자동으로 할당될 카드 구성을 미리 정의합니다.
+                        기본타입 외에 A타입, B타입 등을 추가할 수 있으며, 등록 후 '새 장비 등록' 메뉴에서 개별 모델로 선택할 수 있습니다.
+                      </p>
+
+                      <div className="mrm-models-list" style={{ marginBottom: "16px", marginTop: "4px" }}>
+                        {variants.map((v, i) => (
+                          <div key={v.variantId || i} className="mrm-model-row">
+                            <span className="model-type-tag card-based">
+                              {v.isDefault ? "기본" : "추가"}
+                            </span>
+                            <div className="model-thumb">
+                              {v.variantPngRaw ? (
+                                <img src={v.variantPngRaw} alt={v.variantName} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                              ) : (
+                                <div
+                                  style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}
+                                  dangerouslySetInnerHTML={{
+                                    __html: modelSvgRaw || baseChassisRaw || ""
+                                  }}
+                                />
+                              )}
+                            </div>
+                            <div className="model-info-wrapper">
+                              <div className="model-info-header">
+                                <div className="model-info">
+                                  <div className="model-display-name">
+                                    {v.variantName}
+                                  </div>
+                                  <div className="model-meta">
+                                    <span>{v.insertedCards?.length || 0}개 카드 장착됨</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="model-actions">
+                                <button
+                                  type="button"
+                                  className="action-icon-btn edit-btn"
+                                  onClick={() => { setEditingVariantIndex(i); setIsAssemblyOpen(true); }}
+                                  title="타입 수정"
+                                  aria-label="타입 수정"
+                                >
+                                  <Icon icon="material-symbols:edit" style={{ width: 16, height: 16 }} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="action-icon-btn delete-btn"
+                                  onClick={() => setVariants(prev => prev.filter((_, idx) => idx !== i))}
+                                  title="타입 삭제"
+                                  aria-label="타입 삭제"
+                                >
+                                  <Icon icon="material-symbols:delete" style={{ width: 16, height: 16 }} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {variants.length === 0 && (
+                        <div style={{ padding: "20px", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px", background: "var(--bg-primary)", borderRadius: "6px", border: "1px dashed var(--border-medium)", marginBottom: "16px" }}>
+                          구성된 타입이 없습니다. 새 타입을 추가해주세요.
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        disabled={!baseChassisRaw || !isChassisDrawn}
+                        onClick={() => {
+                          setEditingVariantIndex(null);
+                          setIsAssemblyOpen(true);
+                        }}
+                        style={{
+                          width: "100%", padding: "10px", borderRadius: "6px",
+                          background: "var(--theme-primary)", color: "#fff", fontWeight: 600, border: "none",
+                          opacity: (!baseChassisRaw || !isChassisDrawn) ? 0.5 : 1,
+                          cursor: (!baseChassisRaw || !isChassisDrawn) ? "not-allowed" : "pointer"
+                        }}
+                      >
+                        + 새 타입 추가
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Card Assignment */}
                   <div className="mrm-section">
                     <div className="mrm-section-title">카드 할당</div>
@@ -1562,96 +1638,7 @@ export const ModelRegistrationModal: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Type/Variant Configuration */}
-                  <div className="mrm-section">
-                    <div className="mrm-section-title">
-                      타입 관리
-                      <span className="badge">미리 구성된 모델 옵션</span>
-                    </div>
-                    <div style={{ padding: "16px", border: "1px solid var(--border-weak)", borderRadius: "10px", background: "var(--bg-secondary)" }}>
-                      <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "12px", lineHeight: 1.5 }}>
-                        이 섀시 모델을 선택했을 때 자동으로 할당될 카드 구성을 미리 정의합니다.
-                        기본타입 외에 A타입, B타입 등을 추가할 수 있으며, 등록 후 '새 장비 등록' 메뉴에서 개별 모델로 선택할 수 있습니다.
-                      </p>
 
-                      <div className="mrm-models-list" style={{ marginBottom: "16px", marginTop: "4px" }}>
-                        {variants.map((v, i) => (
-                          <div key={v.variantId || i} className="mrm-model-row">
-                            <span className="model-type-tag card-based">
-                              {v.isDefault ? "기본" : "추가"}
-                            </span>
-                            <div className="model-thumb">
-                              {v.variantPngRaw ? (
-                                <img src={v.variantPngRaw} alt={v.variantName} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                              ) : (
-                                <div
-                                  style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}
-                                  dangerouslySetInnerHTML={{
-                                    __html: modelSvgRaw || baseChassisRaw || ""
-                                  }}
-                                />
-                              )}
-                            </div>
-                            <div className="model-info-wrapper">
-                              <div className="model-info-header">
-                                <div className="model-info">
-                                  <div className="model-display-name">
-                                    {v.variantName}
-                                  </div>
-                                  <div className="model-meta">
-                                    <span>{v.insertedCards?.length || 0}개 카드 장착됨</span>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="model-actions">
-                                <button
-                                  type="button"
-                                  className="action-icon-btn edit-btn"
-                                  onClick={() => { setEditingVariantIndex(i); setIsAssemblyOpen(true); }}
-                                  title="타입 수정"
-                                  aria-label="타입 수정"
-                                >
-                                  <Icon icon="material-symbols:edit" style={{ width: 16, height: 16 }} />
-                                </button>
-                                <button
-                                  type="button"
-                                  className="action-icon-btn delete-btn"
-                                  onClick={() => setVariants(prev => prev.filter((_, idx) => idx !== i))}
-                                  title="타입 삭제"
-                                  aria-label="타입 삭제"
-                                >
-                                  <Icon icon="material-symbols:delete" style={{ width: 16, height: 16 }} />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      {variants.length === 0 && (
-                        <div style={{ padding: "20px", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px", background: "var(--bg-primary)", borderRadius: "6px", border: "1px dashed var(--border-medium)", marginBottom: "16px" }}>
-                          구성된 타입이 없습니다. 새 타입을 추가해주세요.
-                        </div>
-                      )}
-
-                      <button
-                        type="button"
-                        disabled={!baseChassisRaw || !isChassisDrawn}
-                        onClick={() => {
-                          setEditingVariantIndex(null);
-                          setIsAssemblyOpen(true);
-                        }}
-                        style={{
-                          width: "100%", padding: "10px", borderRadius: "6px",
-                          background: "var(--theme-primary)", color: "#fff", fontWeight: 600, border: "none",
-                          opacity: (!baseChassisRaw || !isChassisDrawn) ? 0.5 : 1,
-                          cursor: (!baseChassisRaw || !isChassisDrawn) ? "not-allowed" : "pointer"
-                        }}
-                      >
-                        + 새 타입 추가
-                      </button>
-                    </div>
-                  </div>
                 </>
               )}
             </div>
@@ -2183,7 +2170,7 @@ export const ModelRegistrationModal: React.FC = () => {
             />
           </div>
         )}
-      </div>
+      </StnModal>
 
       {/* Card Registration Sub-Modal */}
       <CardRegistrationForm
@@ -2393,13 +2380,12 @@ export const ModelRegistrationModal: React.FC = () => {
         </div>
       )}
 
-      {/* Toast */}
+
       {toast &&
         createPortal(
           <div className={`mrm-toast ${toast.type}`}>{toast.message}</div>,
           document.body,
         )}
-    </div>,
-    document.body,
+    </>
   );
 };

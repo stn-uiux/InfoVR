@@ -39,7 +39,7 @@ export const GlobalFocusLights = () => {
     const rackZ = rack.position[1] * GRID_SPACING;
     const h = rack.rackSize * U_HEIGHT + 0.1; // adding 0.1 as per Rack.tsx
     const w = rack.width || 0.6;
-    const d = rack.depth || RACK_D;
+    const d = (rack as any).depth || RACK_D;
     const orientation = rack.orientation ?? 180;
     const rot = [
       0,

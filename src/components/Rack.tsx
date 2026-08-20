@@ -761,6 +761,7 @@ const DeviceMesh = ({
   isObstructing?: boolean;
   rackTitle?: string;
   rackId: string;
+  isRackFocused?: boolean;
 }) => {
   const meshRef = useRef<Mesh>(null);
   const faceplateRef = useRef<Mesh>(null);
@@ -906,7 +907,14 @@ const DeviceMesh = ({
         if (state.isGizmoHovered) return;
         if (state.isEditMode && state.selectedRackId === rackId) return;
 
-        const hitGizmoHelper = e.intersections.some((hit) => hit.object.userData?.isGizmoHelper || hit.object.userData?.isGizmo);
+        const hitGizmoHelper = e.intersections.some((hit) => {
+          let obj: Object3D | null = hit.object;
+          while (obj) {
+            if (obj.userData?.isGizmoHelper || obj.userData?.isGizmo) return true;
+            obj = obj.parent;
+          }
+          return false;
+        });
         if (hitGizmoHelper) return;
 
         e.stopPropagation();
@@ -925,6 +933,23 @@ const DeviceMesh = ({
         const state = useStore.getState();
         if (state.isGizmoHovered) return;
         if (state.isEditMode && state.selectedRackId === rackId) return;
+
+        const hitGizmoHelper = e.intersections.some((hit) => {
+          let obj: Object3D | null = hit.object;
+          while (obj) {
+            if (obj.userData?.isGizmoHelper || obj.userData?.isGizmo) return true;
+            obj = obj.parent;
+          }
+          return false;
+        });
+        if (hitGizmoHelper) {
+          const { hoveredDevice, setHoveredDevice } = state;
+          if (hoveredDevice?.device.itemId === device.itemId) {
+            setIsDeviceHovered(false);
+            setHoveredDevice(null);
+          }
+          return;
+        }
 
         e.stopPropagation();
         state.setHoveredDevice({

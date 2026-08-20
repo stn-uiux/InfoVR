@@ -367,19 +367,19 @@ export const ModelImporter = () => {
 
   useEffect(() => {
     let dragTimeout: NodeJS.Timeout;
-    
+
     const handleDragOver = (e: DragEvent) => {
       if (e.dataTransfer?.types.includes("Files") && isEditMode) {
         e.preventDefault();
         setIsDragOver(true);
-        
+
         clearTimeout(dragTimeout);
         dragTimeout = setTimeout(() => {
           setIsDragOver(false);
         }, 150);
       }
     };
-    
+
     const handleDrop = () => {
       clearTimeout(dragTimeout);
       setIsDragOver(false);
@@ -387,7 +387,7 @@ export const ModelImporter = () => {
 
     window.addEventListener("dragover", handleDragOver, { capture: true });
     window.addEventListener("drop", handleDrop, { capture: true });
-    
+
     return () => {
       clearTimeout(dragTimeout);
       window.removeEventListener("dragover", handleDragOver, { capture: true });
@@ -402,7 +402,7 @@ export const ModelImporter = () => {
           <div className="comm-flex-center-10-flex1">
             <span className="comm-flex-center-8-noshrink">
               <span className="comm-icon-primary-lg">
-                <Icon icon="mdi:server-network" className="icon comm-icon-md" />
+                <Icon icon="ri:box-3-fill" className="icon comm-icon-md" />
               </span>
               <span className="tree-node-header-text">가상 공간</span>
             </span>
@@ -553,55 +553,13 @@ export const ModelImporter = () => {
     );
   };
 
-  const renderProjectPanel = () => (
-    <div className="collapse-panel expanded" style={{ flexShrink: 0, height: "auto", minHeight: 0 }}>
-      <div className="collapse-panel-header">
-        <div className="comm-flex-center-10-flex1">
-          <span className="comm-flex-center-8-noshrink">
-            <span className="comm-icon-primary-lg">
-              <Icon icon="material-symbols:folder" className="icon comm-icon-md" />
-            </span>
-            <span className="tree-node-header-text">에셋 레이아웃</span>
-          </span>
-        </div>
-      </div>
-      <div className="collapse-panel-body">
-        <div className="comm-flex-col-10">
-          <div>
-
-            <div className="comm-flex-gap-8">
-              <button
-                className="comm-btn comm-btn-md comm-btn-secondary comm-flex-1"
-                disabled={importedModels.length === 0}
-                onClick={handleExportModels}
-              >
-                <Icon icon="material-symbols:save" className="icon" /> 내보내기
-              </button>
-              <button
-                className="comm-btn comm-btn-md comm-btn-secondary comm-flex-1"
-                onClick={() => modelImportRef.current?.click()}
-              >
-                <Icon icon="material-symbols:folder-open" className="icon" /> 불러오기
-              </button>
-            </div>
-            {(successMsg || error || importError) && (
-              <div style={{ marginTop: "8px", fontSize: "10px", color: error || importError ? "#ef4444" : "#22c55e", fontWeight: 500, textAlign: "center", padding: "6px", background: error || importError ? "rgba(239, 68, 68, 0.05)" : "rgba(34, 197, 94, 0.05)", borderRadius: "4px", border: "1px solid", borderColor: error || importError ? "rgba(239, 68, 68, 0.1)" : "rgba(34, 197, 94, 0.1)" }}>
-                {(error || importError || successMsg)?.replace("Exported", "Saved").replace("Import", "Load")}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
   const renderBuiltinPanel = () => (
     <div className="collapse-panel expanded" style={{ flexShrink: 0, height: "auto", minHeight: 0 }}>
       <div className="collapse-panel-header">
         <div className="comm-flex-center-10-flex1">
           <span className="comm-flex-center-8-noshrink">
             <span className="comm-icon-primary-lg">
-              <Icon icon="material-symbols:inventory-2" className="icon comm-icon-md" />
+              <Icon icon="lucide:library" className="icon comm-icon-md" />
             </span>
             <span className="tree-node-header-text">에셋 라이브러리</span>
           </span>
@@ -640,6 +598,48 @@ export const ModelImporter = () => {
     </div>
   );
 
+  const renderProjectPanel = () => (
+    <div className="collapse-panel expanded" style={{ flexShrink: 0, height: "auto", minHeight: 0 }}>
+      <div className="collapse-panel-header">
+        <div className="comm-flex-center-10-flex1">
+          <span className="comm-flex-center-8-noshrink">
+            <span className="comm-icon-primary-lg">
+              <Icon icon="material-symbols:folder" className="icon comm-icon-md" />
+            </span>
+            <span className="tree-node-header-text">에셋 레이아웃</span>
+          </span>
+        </div>
+      </div>
+      <div className="collapse-panel-body">
+        <div className="comm-flex-col-10">
+          <div>
+
+            <div className="comm-flex-gap-8">
+              <button
+                className="comm-btn comm-btn-md comm-btn-secondary comm-flex-1"
+                disabled={importedModels.length === 0}
+                onClick={handleExportModels}
+              >
+                <Icon icon="material-symbols:download" className="icon" /> 내보내기
+              </button>
+              <button
+                className="comm-btn comm-btn-md comm-btn-secondary comm-flex-1"
+                onClick={() => modelImportRef.current?.click()}
+              >
+                <Icon icon="material-symbols:upload" className="icon" /> 불러오기
+              </button>
+            </div>
+            {(successMsg || error || importError) && (
+              <div style={{ marginTop: "8px", fontSize: "10px", color: error || importError ? "#ef4444" : "#22c55e", fontWeight: 500, textAlign: "center", padding: "6px", background: error || importError ? "rgba(239, 68, 68, 0.05)" : "rgba(34, 197, 94, 0.05)", borderRadius: "4px", border: "1px solid", borderColor: error || importError ? "rgba(239, 68, 68, 0.1)" : "rgba(34, 197, 94, 0.1)" }}>
+                {(error || importError || successMsg)?.replace("Exported", "Saved").replace("Import", "Load")}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   const renderImportedPanel = () => {
     return (
       <div className="collapse-panel expanded" style={{ flexShrink: 0, height: "auto", minHeight: 0 }}>
@@ -647,7 +647,7 @@ export const ModelImporter = () => {
           <div className="comm-flex-center-10-flex1" style={{ justifyContent: "space-between" }}>
             <span className="comm-flex-center-8-noshrink">
               <span className="comm-icon-primary-lg">
-                <Icon icon="mdi:cube-outline" className="icon comm-icon-md" />
+                <Icon icon="ph:stack-fill" className="icon comm-icon-md" />
               </span>
               <span className="tree-node-header-text">오브젝트 레이어 ({importedModels.length})</span>
             </span>
@@ -752,7 +752,7 @@ export const ModelImporter = () => {
               onClick={(e) => toggleFloatingPanel("hierarchy", e)}
               title="구조 (Hierarchy)"
             >
-              <Icon icon="material-symbols:grid-view" className="icon" />
+              <Icon icon="icon-park-solid:network-tree" className="icon" />
             </button>
             {isEditMode && (
               <>
@@ -761,7 +761,14 @@ export const ModelImporter = () => {
                   onClick={(e) => toggleFloatingPanel("serverRoomEnv", e)}
                   title="가상 공간"
                 >
-                  <Icon icon="mdi:server-network" className="icon" />
+                  <Icon icon="ri:box-3-fill" className="icon" />
+                </button>
+                <button
+                  className={`sidebar-tab-btn ${floatingPanel === "builtin" ? "active" : ""}`}
+                  onClick={(e) => toggleFloatingPanel("builtin", e)}
+                  title="에셋 라이브러리 (Asset Library)"
+                >
+                  <Icon icon="lucide:library" className="icon" />
                 </button>
                 <button
                   className={`sidebar-tab-btn ${floatingPanel === "project" ? "active" : ""}`}
@@ -771,18 +778,11 @@ export const ModelImporter = () => {
                   <Icon icon="material-symbols:folder" className="icon" />
                 </button>
                 <button
-                  className={`sidebar-tab-btn ${floatingPanel === "builtin" ? "active" : ""}`}
-                  onClick={(e) => toggleFloatingPanel("builtin", e)}
-                  title="에셋 라이브러리 (Asset Library)"
-                >
-                  <Icon icon="material-symbols:inventory-2" className="icon" />
-                </button>
-                <button
                   className={`sidebar-tab-btn ${floatingPanel === "imported" ? "active" : ""}`}
                   onClick={(e) => toggleFloatingPanel("imported", e)}
                   title="오브젝트 레이어 (Object Layer)"
                 >
-                  <Icon icon="material-symbols:archive" className="icon" />
+                  <Icon icon="ph:stack-fill" className="icon" />
                 </button>
               </>
             )}
@@ -818,8 +818,8 @@ export const ModelImporter = () => {
               }}
             >
               {isEditMode && renderServerRoomEnvPanel()}
-              {isEditMode && renderProjectPanel()}
               {isEditMode && renderBuiltinPanel()}
+              {isEditMode && renderProjectPanel()}
               {isEditMode && renderImportedPanel()}
             </div>
           </div>
@@ -866,8 +866,8 @@ export const ModelImporter = () => {
               >
                 {floatingPanel === "hierarchy" && <HierarchyTree />}
                 {floatingPanel === "serverRoomEnv" && isEditMode && renderServerRoomEnvPanel()}
-                {floatingPanel === "project" && isEditMode && renderProjectPanel()}
                 {floatingPanel === "builtin" && isEditMode && renderBuiltinPanel()}
+                {floatingPanel === "project" && isEditMode && renderProjectPanel()}
                 {floatingPanel === "imported" && isEditMode && renderImportedPanel()}
               </div>
 
@@ -882,13 +882,13 @@ export const ModelImporter = () => {
       </div>
 
       {/* Equipment Panel Portal Target - Sibling of sidebar to avoid backdrop-filter stacking issues */}
-      <div 
-        id={isCollapsed ? "equipment-panel-portal-hidden" : "equipment-panel-portal"} 
-        className="sidebar-portal-target" 
-        style={{ 
-          left: isCollapsed ? 60 : sidebarWidth, 
-          width: 0 
-        }} 
+      <div
+        id={isCollapsed ? "equipment-panel-portal-hidden" : "equipment-panel-portal"}
+        className="sidebar-portal-target"
+        style={{
+          left: isCollapsed ? 60 : sidebarWidth,
+          width: 0
+        }}
       />
 
       {/* Properties Section — positioned right next to the left panel */}

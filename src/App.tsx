@@ -370,7 +370,7 @@ function App() {
               }}
               title="장비 관리"
             >
-              <Icon icon="material-symbols:archive" className="icon" />
+              <Icon icon="mdi:server" className="icon" />
               장비
             </button>
 
