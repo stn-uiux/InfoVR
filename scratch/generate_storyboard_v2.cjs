@@ -698,7 +698,7 @@ const manualUIData = {
   ],
   "6-3": [
     { name: "캔버스 + 포트 박스 오버레이", type: "3D Canvas", desc: "장비 이미지 위에 감지된 포트들이 <mark>색상 구분 사각형</mark>으로 오버레이. 드래그 이동·리사이즈 가능." },
-    { name: "상단 편집 툴바", type: "Button", desc: "<mark>Lock/Unlock</mark>, <mark>Manual Port</mark>, <mark>PRT</mark>(포트 복제), <mark>GRP_CPY</mark>(그룹 복제), <mark>Export</mark> 등 편집 액션 버튼 배치." },
+    { name: "편집 툴바", type: "Button", desc: "<mark>Manual Port</mark>, <mark>PRT</mark>(포트 복제), <mark>GRP_CPY</mark>(그룹 복제), <mark>Export</mark> 등 편집 액션 버튼 배치." },
     { name: "우측 Object Registry", type: "Sidebar", desc: "매핑된 전체 포트를 <mark>Tag별 카테고리</mark>로 그룹핑 표시. 항목 클릭 시 캔버스에서 해당 포트 선택·하이라이트." }
   ],
   "6-4": [
