@@ -37,6 +37,36 @@
       border-right: 1px solid var(--border-color);
       padding: 1.5rem 1rem;
       box-sizing: border-box;
+      transition: transform 0.3s ease;
+      z-index: 999;
+    }
+
+    .sidebar-nav.hidden {
+      transform: translateX(-100%);
+    }
+
+    .sidebar-toggle-btn {
+      position: fixed;
+      top: 1.5rem;
+      left: 280px;
+      width: 24px;
+      height: 40px;
+      background: var(--secondary-color);
+      color: white;
+      border: none;
+      border-radius: 0 4px 4px 0;
+      cursor: pointer;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: left 0.3s ease;
+      box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
+      font-size: 12px;
+    }
+
+    .sidebar-toggle-btn.hidden {
+      left: 0;
     }
 
     .sidebar-nav h2 {
@@ -63,6 +93,23 @@
       margin-bottom: 0.3rem;
       color: var(--primary-color);
       font-size: 1rem;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .sidebar-nav>ul>li>strong::after {
+      content: ' ▼';
+      font-size: 0.8em;
+      float: right;
+      transition: transform 0.2s;
+    }
+
+    .sidebar-nav>ul>li.collapsed>strong::after {
+      transform: rotate(-90deg);
+    }
+
+    .sidebar-nav>ul>li.collapsed>ul {
+      display: none;
     }
 
     .sidebar-nav ul ul {
@@ -104,6 +151,12 @@
       padding: 1.5rem 2rem;
       width: calc(100% - 280px);
       box-sizing: border-box;
+      transition: margin-left 0.3s ease, width 0.3s ease;
+    }
+
+    .main-content.expanded {
+      margin-left: 0;
+      width: 100%;
     }
 
     header {
@@ -453,6 +506,7 @@
       초기화</button>
     <button id="editToggleBtn" onclick="toggleEditMode()" style="background:#3b82f6; color:white;">✏️ 마커 편집 켜기</button>
   </div>
+  <button id="sidebarToggleBtn" class="sidebar-toggle-btn">◀</button>
   <nav class="sidebar-nav">
     <h2>📋 목차</h2>
     <ul>
@@ -1224,14 +1278,6 @@
               <div class="ui-item-desc">임포트된 모델의 <mark>위치(X/Y/Z)</mark>, <mark>회전(X/Y/Z)</mark>, <mark>크기(X/Y/Z)</mark>를
                 수치로 정밀 편집.</div>
             </div>
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">3</span>
-                <span class="ui-item-name">Scene Objects 리스트</span>
-                <span class="badge badge-green">List</span>
-              </div>
-              <div class="ui-item-desc">씬에 배치된 모든 오브젝트 목록. 항목 클릭 시 해당 오브젝트 선택, 잠금/해제·삭제 액션 제공.</div>
-            </div>
           </div>
         </div>
       </div>
@@ -1322,7 +1368,7 @@
                 <span class="ui-item-name">랙 생성 패널</span>
                 <span class="badge badge-indigo">Panel</span>
               </div>
-              <div class="ui-item-desc"><mark>24U/32U/48U</mark> 크기와 <mark>Standard/Wide</mark> 규격을 선택하여 빈 랙을 씬에 추가.
+              <div class="ui-item-desc"><mark>24U/32U/48U</mark> 크기를 선택하여 빈 랙을 씬에 추가.
               </div>
             </div>
             <div class="ui-item">
@@ -1638,8 +1684,7 @@
     <div id="page-3-3" class="page">
       <h2 class="page-title"><span class="page-id">3-3</span> 장비 등록 폼</h2>
       <h3>화면 설명</h3>
-      <p>본 화면은 <strong>장비 등록 폼</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [장비 기본 정보 입력(모델 선택, IP, MAC 등), 모듈러 장비 조립 버튼, 양면
-        프리뷰, 기본 표시 면 선택] 등을 포함하고 있습니다.</p>
+      <p>본 화면은 <strong>장비 등록 폼</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [장비 기본 정보 입력(모델 선택, IP, MAC 등),등을 포함하고 있습니다.</p>
 
       <div class="page-content-split">
         <div class="page-left">
@@ -1675,23 +1720,6 @@
                 <span class="badge badge-yellow">Input / Form</span>
               </div>
               <div class="ui-item-desc">등록된 장비 모델 목록에서 선택. 선택 시 <mark>SVG 프리뷰</mark>와 U 크기가 자동 반영됨.</div>
-            </div>
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">3</span>
-                <span class="ui-item-name">모듈러 장비 조립 버튼</span>
-                <span class="badge badge-blue">Button</span>
-              </div>
-              <div class="ui-item-desc">카드 기반(섀시형) 모델 선택 시 활성화. 클릭 시 <mark>장비 조립 모달</mark>(Equipment Assembly)로 진입.
-              </div>
-            </div>
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">4</span>
-                <span class="ui-item-name">양면 프리뷰 & 기본 면 선택</span>
-                <span class="badge badge-pink">Graphics</span>
-              </div>
-              <div class="ui-item-desc">양면 모델 선택 시 앞면·뒷면 SVG가 함께 프리뷰. <mark>기본 표시 면</mark>(앞면/뒷면)을 장비별로 선택 가능.</div>
             </div>
           </div>
         </div>
@@ -2071,11 +2099,11 @@
             <div class="ui-item">
               <div class="ui-item-header">
                 <span class="element-number">3</span>
-                <span class="ui-item-name">행별 높이·열 수·간격 설정</span>
+                <span class="ui-item-name">행별 높이·열 수·간격 표출</span>
                 <span class="badge badge-yellow">Input / Form</span>
               </div>
-              <div class="ui-item-desc">각 행(Row)별로 <mark>높이</mark>(px), <mark>열 수</mark>, <mark>간격(Gap)</mark>을 개별 설정
-                가능. 열 너비는 자동 계산 표시.</div>
+              <div class="ui-item-desc">각 행(Row)별로 <mark>높이</mark>(px), <mark>열 수</mark>, <mark>간격(Gap)</mark>을 자동 계산 개별
+                표출.</div>
             </div>
             <div class="ui-item">
               <div class="ui-item-header">
@@ -2190,14 +2218,6 @@
             <div class="ui-item">
               <div class="ui-item-header">
                 <span class="element-number">3</span>
-                <span class="ui-item-name">타입명 설정 & 중복 검증</span>
-                <span class="badge badge-yellow">Input / Form</span>
-              </div>
-              <div class="ui-item-desc">타입에 고유 이름 부여. 동일 모델 내 <mark>중복 타입명</mark>이 있으면 경고 토스트 표시 + 저장 차단.</div>
-            </div>
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">4</span>
                 <span class="ui-item-name">타입 수정/삭제</span>
                 <span class="badge badge-blue">Button</span>
               </div>
@@ -2267,6 +2287,14 @@
               <div class="ui-item-desc">클릭 시 <mark>썸네일 자동 합성</mark>(WebP)과 장비 등록 시 사용할 <mark>카드 조합 SVG 자동 생성</mark>이
                 수행됨.</div>
             </div>
+            <div class="ui-item">
+              <div class="ui-item-header">
+                <span class="element-number">5</span>
+                <span class="ui-item-name">저장 시 타입명 설정 & 중복 검증</span>
+                <span class="badge badge-yellow">Input / Form</span>
+              </div>
+              <div class="ui-item-desc">타입에 고유 이름 부여. 동일 모델 내 <mark>중복 타입명</mark>이 있으면 경고 토스트 표시 + 저장 차단.</div>
+            </div>
           </div>
         </div>
       </div>
@@ -2304,17 +2332,10 @@
               </div>
               <div class="ui-item-desc">장비 전면부 사진(PNG/JPG/WEBP)을 <mark>파일 선택 또는 드래그 앤 드롭</mark>으로 업로드.</div>
             </div>
+
             <div class="ui-item">
               <div class="ui-item-header">
                 <span class="element-number">2</span>
-                <span class="ui-item-name">빈 캔버스 상태</span>
-                <span class="badge badge-pink">3D Canvas</span>
-              </div>
-              <div class="ui-item-desc">이미지 미업로드 시 빈 캔버스에 업로드 안내 표시.</div>
-            </div>
-            <div class="ui-item">
-              <div class="ui-item-header">
-                <span class="element-number">3</span>
                 <span class="ui-item-name">Process Telemetry 패널</span>
                 <span class="badge badge-indigo">Panel</span>
               </div>
@@ -2438,8 +2459,8 @@
     <div id="page-5-4" class="page">
       <h2 class="page-title"><span class="page-id">5-4</span> 포트 편집 모드 — 전체 레이아웃</h2>
       <h3>화면 설명</h3>
-      <p>본 화면은 <strong>포트 편집 모드 — 전체 레이아웃</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [캔버스 + 포트 박스 오버레이, 상단 툴바(Lock/Unlock,
-        Manual Port, PRT, GRP_CPY, Export), 우측 Object Registry] 등을 포함하고 있습니다.</p>
+      <p>본 화면은 <strong>포트 편집 모드 — 전체 레이아웃</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [캔버스 + 포트 박스 오버레이, 툴바(Manual Port,
+        PRT, GRP_CPY, Export), 우측 Object Registry] 등을 포함하고 있습니다.</p>
 
       <div class="page-content-split">
         <div class="page-left">
@@ -2464,17 +2485,17 @@
               <div class="ui-item-header">
                 <span class="element-number">1</span>
                 <span class="ui-item-name">캔버스 + 포트 박스 오버레이</span>
-                <span class="badge badge-pink">3D Canvas</span>
+                <span class="badge badge-pink">Graphics</span>
               </div>
               <div class="ui-item-desc">장비 이미지 위에 감지된 포트들이 <mark>색상 구분 사각형</mark>으로 오버레이. 드래그 이동·리사이즈 가능.</div>
             </div>
             <div class="ui-item">
               <div class="ui-item-header">
                 <span class="element-number">2</span>
-                <span class="ui-item-name">상단 편집 툴바</span>
+                <span class="ui-item-name">편집 툴바</span>
                 <span class="badge badge-blue">Button</span>
               </div>
-              <div class="ui-item-desc"><mark>Lock/Unlock</mark>, <mark>Manual Port</mark>, <mark>PRT</mark>(포트 복제),
+              <div class="ui-item-desc"><mark>Manual Port</mark>, <mark>PRT</mark>(포트 복제),
                 <mark>GRP_CPY</mark>(그룹 복제), <mark>Export</mark> 등 편집 액션 버튼 배치.
               </div>
             </div>
@@ -3358,7 +3379,7 @@
         });
         state[pageId] = markers;
       });
-      localStorage.setItem('storyboard_markers_v4', JSON.stringify(state));
+      localStorage.setItem('storyboard_markers_v5', JSON.stringify(state));
     }
 
     function loadMarkers() {
@@ -3444,6 +3465,30 @@
     window.onload = () => {
       loadMarkers();
       initScrollSpy();
+
+      document.querySelectorAll('.sidebar-nav > ul > li > strong').forEach(title => {
+        title.addEventListener('click', () => {
+          title.parentElement.classList.toggle('collapsed');
+        });
+      });
+
+      const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+      if (sidebarToggleBtn) {
+        sidebarToggleBtn.addEventListener('click', () => {
+          const sidebar = document.querySelector('.sidebar-nav');
+          const mainContent = document.querySelector('.main-content');
+
+          sidebar.classList.toggle('hidden');
+          sidebarToggleBtn.classList.toggle('hidden');
+          mainContent.classList.toggle('expanded');
+
+          if (sidebar.classList.contains('hidden')) {
+            sidebarToggleBtn.innerText = '▶';
+          } else {
+            sidebarToggleBtn.innerText = '◀';
+          }
+        });
+      }
     };
   </script>
 </body>

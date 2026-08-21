@@ -39,6 +39,36 @@ const htmlStart = `<!DOCTYPE html>
       border-right: 1px solid var(--border-color);
       padding: 1.5rem 1rem;
       box-sizing: border-box;
+      transition: transform 0.3s ease;
+      z-index: 999;
+    }
+    
+    .sidebar-nav.hidden {
+      transform: translateX(-100%);
+    }
+
+    .sidebar-toggle-btn {
+      position: fixed;
+      top: 1.5rem;
+      left: 280px;
+      width: 24px;
+      height: 40px;
+      background: var(--secondary-color);
+      color: white;
+      border: none;
+      border-radius: 0 4px 4px 0;
+      cursor: pointer;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: left 0.3s ease;
+      box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+      font-size: 12px;
+    }
+    
+    .sidebar-toggle-btn.hidden {
+      left: 0;
     }
 
     .sidebar-nav h2 {
@@ -65,6 +95,23 @@ const htmlStart = `<!DOCTYPE html>
       margin-bottom: 0.3rem;
       color: var(--primary-color);
       font-size: 1rem;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .sidebar-nav > ul > li > strong::after {
+      content: ' ▼';
+      font-size: 0.8em;
+      float: right;
+      transition: transform 0.2s;
+    }
+
+    .sidebar-nav > ul > li.collapsed > strong::after {
+      transform: rotate(-90deg);
+    }
+
+    .sidebar-nav > ul > li.collapsed > ul {
+      display: none;
     }
 
     .sidebar-nav ul ul {
@@ -106,6 +153,12 @@ const htmlStart = `<!DOCTYPE html>
       padding: 1.5rem 2rem;
       width: calc(100% - 280px);
       box-sizing: border-box;
+      transition: margin-left 0.3s ease, width 0.3s ease;
+    }
+
+    .main-content.expanded {
+      margin-left: 0;
+      width: 100%;
     }
 
     header {
@@ -416,7 +469,7 @@ while ((match = chapterRegex.exec(md)) !== null) {
   chapters.push({ num: match[1], title: match[2].trim(), pos: match.index });
 }
 
-let tocHtml = '<nav class="sidebar-nav"><h2>📋 목차</h2><ul>';
+let tocHtml = '<button id="sidebarToggleBtn" class="sidebar-toggle-btn">◀</button><nav class="sidebar-nav"><h2>📋 목차</h2><ul>';
 let pagesHtml = '<div class="main-content"><header><h1>📐 ArcVRack 화면설계서</h1><div class="meta-info"><strong>버전:</strong> v1.0 | <strong>작성일:</strong> 2026-08-19 | <strong>관련 문서:</strong> 기능명세서 v1.5</div></header>';
 
 function guessUIType(text) {
@@ -616,7 +669,7 @@ const manualUIData = {
     { name: "섀시 프리뷰 오버레이", type: "Graphics", desc: "카드 영역이 <mark>점선 사각형 + 행/열 구분선 + 라벨</mark>로 실시간 오버레이되어 좌표 설정 결과 확인." }
   ],
   "5-6": [
-    { name: "행별 높이·열 수·간격 설정", type: "Input / Form", desc: "각 행(Row)별로 <mark>높이</mark>(px), <mark>열 수</mark>, <mark>간격(Gap)</mark>을 개별 설정 가능. 열 너비는 자동 계산 표시." },
+    { name: "행별 높이·열 수·간격 표출", type: "Input / Form", desc: "각 행(Row)별로 <mark>높이</mark>(px), <mark>열 수</mark>, <mark>간격(Gap)</mark>을 개별 표출. 열 너비는 자동 계산 표시." },
     { name: "전체 통일 기능", type: "Input / Form", desc: "상단 일괄 입력 폼으로 높이·열 수·간격 값을 <mark>모든 행에 한 번에 적용</mark>." },
     { name: "Gap 시각화", type: "Graphics", desc: "양수 간격은 <mark>주황색</mark>(Warning) 영역, 음수 간격(겹침)은 <mark>빨간색</mark>(Danger) 영역으로 프리뷰에 오버레이 표시." }
   ],
@@ -720,11 +773,11 @@ const manualUIData = {
 
 for (let i = 0; i < chapters.length; i++) {
   const start = chapters[i].pos;
-  const end = (i + 1 < chapters.length) ? chapters[i+1].pos : md.indexOf('## 🛠️ 작성 방법 가이드');
+  const end = (i + 1 < chapters.length) ? chapters[i + 1].pos : md.indexOf('## 🛠️ 작성 방법 가이드');
   const sectionText = md.substring(start, end);
-  
+
   tocHtml += '<li><strong>' + chapters[i].num + '장. ' + chapters[i].title + '</strong><ul>';
-  
+
   const rowRegex = /\|\s*\*\*(.*?)\*\*\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|/g;
   let rowMatch;
   while ((rowMatch = rowRegex.exec(sectionText)) !== null) {
@@ -732,9 +785,9 @@ for (let i = 0; i < chapters.length; i++) {
     const pageTitle = rowMatch[2].trim();
     const pageDesc = rowMatch[3].trim();
     const requiredCap = rowMatch[4].trim();
-    
+
     tocHtml += `<li><a href="#page-${pageId}">${pageId}. ${pageTitle}</a></li>`;
-    
+
     let imgHtml = `<div style="text-align:center; padding: 3rem; width: 100%;">이미지 캡처 필요: ${requiredCap}</div>`;
     if (pageId === '1-1') imgHtml = '<img src="images/1_main_view.png" alt="' + pageTitle + '" class="screenshot" draggable="false">';
     if (pageId === '1-2') imgHtml = '<img src="images/2_sample_data.png" alt="' + pageTitle + '" class="screenshot" draggable="false">';
@@ -744,14 +797,14 @@ for (let i = 0; i < chapters.length; i++) {
     if (pageId === '3-1') imgHtml = '<img src="images/9_device_mgmt.png" alt="' + pageTitle + '" class="screenshot" draggable="false">';
     if (pageId === '5-1') imgHtml = '<img src="images/11_model_list.png" alt="' + pageTitle + '" class="screenshot" draggable="false">';
     if (pageId === '5-3') imgHtml = '<img src="images/12_new_model_form.png" alt="' + pageTitle + '" class="screenshot" draggable="false">';
-    
+
     let tableRows = '';
     if (manualUIData[pageId]) {
       manualUIData[pageId].forEach((item, idx) => {
         tableRows += `
           <div class="ui-item">
             <div class="ui-item-header">
-              <span class="element-number">${idx+1}</span>
+              <span class="element-number">${idx + 1}</span>
               <span class="ui-item-name">${item.name}</span>
               <span class="badge ${getBadgeClass(item.type)}">${item.type}</span>
             </div>
@@ -764,20 +817,20 @@ for (let i = 0; i < chapters.length; i++) {
         let name = elText;
         let desc = elText + " 기능을 수행합니다.";
         if (elText.includes('→')) {
-           const parts = elText.split('→');
-           name = parts[0].trim() + " 인터랙션";
-           desc = "사용자가 " + parts[0].trim() + " 시, " + parts[1].trim() + " 동작이 발생합니다.";
+          const parts = elText.split('→');
+          name = parts[0].trim() + " 인터랙션";
+          desc = "사용자가 " + parts[0].trim() + " 시, " + parts[1].trim() + " 동작이 발생합니다.";
         } else if (elText.includes('(')) {
-           name = elText.split('(')[0].trim();
-           desc = elText + " 정보를 포함합니다.";
+          name = elText.split('(')[0].trim();
+          desc = elText + " 정보를 포함합니다.";
         }
-        
+
         const uiType = guessUIType(elText);
-        
+
         tableRows += `
           <div class="ui-item">
             <div class="ui-item-header">
-              <span class="element-number">${idx+1}</span>
+              <span class="element-number">${idx + 1}</span>
               <span class="ui-item-name">${name}</span>
               <span class="badge ${getBadgeClass(uiType)}">${uiType}</span>
             </div>
@@ -912,8 +965,13 @@ const jsCode = `
       }
       
       activeMarker = e.target;
-      offsetX = e.clientX - rect.left;
-      offsetY = e.clientY - rect.top;
+      offsetX = e.clientX;
+      offsetY = e.clientY;
+      
+      // Save initial percentage position, or compute if not set
+      const container = activeMarker.parentElement;
+      activeMarker.dataset.startX = parseFloat(activeMarker.style.left) || (activeMarker.offsetLeft / container.offsetWidth * 100);
+      activeMarker.dataset.startY = parseFloat(activeMarker.style.top) || (activeMarker.offsetTop / container.offsetHeight * 100);
     }
   });
 
@@ -921,13 +979,15 @@ const jsCode = `
     if (activeMarker && isEditMode) {
       e.preventDefault();
       const container = activeMarker.parentElement;
-      const containerRect = container.getBoundingClientRect();
       
-      let x = e.clientX - containerRect.left - offsetX;
-      let y = e.clientY - containerRect.top - offsetY;
-      
-      activeMarker.style.left = (x / containerRect.width * 100) + '%';
-      activeMarker.style.top = (y / containerRect.height * 100) + '%';
+      let dx = e.clientX - offsetX;
+      let dy = e.clientY - offsetY;
+
+      let newLeft = parseFloat(activeMarker.dataset.startX) + (dx / container.offsetWidth * 100);
+      let newTop = parseFloat(activeMarker.dataset.startY) + (dy / container.offsetHeight * 100);
+
+      activeMarker.style.left = newLeft + '%';
+      activeMarker.style.top = newTop + '%';
     }
   });
 
@@ -982,11 +1042,8 @@ const jsCode = `
           const box = entry.target;
           const wrapper = box.parentElement;
           if(wrapper && box.style.width && box.style.width.endsWith('px')) {
-            const wrapperRect = wrapper.getBoundingClientRect();
-            const wPx = parseFloat(box.style.width);
-            const hPx = parseFloat(box.style.height);
-            box.style.width = (wPx / wrapperRect.width * 100) + '%';
-            box.style.height = (hPx / wrapperRect.height * 100) + '%';
+            box.style.width = (box.offsetWidth / wrapper.offsetWidth * 100) + '%';
+            box.style.height = (box.offsetHeight / wrapper.offsetHeight * 100) + '%';
           }
         }
         saveAllMarkers();
@@ -1010,13 +1067,13 @@ const jsCode = `
         
         // If they are in px, convert to %
         if (left.endsWith('px') || top.endsWith('px') || (width && width.endsWith('px'))) {
-           const rect = wrapper.getBoundingClientRect();
-           const mRect = m.getBoundingClientRect();
-           left = ((mRect.left - rect.left) / rect.width * 100) + '%';
-           top = ((mRect.top - rect.top) / rect.height * 100) + '%';
+           const wrapperW = wrapper.offsetWidth;
+           const wrapperH = wrapper.offsetHeight;
+           if (left.endsWith('px')) left = (m.offsetLeft / wrapperW * 100) + '%';
+           if (top.endsWith('px')) top = (m.offsetTop / wrapperH * 100) + '%';
            if (width && width.endsWith('px')) {
-             width = (mRect.width / rect.width * 100) + '%';
-             height = (mRect.height / rect.height * 100) + '%';
+             width = (m.offsetWidth / wrapperW * 100) + '%';
+             height = (m.offsetHeight / wrapperH * 100) + '%';
            }
         }
 
@@ -1113,6 +1170,30 @@ const jsCode = `
   window.onload = () => {
     loadMarkers();
     initScrollSpy();
+    
+    document.querySelectorAll('.sidebar-nav > ul > li > strong').forEach(title => {
+      title.addEventListener('click', () => {
+        title.parentElement.classList.toggle('collapsed');
+      });
+    });
+
+    const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+    if (sidebarToggleBtn) {
+      sidebarToggleBtn.addEventListener('click', () => {
+        const sidebar = document.querySelector('.sidebar-nav');
+        const mainContent = document.querySelector('.main-content');
+        
+        sidebar.classList.toggle('hidden');
+        sidebarToggleBtn.classList.toggle('hidden');
+        mainContent.classList.toggle('expanded');
+        
+        if (sidebar.classList.contains('hidden')) {
+          sidebarToggleBtn.innerText = '▶';
+        } else {
+          sidebarToggleBtn.innerText = '◀';
+        }
+      });
+    }
   };
 </script>
 </body>
