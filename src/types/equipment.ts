@@ -11,6 +11,7 @@ export type CardWidthType = "half" | "full" | string;
 export function getColSpan(widthType: CardWidthType, maxColumns: number = 2): number {
   if (widthType === "full") return maxColumns;
   if (widthType === "half") return Math.floor(maxColumns / 2) || 1;
+  if (widthType === "sixth") return Math.floor(maxColumns / 6) || 1;
   const n = parseInt(widthType);
   return n > 0 ? n : 1;
 }

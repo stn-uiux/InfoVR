@@ -117,12 +117,13 @@ export function useSvgComposer(
     customModels
       .filter((m) => m.modelType === "card-based")
       .forEach((m) => {
+        const defaultTemplate = equipmentModels.find(em => em.modelName === m.modelName);
         const baseProps = {
           modelId: m.modelId,
           rackUnit: `${m.unit}U`,
           baseSvgUrl: `custom-model-base-${m.modelId}`,
-          equipmentSize: m.equipmentSize,
-          cardArea: m.cardArea,
+          equipmentSize: m.equipmentSize || defaultTemplate?.equipmentSize,
+          cardArea: m.cardArea || defaultTemplate?.cardArea,
           _rowHeights: m.rowHeights,
           _rowGaps: m.rowGaps,
           _rowColumns: m.rowColumns,

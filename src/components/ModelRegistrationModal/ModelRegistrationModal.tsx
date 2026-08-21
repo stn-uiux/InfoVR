@@ -17,6 +17,7 @@ import { cardDefinitions, equipmentModels, loadBaseEquipmentSvgRaw, getCardsForM
 import { DEVICE_TEMPLATES } from "../../utils/deviceTemplates";
 import { getDeviceViewSides, resolveDeviceImage, resolveDeviceSvgContent } from "../../utils/deviceAssets";
 import { generateComposedSvgAsync } from "../../hooks/useSvgComposer";
+
 import { convertSvgToPngAsync } from "../../utils/imageUtils";
 
 const DELETE_ICON_STYLE: React.CSSProperties = {
@@ -399,7 +400,7 @@ export const ModelRegistrationModal: React.FC = () => {
     let isCancelled = false;
 
     // Only run if there is a missing png AND we have the necessary base data
-    if (variants.length > 0 && variants.some(v => !v.variantPngRaw) && (baseChassisRaw || modelSvgRaw)) {
+    if (modelType !== "card-based" && variants.length > 0 && variants.some(v => !v.variantPngRaw) && (baseChassisRaw || modelSvgRaw)) {
       const generateMissingPngs = async () => {
         let changed = false;
         const newVariants = [...variants];
@@ -852,57 +853,16 @@ export const ModelRegistrationModal: React.FC = () => {
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) return;
 
-    const dims = parseSvgDimensions(modelSvgRaw!);
-    const parsedRowHeights = rowHeights.map((h) => parseFloat(h) || defaultRowHeight);
+    const dims = parseSvgDimensions(modelSvgRaw || baseChassisRaw || "");
     const parsedRowColumns = rowColumnsArr.map((c) => parseInt(c) || caColumns);
-    const parsedRowGaps = rowGapsArr.map((g) => parseFloat(g) || 0);
     // columnWidth는 최대 열 수 기준으로 자동 계산
     const effectiveMaxCols = parsedRowColumns.length > 0 ? Math.max(...parsedRowColumns, 1) : caColumns;
     const effectiveColWidth = caWidth / effectiveMaxCols;
 
-    let finalModelSvgRaw = modelSvgRaw || "";
+    const finalModelSvgRaw = modelType === "card-based" ? "" : (modelSvgRaw || "");
     let finalModelPngRaw: string | undefined = undefined;
-    if (modelType === "card-based") {
-      const defaultVariant = variants.find(v => v.isDefault) || variants[0];
-      if (defaultVariant) {
-        try {
-          const composed = await generateComposedSvgAsync(
-            modelName.trim(),
-            {
-              modelId: editingModelId || "temp",
-              modelName: modelName.trim(),
-              rackUnit: `${unit}U`,
-              baseSvgUrl: baseChassisFileName || "",
-              baseEquipmentViewSvgRaw: baseChassisRaw || "",
-              equipmentSize: { width: dims.width, height: dims.height },
-              cardArea: { x: caX, y: caY, width: caWidth, height: caHeight, columns: effectiveMaxCols, columnWidth: effectiveColWidth },
-              _rowHeights: parsedRowHeights,
-              _rowColumns: parsedRowColumns,
-              _rowGaps: parsedRowGaps,
-              gridMerges: gridMerges,
-              gridColWidths: gridColWidths,
-              gridRowHeights: gridRowHeights,
-            } as any,
-            defaultVariant.insertedCards,
-            [],
-            "front"
-          );
-          if (composed) {
-            finalModelSvgRaw = composed;
-            setModelSvgRaw(composed);
-            try {
-              finalModelPngRaw = await convertSvgToPngAsync(composed, dims.width || 860, dims.height || 200);
-            } catch (err) {
-              console.error("Failed to generate PNG on submit", err);
-            }
-          }
-        } catch (err) {
-          console.error("Failed to generate composed SVG on submit", err);
-        }
-      }
-    }
 
-    if (!finalModelPngRaw && finalModelSvgRaw) {
+    if (modelType !== "card-based" && !finalModelPngRaw && finalModelSvgRaw) {
       try {
         finalModelPngRaw = await convertSvgToPngAsync(finalModelSvgRaw, dims.width || 860, dims.height || 200);
       } catch (err) {
@@ -964,9 +924,7 @@ export const ModelRegistrationModal: React.FC = () => {
     modelType,
     baseChassisRaw,
     caX, caY, caWidth, caHeight, caColumns,
-    rowHeights,
     rowColumnsArr,
-    rowGapsArr,
     gridMerges,
     gridColWidths,
     gridRowHeights,
@@ -1726,7 +1684,12 @@ export const ModelRegistrationModal: React.FC = () => {
                         <div
                           className="model-thumb"
                           onMouseEnter={(e) => {
-                            setHoveredListThumb({ pngRaw: displayThumbPng, svgRaw: displayThumb, imgUrl, name: tmpl.modelName });
+                            setHoveredListThumb({ 
+                              pngRaw: displayThumbPng, 
+                              svgRaw: displayThumb, 
+                              imgUrl, 
+                              name: tmpl.modelName,
+                            });
                             setHoveredListThumbPos({ x: e.clientX, y: e.clientY });
                           }}
                           onMouseMove={(e) => {
@@ -1750,7 +1713,7 @@ export const ModelRegistrationModal: React.FC = () => {
                           <div className="model-info-header">
                             <div className="model-info">
                               <div className="model-display-name">
-                                [{displayUnit}U] {tmpl.modelName} {overrideModel && <span style={{ fontSize: 10, padding: "2px 6px", background: "var(--theme-primary)", color: "#fff", borderRadius: 4, marginLeft: 6 }}>수정됨</span>}
+                                [{displayUnit}U] {tmpl.modelName}
                               </div>
                               <div className="model-meta">
                                 <span>{displayUnit}U</span>
@@ -2227,77 +2190,16 @@ export const ModelRegistrationModal: React.FC = () => {
 
             // Auto-save to store
             const dims = parseSvgDimensions(modelSvgRaw || "");
-            const parsedRowHeights = rowHeights.map((h) => parseFloat(h) || defaultRowHeight);
             const parsedRowColumns = rowColumnsArr.map((c) => parseInt(c) || caColumns);
-            const parsedRowGaps = rowGapsArr.map((g) => parseFloat(g) || 0);
             const effectiveMaxCols = parsedRowColumns.length > 0 ? Math.max(...parsedRowColumns, 1) : caColumns;
             const effectiveColWidth = caWidth / effectiveMaxCols;
 
-            let finalModelSvgRaw = modelType === "card-based" ? "" : modelSvgRaw || "";
+            const finalModelSvgRaw = modelType === "card-based" ? "" : (modelSvgRaw || "");
             let finalModelPngRaw: string | undefined = undefined;
 
-            if (modelType === "card-based") {
-              const generateVariantImage = async (variant: any) => {
-                try {
-                  const composed = await generateComposedSvgAsync(
-                    modelName.trim(),
-                    {
-                      modelId: editingModelId || "temp",
-                      modelName: modelName.trim(),
-                      rackUnit: `${unit}U`,
-                      baseSvgUrl: baseChassisFileName || "",
-                      baseEquipmentViewSvgRaw: baseChassisRaw || "",
-                      equipmentSize: { width: dims.width, height: dims.height },
-                      cardArea: { x: caX, y: caY, width: caWidth, height: caHeight, columns: effectiveMaxCols, columnWidth: effectiveColWidth },
-                      _rowHeights: parsedRowHeights,
-                      _rowColumns: parsedRowColumns,
-                      _rowGaps: parsedRowGaps,
-                      gridMerges: gridMerges,
-                      gridColWidths: gridColWidths,
-                      gridRowHeights: gridRowHeights,
-                    } as any,
-                    variant.insertedCards,
-                    [],
-                    "front"
-                  );
-                  if (composed) {
-                    const png = await convertSvgToPngAsync(composed, dims.width || 860, dims.height || 200);
-                    return { svg: composed, png };
-                  }
-                } catch (err) {
-                  console.error("Failed to generate variant image", err);
-                }
-                return null;
-              };
+            setVariants([...next]);
 
-              const savedVariantIndex = editingVariantIndex !== null ? editingVariantIndex : next.length - 1;
-              const savedVariant = next[savedVariantIndex];
-              const savedRes = await generateVariantImage(savedVariant);
-              if (savedRes) {
-                savedVariant.variantPngRaw = savedRes.png;
-              }
-
-              const defaultVariant = next.find(v => v.isDefault) || next[0];
-              let defaultRes = savedRes;
-              if (defaultVariant && defaultVariant.variantId !== savedVariant.variantId) {
-                defaultRes = await generateVariantImage(defaultVariant);
-                if (defaultRes) {
-                  defaultVariant.variantPngRaw = defaultRes.png;
-                }
-              } else if (defaultVariant && defaultVariant.variantId === savedVariant.variantId && savedRes) {
-                defaultVariant.variantPngRaw = savedRes.png;
-              }
-
-              setVariants([...next]);
-
-              if (defaultRes) {
-                finalModelSvgRaw = defaultRes.svg;
-                setModelSvgRaw(defaultRes.svg);
-                finalModelPngRaw = defaultRes.png;
-              }
-            }
-
-            if (!finalModelPngRaw && finalModelSvgRaw) {
+            if (modelType !== "card-based" && !finalModelPngRaw && finalModelSvgRaw) {
               try {
                 finalModelPngRaw = await convertSvgToPngAsync(finalModelSvgRaw, dims.width || 860, dims.height || 200);
               } catch (err) {

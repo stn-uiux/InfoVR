@@ -178,7 +178,7 @@ for (const [path, mod] of Object.entries(ixrUrlModules)) {
     widthType = "full";
     svgWidth = 984;
   } else if (filename.includes("-sixth")) {
-    widthType = "half";
+    widthType = "sixth";
     svgWidth = 164;
   }
 

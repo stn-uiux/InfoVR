@@ -9,6 +9,21 @@ export interface GridMerge {
   cs: number; // colSpan
 }
 
+function distributeSize(originalSizes: number[], newTotalSize: number): number[] {
+  const totalOrig = originalSizes.reduce((a, b) => a + b, 0);
+  if (totalOrig === 0) return originalSizes;
+  const scale = newTotalSize / totalOrig;
+  let runningExact = 0;
+  let runningRounded = 0;
+  return originalSizes.map(s => {
+    runningExact += s * scale;
+    const currentRound = Math.round(runningExact);
+    const piece = currentRound - runningRounded;
+    runningRounded = currentRound;
+    return piece;
+  });
+}
+
 interface InteractiveGridEditorProps {
   svgRef: React.RefObject<SVGSVGElement | null>;
   baseX: number;
@@ -119,6 +134,10 @@ function getSelectionRect(
   return { minR, maxR, minC, maxC };
 }
 
+type ContextMenuState = 
+  | { type: "gap"; x: number; y: number; r: number }
+  | { type: "cell"; x: number; y: number; r: number; c: number };
+
 export default function InteractiveGridEditor({
   svgRef,
   baseX,
@@ -137,12 +156,19 @@ export default function InteractiveGridEditor({
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
   const [dragStartGrid, setDragStartGrid] = useState({ baseX: 0, baseY: 0, colWidths: [] as number[], rowHeights: [] as number[] });
   const isDragging = useRef(false);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; r: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [lastSelectedCell, setLastSelectedCell] = useState<{ r: number, c: number } | null>(null);
+  const [dragStartClientPos, setDragStartClientPos] = useState({ x: 0, y: 0 });
+  const [isTableSelected, setIsTableSelected] = useState(false);
 
   const [invScale, setInvScale] = useState(1);
 
   React.useEffect(() => {
-    const handleClick = () => setContextMenu(null);
+    const handleClick = () => {
+      setContextMenu(null);
+      setSelectedCells(new Set());
+      setIsTableSelected(false);
+    };
     window.addEventListener("click", handleClick);
     return () => window.removeEventListener("click", handleClick);
   }, []);
@@ -193,6 +219,7 @@ export default function InteractiveGridEditor({
 
       const pt = getSvgPoint(svg, e.clientX, e.clientY);
       setDragStartPos({ x: pt.x, y: pt.y });
+      setDragStartClientPos({ x: e.clientX, y: e.clientY });
 
       (e.target as Element).setPointerCapture(e.pointerId);
     },
@@ -206,8 +233,9 @@ export default function InteractiveGridEditor({
       if (!svg) return;
 
       const pt = getSvgPoint(svg, e.clientX, e.clientY);
-      const dx = pt.x - dragStartPos.x;
-      const dy = pt.y - dragStartPos.y;
+      
+      const dx = e.clientX - dragStartClientPos.x;
+      const dy = e.clientY - dragStartClientPos.y;
       const MIN_SIZE = 10;
       const vb = svg.viewBox.baseVal;
       const maxW = vb && vb.width > 0 ? vb.width : 800;
@@ -267,17 +295,17 @@ export default function InteractiveGridEditor({
         if (dragType === "edge-r" || dragType === "edge-l") {
           const scale = newW / totalW;
           onGridChange({ 
-            colWidths: dragStartGrid.colWidths.map(w => Math.round(w * scale)), 
+            colWidths: distributeSize(dragStartGrid.colWidths, newW), 
             rowHeights, merges,
             baseX: newBaseX
           });
         } else {
           const baseH = dragStartGrid.rowHeights.reduce((a, b) => a + b, 0);
           const totalGaps = totalH - baseH;
-          const scale = baseH > 0 ? Math.max(0.1, newH - totalGaps) / baseH : 1;
+          const targetBaseH = Math.max(0.1, newH - totalGaps);
           onGridChange({ 
             colWidths, 
-            rowHeights: dragStartGrid.rowHeights.map(h => Math.round(h * scale)), 
+            rowHeights: distributeSize(dragStartGrid.rowHeights, targetBaseH), 
             merges,
             baseY: newBaseY
           });
@@ -305,10 +333,8 @@ export default function InteractiveGridEditor({
           newColWidths = sizes.map((s, c) => selectedCols.has(c) ? Math.round(targetSize) : s);
         } else {
           const newA = sizes[i] + delta;
-          const newB = sizes[i + 1] - delta;
-          if (newA >= MIN_SIZE && newB >= MIN_SIZE) {
+          if (newA >= MIN_SIZE) {
             sizes[i] = Math.round(newA);
-            sizes[i + 1] = Math.round(newB);
             newColWidths = sizes;
           }
         }
@@ -327,10 +353,8 @@ export default function InteractiveGridEditor({
           newRowHeights = sizes.map((s, r) => selectedRows.has(r) ? Math.round(targetSize) : s);
         } else {
           const newA = sizes[i] + delta;
-          const newB = sizes[i + 1] - delta;
-          if (newA >= MIN_SIZE && newB >= MIN_SIZE) {
+          if (newA >= MIN_SIZE) {
             sizes[i] = Math.round(newA);
-            sizes[i + 1] = Math.round(newB);
             newRowHeights = sizes;
           }
         }
@@ -364,10 +388,23 @@ export default function InteractiveGridEditor({
   const handleCellClick = useCallback(
     (r: number, c: number, e: React.MouseEvent) => {
       e.stopPropagation();
+      setIsTableSelected(false);
       const key = `${r}-${c}`;
       setSelectedCells((prev) => {
         const next = new Set(prev);
-        if (e.shiftKey || e.ctrlKey || e.metaKey) {
+        if (e.shiftKey && lastSelectedCell) {
+          if (lastSelectedCell.r === r) {
+            const minC = Math.min(lastSelectedCell.c, c);
+            const maxC = Math.max(lastSelectedCell.c, c);
+            for(let i=minC; i<=maxC; i++) next.add(`${r}-${i}`);
+          } else if (lastSelectedCell.c === c) {
+            const minR = Math.min(lastSelectedCell.r, r);
+            const maxR = Math.max(lastSelectedCell.r, r);
+            for(let i=minR; i<=maxR; i++) next.add(`${i}-${c}`);
+          } else {
+            next.add(key);
+          }
+        } else if (e.ctrlKey || e.metaKey) {
           if (next.has(key)) next.delete(key);
           else next.add(key);
         } else {
@@ -380,14 +417,28 @@ export default function InteractiveGridEditor({
         }
         return next;
       });
+      setLastSelectedCell({ r, c });
     },
-    []
+    [lastSelectedCell]
   );
+
+  const handleCellContextMenu = useCallback((e: React.MouseEvent, r: number, c: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const key = `${r}-${c}`;
+    setSelectedCells(prev => {
+      if (!prev.has(key)) {
+        return new Set([key]);
+      }
+      return prev;
+    });
+    setContextMenu({ type: "cell", x: e.clientX, y: e.clientY, r, c });
+  }, []);
 
   const handleContextMenu = useCallback((e: React.MouseEvent, r: number) => {
     e.preventDefault();
     e.stopPropagation();
-    setContextMenu({ x: e.clientX, y: e.clientY, r });
+    setContextMenu({ type: "gap", x: e.clientX, y: e.clientY, r });
   }, []);
 
   // ── Merge ──
@@ -501,6 +552,22 @@ export default function InteractiveGridEditor({
     return m !== null && (m.rs > 1 || m.cs > 1);
   })();
 
+  // ── Keyboard Shortcuts ──
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key.toLowerCase() === 'm') {
+        if (canMerge) {
+          handleMerge();
+        } else if (canSplit) {
+          handleSplit();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [canMerge, canSplit, handleMerge, handleSplit]);
+
   // ── Render cells ──
   const cellRects: React.ReactNode[] = [];
   for (let r = 0; r < rows; r++) {
@@ -545,6 +612,7 @@ export default function InteractiveGridEditor({
           onPointerMove={handleDragMove}
           onPointerUp={handleDragEnd}
           onClick={(e) => handleCellClick(r, c, e)}
+          onContextMenu={(e) => handleCellContextMenu(e, r, c)}
         />
       );
 
@@ -580,30 +648,32 @@ export default function InteractiveGridEditor({
   // ── Render vertical dividers (column) ──
   const HANDLE_WIDTH = 8;
   const colDividers: React.ReactNode[] = [];
-  for (let c = 0; c < cols - 1; c++) {
+  for (let c = 0; c < cols; c++) {
     const x = colX(c + 1, colWidths, baseX);
     const lineSegments = [];
-    for (let r = 0; r < rows; r++) {
-      const m1 = getMergeAt(r, c, merges);
-      const m2 = getMergeAt(r, c + 1, merges);
-      if (m1 && m2 && m1 === m2) {
-        continue; // skip line inside merge
+    if (c < cols - 1) {
+      for (let r = 0; r < rows; r++) {
+        const m1 = getMergeAt(r, c, merges);
+        const m2 = getMergeAt(r, c + 1, merges);
+        if (m1 && m2 && m1 === m2) {
+          continue; // skip line inside merge
+        }
+        const yStart = rowY(r, rowHeights, baseY, rowGaps);
+        const yEnd = yStart + rowHeights[r];
+        lineSegments.push(
+          <line
+            key={`col-div-seg-${c}-${r}`}
+            x1={x}
+            y1={yStart}
+            x2={x}
+            y2={yEnd}
+            stroke="rgba(0,200,255,0.5)"
+            strokeWidth="1"
+            vectorEffect="non-scaling-stroke"
+            style={{ pointerEvents: "none" }}
+          />
+        );
       }
-      const yStart = rowY(r, rowHeights, baseY, rowGaps);
-      const yEnd = yStart + rowHeights[r];
-      lineSegments.push(
-        <line
-          key={`col-div-seg-${c}-${r}`}
-          x1={x}
-          y1={yStart}
-          x2={x}
-          y2={yEnd}
-          stroke="rgba(0,200,255,0.5)"
-          strokeWidth="1"
-          vectorEffect="non-scaling-stroke"
-          style={{ pointerEvents: "none" }}
-        />
-      );
     }
     colDividers.push(
       <React.Fragment key={`col-div-${c}`}>
@@ -625,30 +695,32 @@ export default function InteractiveGridEditor({
 
   // ── Render horizontal dividers (row) ──
   const rowDividers: React.ReactNode[] = [];
-  for (let r = 0; r < rows - 1; r++) {
+  for (let r = 0; r < rows; r++) {
     const y = rowY(r, rowHeights, baseY, rowGaps) + rowHeights[r];
     const lineSegments = [];
-    for (let c = 0; c < cols; c++) {
-      const m1 = getMergeAt(r, c, merges);
-      const m2 = getMergeAt(r + 1, c, merges);
-      if (m1 && m2 && m1 === m2) {
-        continue; // skip line inside merge
+    if (r < rows - 1) {
+      for (let c = 0; c < cols; c++) {
+        const m1 = getMergeAt(r, c, merges);
+        const m2 = getMergeAt(r + 1, c, merges);
+        if (m1 && m2 && m1 === m2) {
+          continue; // skip line inside merge
+        }
+        const xStart = colX(c, colWidths, baseX);
+        const xEnd = xStart + colWidths[c];
+        lineSegments.push(
+          <line
+            key={`row-div-seg-${r}-${c}`}
+            x1={xStart}
+            y1={y}
+            x2={xEnd}
+            y2={y}
+            stroke="rgba(0,200,255,0.5)"
+            strokeWidth="1"
+            vectorEffect="non-scaling-stroke"
+            style={{ pointerEvents: "none" }}
+          />
+        );
       }
-      const xStart = colX(c, colWidths, baseX);
-      const xEnd = xStart + colWidths[c];
-      lineSegments.push(
-        <line
-          key={`row-div-seg-${r}-${c}`}
-          x1={xStart}
-          y1={y}
-          x2={xEnd}
-          y2={y}
-          stroke="rgba(0,200,255,0.5)"
-          strokeWidth="1"
-          vectorEffect="non-scaling-stroke"
-          style={{ pointerEvents: "none" }}
-        />
-      );
     }
     rowDividers.push(
       <React.Fragment key={`row-div-${r}`}>
@@ -663,7 +735,9 @@ export default function InteractiveGridEditor({
           onPointerDown={(e) => handleDragStart(e, "row", r)}
           onPointerMove={handleDragMove}
           onPointerUp={handleDragEnd}
-          onContextMenu={(e) => handleContextMenu(e, r)}
+          onContextMenu={(e) => {
+            if (r < rows - 1) handleContextMenu(e, r);
+          }}
         />
       </React.Fragment>
     );
@@ -671,14 +745,19 @@ export default function InteractiveGridEditor({
 
     // ── Edge Resize Handles ──
   const HANDLE_EDGE = 12; // Thicker handle for easier dragging
-  const edgeHandles = (
+  const edgeHandles = isTableSelected ? (
     <g>
       <rect x={baseX} y={baseY - HANDLE_EDGE/2} width={totalW} height={HANDLE_EDGE} fill="transparent" style={{ cursor: "ns-resize" }} onPointerDown={(e) => handleDragStart(e, "edge-t")} onPointerMove={handleDragMove} onPointerUp={handleDragEnd} />
       <rect x={baseX} y={baseY + totalH - HANDLE_EDGE/2} width={totalW} height={HANDLE_EDGE} fill="transparent" style={{ cursor: "ns-resize" }} onPointerDown={(e) => handleDragStart(e, "edge-b")} onPointerMove={handleDragMove} onPointerUp={handleDragEnd} />
       <rect x={baseX - HANDLE_EDGE/2} y={baseY} width={HANDLE_EDGE} height={totalH} fill="transparent" style={{ cursor: "ew-resize" }} onPointerDown={(e) => handleDragStart(e, "edge-l")} onPointerMove={handleDragMove} onPointerUp={handleDragEnd} />
       <rect x={baseX + totalW - HANDLE_EDGE/2} y={baseY} width={HANDLE_EDGE} height={totalH} fill="transparent" style={{ cursor: "ew-resize" }} onPointerDown={(e) => handleDragStart(e, "edge-r")} onPointerMove={handleDragMove} onPointerUp={handleDragEnd} />
+      
+      <circle cx={baseX} cy={baseY} r={4} fill="rgba(0,255,100,1)" style={{ pointerEvents: "none" }} />
+      <circle cx={baseX + totalW} cy={baseY} r={4} fill="rgba(0,255,100,1)" style={{ pointerEvents: "none" }} />
+      <circle cx={baseX} cy={baseY + totalH} r={4} fill="rgba(0,255,100,1)" style={{ pointerEvents: "none" }} />
+      <circle cx={baseX + totalW} cy={baseY + totalH} r={4} fill="rgba(0,255,100,1)" style={{ pointerEvents: "none" }} />
     </g>
-  );
+  ) : null;
 
   // ── Outer border ──
   const outerBorder = (
@@ -688,11 +767,16 @@ export default function InteractiveGridEditor({
       width={totalW}
       height={totalH}
       fill="none"
-      stroke="rgba(0,200,255,0.8)"
-      strokeWidth="2"
+      stroke={isTableSelected ? "rgba(0,255,100,1)" : "rgba(0,200,255,0.8)"}
+      strokeWidth={isTableSelected ? "3" : "2"}
       vectorEffect="non-scaling-stroke"
       rx="2"
-      style={{ pointerEvents: "none" }}
+      style={{ pointerEvents: "stroke", cursor: "pointer" }}
+      onClick={(e) => {
+        e.stopPropagation();
+        setIsTableSelected(true);
+        setSelectedCells(new Set());
+      }}
     />
   );
 
@@ -876,51 +960,171 @@ export default function InteractiveGridEditor({
 
   const renderContextMenu = () => {
     if (!contextMenu) return null;
-    return createPortal(
-      <div
-        style={{
-          position: "fixed",
-          top: contextMenu.y,
-          left: contextMenu.x,
-          background: "var(--panel-bg, #1a202c)",
-          border: "1px solid var(--border-medium, #4a5568)",
-          borderRadius: "8px",
-          padding: "8px",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
-          zIndex: 9999,
-          display: "flex",
-          flexDirection: "column",
-          gap: "4px"
-        }}
-        onClick={(e) => e.stopPropagation()}
-        onContextMenu={(e) => e.preventDefault()}
-      >
-        <button
-          className="comm-btn comm-btn-sm comm-btn-secondary"
-          onClick={() => {
-            const currentGap = rowGaps ? rowGaps[contextMenu.r] || 0 : 0;
-            const input = window.prompt(`[행 ${contextMenu.r + 1} 아래 간격 설정 (px)]\n양수: 간격 추가, 음수: 겹침 허용`, currentGap.toString());
-            if (input !== null) {
-              const val = parseInt(input, 10);
-              if (!isNaN(val)) {
-                const newGaps = rowGaps ? [...rowGaps] : new Array(rowHeights.length).fill(0);
-                newGaps[contextMenu.r] = val;
-                onGridChange({ colWidths, rowHeights, merges, rowGaps: newGaps });
-              }
-            }
-            setContextMenu(null);
+    
+    if (contextMenu.type === "gap") {
+      return createPortal(
+        <div
+          style={{
+            position: "fixed",
+            top: contextMenu.y,
+            left: contextMenu.x,
+            background: "var(--panel-bg, #1a202c)",
+            border: "1px solid var(--border-medium, #4a5568)",
+            borderRadius: "8px",
+            padding: "8px",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+            zIndex: 9999,
+            display: "flex",
+            flexDirection: "column",
+            gap: "4px"
           }}
+          onClick={(e) => e.stopPropagation()}
+          onContextMenu={(e) => e.preventDefault()}
         >
-          간격 설정 (Gap)
-        </button>
-      </div>,
-      document.body
-    );
+          <button
+            className="comm-btn comm-btn-sm comm-btn-secondary"
+            onClick={() => {
+              const currentGap = rowGaps ? rowGaps[contextMenu.r] || 0 : 0;
+              const input = window.prompt(`[행 ${contextMenu.r + 1} 아래 간격 설정 (px)]\n양수: 간격 추가, 음수: 겹침 허용`, currentGap.toString());
+              if (input !== null) {
+                const val = parseInt(input, 10);
+                if (!isNaN(val)) {
+                  const newGaps = rowGaps ? [...rowGaps] : new Array(rowHeights.length).fill(0);
+                  newGaps[contextMenu.r] = val;
+                  onGridChange({ colWidths, rowHeights, merges, rowGaps: newGaps });
+                }
+              }
+              setContextMenu(null);
+            }}
+          >
+            간격 설정 (Gap)
+          </button>
+          <button
+            className="comm-btn comm-btn-sm comm-btn-secondary"
+            onClick={() => {
+              const targetIdx = contextMenu.r + 1;
+              const newRowHeights = [...rowHeights];
+              newRowHeights.splice(targetIdx, 0, rowHeights[contextMenu.r]);
+
+              const newGaps = rowGaps ? [...rowGaps] : new Array(rowHeights.length).fill(0);
+              newGaps.splice(targetIdx, 0, 0);
+
+              const newMerges = merges.map(m => {
+                if (m.r >= targetIdx) {
+                  return { ...m, r: m.r + 1 };
+                } else if (m.r <= contextMenu.r && m.r + m.rs - 1 >= targetIdx) {
+                  return { ...m, rs: m.rs + 1 };
+                }
+                return m;
+              });
+
+              onGridChange({ colWidths, rowHeights: newRowHeights, merges: newMerges, rowGaps: newGaps });
+              setContextMenu(null);
+            }}
+          >
+            행 삽입 (아래)
+          </button>
+        </div>,
+        document.body
+      );
+    } else if (contextMenu.type === "cell") {
+      const currentW = Math.round(colWidths[contextMenu.c]);
+      const currentH = Math.round(rowHeights[contextMenu.r]);
+
+      return createPortal(
+        <div
+          style={{
+            position: "fixed",
+            top: contextMenu.y,
+            left: contextMenu.x,
+            background: "var(--panel-bg, #1a202c)",
+            border: "1px solid var(--border-medium, #4a5568)",
+            borderRadius: "8px",
+            padding: "8px",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+            zIndex: 9999,
+            display: "flex",
+            flexDirection: "column",
+            gap: "8px"
+          }}
+          onClick={(e) => e.stopPropagation()}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <div style={{ fontSize: "12px", fontWeight: "bold", color: "var(--text-primary)", marginBottom: "4px" }}>셀 크기 편집</div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const wVal = parseInt((e.currentTarget.elements.namedItem('w') as HTMLInputElement).value, 10);
+              const hVal = parseInt((e.currentTarget.elements.namedItem('h') as HTMLInputElement).value, 10);
+              if (!isNaN(wVal) && !isNaN(hVal) && wVal >= 1 && hVal >= 1) {
+                const newColWidths = [...colWidths];
+                const newRowHeights = [...rowHeights];
+                const targetCols = new Set<number>();
+                const targetRows = new Set<number>();
+                selectedCells.forEach(key => {
+                  const [cr, cc] = key.split("-").map(Number);
+                  targetRows.add(cr);
+                  targetCols.add(cc);
+                });
+                
+                targetCols.forEach(cc => { newColWidths[cc] = wVal; });
+                targetRows.forEach(cr => { newRowHeights[cr] = hVal; });
+                onGridChange({ colWidths: newColWidths, rowHeights: newRowHeights, merges });
+                setContextMenu(null);
+              }
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "8px" }}>
+              <label style={{ fontSize: "12px", color: "var(--text-secondary)" }}>넓이(W)</label>
+              <input 
+                name="w"
+                type="number" 
+                defaultValue={currentW} 
+                style={{ width: "60px", background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border-medium)", borderRadius: "4px", padding: "2px 4px", fontSize: "12px" }}
+              />
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "8px" }}>
+              <label style={{ fontSize: "12px", color: "var(--text-secondary)" }}>높이(H)</label>
+              <input 
+                name="h"
+                type="number" 
+                defaultValue={currentH} 
+                style={{ width: "60px", background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border-medium)", borderRadius: "4px", padding: "2px 4px", fontSize: "12px" }}
+              />
+            </div>
+            <div style={{ display: "flex", gap: "4px", marginTop: "4px" }}>
+              <button type="button" className="comm-btn comm-btn-sm comm-btn-secondary" style={{ flex: 1, padding: "2px 8px" }} onClick={() => setContextMenu(null)}>취소</button>
+              <button type="submit" className="comm-btn comm-btn-sm comm-btn-primary" style={{ flex: 1, padding: "2px 8px" }}>적용</button>
+            </div>
+          </form>
+        </div>,
+        document.body
+      );
+    }
   };
 
   return (
     <>
       <g className="interactive-grid-editor" shapeRendering="geometricPrecision">
+        <rect
+          x="-50000"
+          y="-50000"
+          width="100000"
+          height="100000"
+          fill="transparent"
+          style={{ pointerEvents: "all" }}
+          onClick={() => {
+            setContextMenu(null);
+            setSelectedCells(new Set());
+            setIsTableSelected(false);
+          }}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setContextMenu(null);
+            setSelectedCells(new Set());
+            setIsTableSelected(false);
+          }}
+        />
         {cellRects}
         {colDividers}
         {rowDividers}

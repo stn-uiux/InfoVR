@@ -5823,8 +5823,8 @@ input:checked+.slider:before {
   box-shadow: var(--elevation-3, 0 24px 80px rgba(0, 0, 0, 0.6));
   width: 1400px;
   max-width: 95vw;
-  height: 85vh;
-  max-height: 90vh;
+  height: 95vh;
+  max-height: 95vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
