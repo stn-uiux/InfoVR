@@ -8,6 +8,12 @@ import {
   RACK_WIDTH_STANDARD,
   GRID_SPACING,
 } from "../components/constants";
+import { getEffectiveTemplates } from "./deviceTemplates";
+import customModelsRaw from "./customModels.json";
+import type { CustomEquipmentModel } from "../types/equipment";
+
+const customModels = customModelsRaw as CustomEquipmentModel[];
+const ALL_TEMPLATES = getEffectiveTemplates(customModels, []);
 
 export const generateUUID = () => {
   if (
@@ -43,7 +49,7 @@ const generateRegisteredDevices = (
   nodeIdx: number,
 ): RegisteredDevice[] =>
   Array.from({ length: count }).map((_, i) => {
-    const template = DEVICE_TEMPLATES[i % DEVICE_TEMPLATES.length];
+    const template = ALL_TEMPLATES[i % ALL_TEMPLATES.length];
     const ipParts = ipBase.split(".");
     const lastOctet = (parseInt(ipParts[3]) + i) % 255;
     const thirdOctet = parseInt(ipParts[2]) + Math.floor((parseInt(ipParts[3]) + i) / 255);
@@ -69,7 +75,8 @@ const generateRegisteredDevices = (
       size: template.uSize,
       IPAddr: `${ipParts[0]}.${ipParts[1]}.${thirdOctet}.${lastOctet}`,
       macAddr: `00:00:5E:00:${formattedMacSuffix}`.toUpperCase(),
-      vendor: "Nokia",
+      vendor: template.vendor,
+      insertedCards: template.variant?.insertedCards || [],
     };
   });
 
@@ -142,6 +149,7 @@ const generateGroupRacks = (
           vendor: regDevice.vendor,
           deviceId: regDevice.deviceId,
           portStates: [],
+          insertedCards: regDevice.insertedCards || [],
         });
         
         currentUPos += (regDevice.size || 1) + 1; // 1U gap between devices
