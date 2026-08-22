@@ -212,7 +212,7 @@ function guessUIType(text) {
 const manualUIData = {
   "1-1": [
     { name: "좌측 사이드바 (계층 트리)", type: "Panel", desc: "지역/센터/전산실 등 논리적 계층 구조를 트리 형태로 제공. 노드 검색 기능 포함." },
-    { name: "가상 공간 (CyberSpace)", type: "3D Canvas", desc: "바닥과 벽면이 렌더링된 메인 3D 뷰어 공간. 드래그로 회전/이동 가능." },
+    { name: "가상공간", type: "3D Canvas", desc: "바닥과 벽면이 렌더링된 메인 3D 뷰어 공간. 드래그로 회전/이동 가능." },
     { name: "Fit Models 버튼", type: "Button", desc: "우측 상단의 카메라 큐브 컨트롤 아래 위치. 클릭 시 씬 내 모든 오브젝트가 화면에 맞게 자동 줌인/아웃됨." },
     { name: "테마 & 모드 토글", type: "Switch", desc: "우측 상단 상단바. Edit Mode ON/OFF 스위치 및 Light/Dark 테마 전환 토글 제공." }
   ],
@@ -239,11 +239,11 @@ const manualUIData = {
 // Extract table data for each chapter
 for (let i = 0; i < chapters.length; i++) {
   const start = chapters[i].pos;
-  const end = (i + 1 < chapters.length) ? chapters[i+1].pos : md.indexOf('## 🛠️ 작성 방법 가이드');
+  const end = (i + 1 < chapters.length) ? chapters[i + 1].pos : md.indexOf('## 🛠️ 작성 방법 가이드');
   const sectionText = md.substring(start, end);
-  
+
   tocHtml += '<li><strong>' + chapters[i].num + '장. ' + chapters[i].title + '</strong><ul>';
-  
+
   const rowRegex = /\|\s*\*\*(.*?)\*\*\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|/g;
   let rowMatch;
   while ((rowMatch = rowRegex.exec(sectionText)) !== null) {
@@ -251,9 +251,9 @@ for (let i = 0; i < chapters.length; i++) {
     const pageTitle = rowMatch[2].trim();
     const pageDesc = rowMatch[3].trim();
     const requiredCap = rowMatch[4].trim();
-    
+
     tocHtml += `<li><a href="#page-${pageId}">${pageId}. ${pageTitle}</a></li>`;
-    
+
     let imgHtml = `<div style="text-align:center; padding: 3rem;">이미지 캡처 필요: ${requiredCap}</div>`;
     if (pageId === '1-1') imgHtml = '<img src="images/1_main_view.png" alt="' + pageTitle + '" class="screenshot">';
     if (pageId === '1-2') imgHtml = '<img src="images/2_sample_data.png" alt="' + pageTitle + '" class="screenshot">';
@@ -263,14 +263,14 @@ for (let i = 0; i < chapters.length; i++) {
     if (pageId === '3-1') imgHtml = '<img src="images/9_device_mgmt.png" alt="' + pageTitle + '" class="screenshot">';
     if (pageId === '5-1') imgHtml = '<img src="images/11_model_list.png" alt="' + pageTitle + '" class="screenshot">';
     if (pageId === '5-3') imgHtml = '<img src="images/12_new_model_form.png" alt="' + pageTitle + '" class="screenshot">';
-    
+
     // Generate UI Table rows
     let tableRows = '';
     if (manualUIData[pageId]) {
       manualUIData[pageId].forEach((item, idx) => {
         tableRows += `
           <tr>
-            <td style="text-align:center"><span class="element-number">${idx+1}</span></td>
+            <td style="text-align:center"><span class="element-number">${idx + 1}</span></td>
             <td><strong>${item.name}</strong></td>
             <td><span class="badge">${item.type}</span></td>
             <td>${item.desc}</td>
@@ -283,28 +283,28 @@ for (let i = 0; i < chapters.length; i++) {
         // Extract a name and description
         let name = elText;
         let desc = elText + " 기능을 수행합니다.";
-        
+
         // If there's an arrow, it's an interaction
         if (elText.includes('→')) {
-           const parts = elText.split('→');
-           name = parts[0].trim() + " 인터랙션";
-           desc = "사용자가 " + parts[0].trim() + " 시, " + parts[1].trim() + " 동작이 발생합니다.";
+          const parts = elText.split('→');
+          name = parts[0].trim() + " 인터랙션";
+          desc = "사용자가 " + parts[0].trim() + " 시, " + parts[1].trim() + " 동작이 발생합니다.";
         } else if (elText.includes('(')) {
-           name = elText.split('(')[0].trim();
-           desc = elText + " 정보를 포함합니다.";
+          name = elText.split('(')[0].trim();
+          desc = elText + " 정보를 포함합니다.";
         }
-        
+
         const uiType = guessUIType(elText);
-        
+
         tableRows += `
           <tr>
-            <td style="text-align:center"><span class="element-number">${idx+1}</span></td>
+            <td style="text-align:center"><span class="element-number">${idx + 1}</span></td>
             <td><strong>${name}</strong></td>
             <td><span class="badge">${uiType}</span></td>
             <td>${desc}</td>
           </tr>`;
       });
-      
+
       if (elements.length === 0) {
         tableRows = `<tr><td colspan="4">UI 요소 설명이 없습니다.</td></tr>`;
       }
@@ -337,7 +337,7 @@ for (let i = 0; i < chapters.length; i++) {
       </table>
     </div>`;
   }
-  
+
   tocHtml += '</ul></li>';
 }
 

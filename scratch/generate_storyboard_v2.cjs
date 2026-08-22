@@ -540,19 +540,19 @@ const manualUIData = {
   ],
   "1-8": [
     { name: "테마 토글 버튼", type: "Switch", desc: "좌측 상단의 <mark>Light/Dark</mark> 전환 토글. 클릭 즉시 UI 전체와 3D 환경이 동시에 테마 전환됨." },
-    { name: "3D 환경 테마 연동", type: "3D Effect", desc: "다크 모드 시 야간 조명·어두운 배경, 라이트 모드 시 주간 조명·밝은 배경으로 <mark>CyberSpace가 실시간 전환</mark>됨." }
+    { name: "3D 환경 테마 연동", type: "3D Effect", desc: "다크 모드 시 야간 조명·어두운 배경, 라이트 모드 시 주간 조명·밝은 배경으로 <mark>가상공간이 실시간 전환</mark>됨." }
   ],
 
   // ── 2장. 수정 모드 (Edit Mode) ──
   "2-1": [
     { name: "Edit Mode 토글", type: "Switch", desc: "상단 바의 ON/OFF 토글. 활성화 시 수정 모드에 진입하며 <mark>상단 툴바</mark>와 좌측 편집 패널이 표시됨." },
     { name: "상단 툴바 버튼", type: "Button", desc: "<mark>Save</mark>, <mark>Undo/Redo</mark>, <mark>Sample</mark>, <mark>Reset</mark>, <mark>장비관리</mark>, <mark>모델관리</mark>, <mark>포트마법사</mark> 등 주요 액션 버튼 배치." },
-    { name: "좌측 편집 사이드바", type: "Sidebar", desc: "계층 트리, 가상 공간 설정, Scene Objects 리스트 등 편집 도구가 탭/아코디언으로 구성됨." },
+    { name: "좌측 편집 사이드바", type: "Sidebar", desc: "계층 트리, 가상공간 설정, Scene Objects 리스트 등 편집 도구가 탭/아코디언으로 구성됨." },
     { name: "접이식 사이드바", type: "Panel", desc: "사이드바를 <mark>아이콘 뷰로 최소화(Fold)</mark> 가능. 접힌 상태에서 아이콘 클릭 시 <mark>플로팅 패널</mark>이 오버레이됨." }
   ],
   "2-2": [
-    { name: "가상 공간 설정 패널", type: "Panel", desc: "공간의 <mark>가로(W)</mark>·<mark>세로(D)</mark> 사이즈를 수치 입력. 값 변경 후 공간이 실시간 렌더링 반영." },
-    { name: "3D공간 제작 버튼", type: "Button", desc: "설정된 사이즈로 바닥·벽면 CyberSpace를 즉시 생성. 기존 공간이 있으면 크기 갱신." },
+    { name: "가상공간 설정 패널", type: "Panel", desc: "공간의 <mark>가로(W)</mark>·<mark>세로(D)</mark> 사이즈를 수치 입력. 값 변경 후 공간이 실시간 렌더링 반영." },
+    { name: "3D공간 제작 버튼", type: "Button", desc: "설정된 사이즈로 바닥·벽면 가상공간을 즉시 생성. 기존 공간이 있으면 크기 갱신." },
     { name: "와이어프레임 가이드 라인", type: "3D Effect", desc: "편집 모드 시 공간 크기를 직관적으로 파악할 수 있는 <mark>하늘색 와이어프레임 박스</mark>가 바닥·둘레에 렌더링됨." }
   ],
   "2-3": [

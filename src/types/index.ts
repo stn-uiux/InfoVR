@@ -69,6 +69,8 @@ export interface Device {
 
   defaultViewSide?: import("./equipment").EquipmentViewSide;
   devicePngRaw?: string;
+  variantName?: string;
+  customModelId?: string;
 }
 
 /** [VITE_CACHE_BREAKER_PORT] */
@@ -98,6 +100,8 @@ export interface RegisteredDevice {
   deviceCheck?: number;
   standardDeviceId?: number;
   modelName?: string;
+  variantName?: string;
+  customModelId?: string;
   hostName?: string;
   tmid?: string;
   externalId?: number;

@@ -165,11 +165,13 @@ export const RegistrationFormModal = ({
       payload.size = selectedTemplate.uSize;
       
       const customModel = customModels.find(m => m.modelName === selectedTemplate.modelName);
-      if (selectedTemplate.variant?.variantPngRaw) {
+      if (selectedTemplate.variant) {
+        payload.variantName = selectedTemplate.variant.variantName;
         payload.devicePngRaw = selectedTemplate.variant.variantPngRaw;
       } else if (customModel?.modelPngRaw) {
         payload.devicePngRaw = customModel.modelPngRaw;
       }
+      payload.customModelId = selectedTemplate.customModelId;
     }
     payload.defaultViewSide = defaultViewSide;
     if (vendor) payload.vendor = vendor;

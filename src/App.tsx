@@ -555,6 +555,8 @@ function App() {
 
       {/* Initial Loading Screen */}
       <InitialLoader />
+
+      <DocsLinks />
     </div>
   );
 }
@@ -650,6 +652,42 @@ const FitToModelsButton = () => {
       >
         전체보기
       </span>
+    </div>
+  );
+};
+
+const DocsLinks = () => {
+  const isEditMode = useStore((s) => s.isEditMode);
+  if (!isEditMode) return null;
+  return (
+    <div
+      style={{
+        position: "absolute",
+        bottom: "20px",
+        right: "30px",
+        zIndex: 10,
+        display: "flex",
+        gap: "12px",
+        opacity: 0.7,
+        transition: "opacity 0.2s",
+      }}
+    >
+      <a
+        href="/docs/arcVRack_feature_summary.html"
+        target="_blank"
+        rel="noreferrer"
+        style={{ fontSize: "12px", color: "var(--text-secondary)", textDecoration: "underline" }}
+      >
+        기능명세서
+      </a>
+      <a
+        href="/docs/arcVRack_ui_design_spec.html"
+        target="_blank"
+        rel="noreferrer"
+        style={{ fontSize: "12px", color: "var(--text-secondary)", textDecoration: "underline" }}
+      >
+        화면설계서
+      </a>
     </div>
   );
 };

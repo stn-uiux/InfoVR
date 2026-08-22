@@ -52,9 +52,8 @@ export function getEffectiveTemplates(
   for (const m of customModels) {
     if (m.modelType === "card-based" && m.variants && m.variants.length > 0) {
       for (const v of m.variants) {
-        const appendedName = v.variantName === "기본타입" ? m.modelName : `${m.modelName} ${v.variantName}`;
         customTemplates.push({
-          modelName: appendedName,
+          modelName: m.modelName,
           type: "Router" as DeviceType,
           uSize: m.unit,
           vendor: (m.vendor || "Nokia") as VendorName,

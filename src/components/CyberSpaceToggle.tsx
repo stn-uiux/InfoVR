@@ -16,7 +16,7 @@ export const CyberSpaceToggle = () => {
       tabIndex={cyberSpaceEnabled ? 0 : -1}
       onKeyDown={(e) => cyberSpaceEnabled && e.key === "Enter" && toggleCsIsVisible()}
       aria-label={`${csIsVisible ? "Hide" : "Show"} server room environment`}
-      title={cyberSpaceEnabled ? (csIsVisible ? "가상 공간 뷰 끄기" : "가상 공간 뷰 켜기") : "가상 공간 사용 불가 (사이드 패널에서 켜주세요)"}
+      title={cyberSpaceEnabled ? (csIsVisible ? "가상공간 뷰 끄기" : "가상공간 뷰 켜기") : "가상공간 사용 불가 (사이드 패널에서 켜주세요)"}
       style={{
         opacity: cyberSpaceEnabled ? 1 : 0.4,
         pointerEvents: cyberSpaceEnabled ? "auto" : "none",

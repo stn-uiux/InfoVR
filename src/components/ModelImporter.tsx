@@ -404,7 +404,7 @@ export const ModelImporter = () => {
               <span className="comm-icon-primary-lg">
                 <Icon icon="ri:box-3-fill" className="icon comm-icon-md" />
               </span>
-              <span className="tree-node-header-text">가상 공간</span>
+              <span className="tree-node-header-text">가상공간</span>
             </span>
           </div>
           <div className="comm-flex-center-8-noshrink">
@@ -759,7 +759,7 @@ export const ModelImporter = () => {
                 <button
                   className={`sidebar-tab-btn ${floatingPanel === "serverRoomEnv" ? "active" : ""}`}
                   onClick={(e) => toggleFloatingPanel("serverRoomEnv", e)}
-                  title="가상 공간"
+                  title="가상공간"
                 >
                   <Icon icon="ri:box-3-fill" className="icon" />
                 </button>
