@@ -71,8 +71,6 @@ const generateRegisteredDevices = (
       deviceGroupId: nodeId,
       title: newTitle,
       modelName: template.modelName,
-      variantName: template.variant?.variantName,
-      customModelId: template.customModelId,
       type: template.type,
       size: template.uSize,
       IPAddr: `${ipParts[0]}.${ipParts[1]}.${thirdOctet}.${lastOctet}`,

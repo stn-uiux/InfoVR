@@ -146,29 +146,6 @@
       border-radius: 0 4px 4px 0;
     }
 
-    .marker-tools {
-      margin-top: 2rem;
-      padding-top: 1rem;
-      border-top: 1px solid var(--border-color);
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    .marker-tools button {
-      background: var(--bg-light);
-      border: 1px solid var(--border-color);
-      padding: 0.5rem;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.8rem;
-      color: var(--text-main);
-    }
-
-    .marker-tools button:hover {
-      background: #e2e8f0;
-    }
-
     .main-content {
       margin-left: 280px;
       padding: 1.5rem 2rem;
@@ -548,7 +525,7 @@
       <li><strong>2장. 수정 모드 (Edit Mode)</strong>
         <ul>
           <li><a href="#page-2-1">2-1. 수정 모드 진입 & 툴바</a></li>
-          <li><a href="#page-2-2">2-2. 가상공간 설정</a></li>
+          <li><a href="#page-2-2">2-2. 가상 공간 (CyberSpace) 설정</a></li>
           <li><a href="#page-2-3">2-3. 오브젝트 배치 & 기즈모 조작</a></li>
           <li><a href="#page-2-4">2-4. 커스텀 3D 모델 임포트</a></li>
           <li><a href="#page-2-5">2-5. 씬 오브젝트 관리 & 내보내기</a></li>
@@ -604,11 +581,6 @@
         </ul>
       </li>
     </ul>
-
-    <div class="marker-tools">
-      <button onclick="exportMarkers()">마커 데이터 백업 (다운로드)</button>
-      <button onclick="importMarkers()">마커 데이터 복원 (불러오기)</button>
-    </div>
   </nav>
   <div class="main-content">
     <header>
@@ -1082,7 +1054,7 @@
                 <span class="ui-item-name">3D 환경 테마 연동</span>
                 <span class="badge badge-pink">3D Effect</span>
               </div>
-              <div class="ui-item-desc">다크 모드 시 야간 조명·어두운 배경, 라이트 모드 시 주간 조명·밝은 배경으로 <mark>가상공간이 실시간 전환</mark>됨.
+              <div class="ui-item-desc">다크 모드 시 야간 조명·어두운 배경, 라이트 모드 시 주간 조명·밝은 배경으로 <mark>CyberSpace가 실시간 전환</mark>됨.
               </div>
             </div>
           </div>
@@ -1138,7 +1110,7 @@
                 <span class="ui-item-name">좌측 편집 사이드바</span>
                 <span class="badge badge-indigo">Sidebar</span>
               </div>
-              <div class="ui-item-desc">계층 트리, 가상공간 설정, Scene Objects 리스트 등 편집 도구가 탭/아코디언으로 구성됨.</div>
+              <div class="ui-item-desc">계층 트리, 가상 공간 설정, Scene Objects 리스트 등 편집 도구가 탭/아코디언으로 구성됨.</div>
             </div>
             <div class="ui-item">
               <div class="ui-item-header">
@@ -1154,9 +1126,9 @@
       </div>
     </div>
     <div id="page-2-2" class="page">
-      <h2 class="page-title"><span class="page-id">2-2</span> 가상공간 설정</h2>
+      <h2 class="page-title"><span class="page-id">2-2</span> 가상 공간 (CyberSpace) 설정</h2>
       <h3>화면 설명</h3>
-      <p>본 화면은 <strong>가상공간 설정</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [우측 '가상공간' 패널, W/D 입력, 3D공간 제작
+      <p>본 화면은 <strong>가상 공간 (CyberSpace) 설정</strong> 기능과 관련된 동작 및 상태를 표시합니다. 주요 기능으로 [우측 '가상 공간' 패널, W/D 입력, 3D공간 제작
         버튼, 와이어프레임 가이드 라인] 등을 포함하고 있습니다.</p>
 
       <div class="page-content-split">
@@ -1169,7 +1141,7 @@
                 (우클릭)</span>
             </div>
             <div class="image-wrapper">
-              <img src="images/2_2.png" alt="가상공간 설정" class="screenshot" draggable="false">
+              <img src="images/2_2.png" alt="가상 공간 (CyberSpace) 설정" class="screenshot" draggable="false">
             </div>
           </div>
         </div>
@@ -1181,7 +1153,7 @@
             <div class="ui-item">
               <div class="ui-item-header">
                 <span class="element-number">1</span>
-                <span class="ui-item-name">가상공간 설정 패널</span>
+                <span class="ui-item-name">가상 공간 설정 패널</span>
                 <span class="badge badge-indigo">Panel</span>
               </div>
               <div class="ui-item-desc">공간의 <mark>가로(W)</mark>·<mark>세로(D)</mark> 사이즈를 수치 입력. 값 변경 후 공간이 실시간 렌더링 반영.
@@ -1193,7 +1165,7 @@
                 <span class="ui-item-name">3D공간 제작 버튼</span>
                 <span class="badge badge-blue">Button</span>
               </div>
-              <div class="ui-item-desc">설정된 사이즈로 바닥·벽면 가상공간을 즉시 생성. 기존 공간이 있으면 크기 갱신.</div>
+              <div class="ui-item-desc">설정된 사이즈로 바닥·벽면 CyberSpace를 즉시 생성. 기존 공간이 있으면 크기 갱신.</div>
             </div>
             <div class="ui-item">
               <div class="ui-item-header">
@@ -3459,45 +3431,6 @@
         location.reload();
         document.querySelectorAll('.marker').forEach(m => m.remove());
       }
-    }
-
-    function exportMarkers() {
-      const data = localStorage.getItem('storyboard_markers_v5');
-      if (!data) {
-        alert("저장된 마커 데이터가 없습니다.");
-        return;
-      }
-      const blob = new Blob([data], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'storyboard_markers_backup.json';
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-
-    function importMarkers() {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'application/json';
-      input.onchange = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          try {
-            const data = event.target.result;
-            JSON.parse(data); // Validate JSON
-            localStorage.setItem('storyboard_markers_v5', data);
-            alert("마커 데이터가 성공적으로 복원되었습니다. 페이지를 새로고침합니다.");
-            location.reload();
-          } catch (err) {
-            alert("잘못된 백업 파일입니다.");
-          }
-        };
-        reader.readAsText(file);
-      };
-      input.click();
     }
 
     function initScrollSpy() {
