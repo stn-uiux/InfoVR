@@ -16,6 +16,9 @@ import {
   RACK_WIDTH_STANDARD,
   GRID_SPACING,
 } from "../components/constants";
+import sampleCardsRaw from "./sampleCards.json";
+
+const sampleCards = sampleCardsRaw as Record<string, any[]>;
 
 // ── 결정론적 UUID 생성 ─────────────────────────────────────────────────────────
 let uuidCounter = 0;
@@ -83,7 +86,7 @@ const generateRegisteredDevices = (
       IPAddr: `${ipParts[0]}.${ipParts[1]}.${thirdOctet}.${lastOctet}`,
       macAddr: `00:00:5E:00:${formattedMacSuffix}`.toUpperCase(),
       vendor: template.vendor,
-      insertedCards: [],
+      insertedCards: sampleCards[template.modelName] || [],
     };
   });
 
@@ -160,19 +163,26 @@ const generateGroupRacks = (
           vendor: regDevice.vendor,
           deviceId: regDevice.deviceId,
           portStates: [],
-          insertedCards: [],
+          insertedCards: regDevice.insertedCards || [],
         };
 
         // 에러 포트 설정 — portName/portNumber 사전 설정으로 PortErrorSynchronizer 트리거 방지
         if (hasError && devices.length === 0) {
           const portNum = (localIdx * 3 + 5) % 24 + 1;
           const errorLevels = ["warning", "minor", "major", "critical"] as const;
+          
+          let portId = `port-${portNum}`;
+          if (device.insertedCards && device.insertedCards.length > 0) {
+            const firstCard = device.insertedCards[0];
+            portId = `${firstCard.shelfNo}/${firstCard.slotNo}/port-${portNum}`;
+          }
+
           device.portStates = [{
-            portId: `port-${portNum}`,
+            portId: portId,
             status: "error" as const,
             errorLevel: errorLevels[localIdx % errorLevels.length],
             errorMessage: "Link down",
-            portNumber: String(portNum),
+            portNumber: portId,
             portName: `Port ${portNum}`, // 사전 설정 — enrichment 트리거 방지
           }];
         }

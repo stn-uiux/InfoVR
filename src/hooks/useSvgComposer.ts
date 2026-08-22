@@ -85,11 +85,16 @@ function getCardPaintOrder(card: InsertedCard, model: ComposerEquipmentModel): n
   return 0;
 }
 
-/** 합성된 SVG HTML 모듈 레벨 캐시 (재열기 시 즉시 렌더링) */
+// ── 합성 캐시 ──
 const _composedHtmlCache = new Map<string, string>();
+const _composingPromises = new Map<string, Promise<string>>();
+const _blobUrlCache = new Map<string, string>();
+const _webpUrlCache = new Map<string, string>();
 
 export interface SvgComposerResult {
   composedHtml: string;
+  blobUrl?: string;
+  webpUrl?: string;
   isModularDevice: boolean;
   generatedPorts: GeneratedPort[];
   generatedPortMap: Map<string, GeneratedPort>;
@@ -110,6 +115,15 @@ export function useSvgComposer(
       .join(","),
     [insertedModules]
   );
+
+  const portsKey = useMemo(() => {
+    return portStates
+      .filter(p => p.status && p.status !== "normal")
+      .map(p => `${p.portId || p.portNumber}=${p.status}`)
+      .sort()
+      .join(",");
+  }, [portStates]);
+
   const customModels = useStore((s) => s.customModels);
 
   const allEquipmentModels = useMemo(() => {
@@ -164,10 +178,14 @@ export function useSvgComposer(
       rowColumns: equipModel._rowColumns,
     });
   }, [equipModel]);
-  const _cacheKey = `${modelName}::${viewSide}::${modelLayoutKey}::${cardsKey}::${modulesKey}`;
+  const _cacheKey = `${modelName}::${viewSide}::${modelLayoutKey}::${cardsKey}::${modulesKey}::${portsKey}`;
 
   const [composedHtml, setComposedHtml] = useState<string>(() =>
     _composedHtmlCache.get(_cacheKey) || ""
+  );
+
+  const [webpUrl, setWebpUrl] = useState<string | undefined>(() =>
+    _webpUrlCache.get(_cacheKey)
   );
 
   // _cacheKey 변경 시 캐시 히트를 즉시 반영
@@ -175,6 +193,8 @@ export function useSvgComposer(
     const cached = _composedHtmlCache.get(_cacheKey);
     if (cached) setComposedHtml(cached);
     else setComposedHtml("");
+
+    setWebpUrl(_webpUrlCache.get(_cacheKey));
   }, [_cacheKey]);
 
   const isModularDevice = useMemo(() => {
@@ -235,22 +255,39 @@ export function useSvgComposer(
     let isMounted = true;
 
     const compose = async () => {
+      if (isModularDevice && insertedCards.length > 0 && cardSvgMap.size === 0) {
+        return;
+      }
       try {
-        let baseSvg: string | undefined;
-        if (isModularDevice && equipModel?.baseSvgUrl && equipModel.baseSvgUrl.startsWith("custom-model-base-")) {
-          baseSvg = await loadBaseEquipmentSvgRaw(equipModel.baseSvgUrl);
-        } else {
-          const targetModelName = isModularDevice && equipModel?.baseSvgUrl
-            ? equipModel.baseSvgUrl.replace(/\.svg$/i, "").replace(/^\[\d+U\]\s*/, "")
-            : modelName;
-          baseSvg = await resolveDeviceSvgContent(targetModelName, viewSide);
+        const cached = _composedHtmlCache.get(_cacheKey);
+        if (cached) {
+          if (isMounted) setComposedHtml(cached);
+          return;
         }
-        if (!isMounted || !baseSvg) return;
 
-        const parser = new DOMParser();
-        const baseDoc = parser.parseFromString(baseSvg, "image/svg+xml");
-        const baseSvgEl = baseDoc.querySelector("svg");
-        if (!baseSvgEl) { setComposedHtml(baseSvg); return; }
+        let promise = _composingPromises.get(_cacheKey);
+        if (promise) {
+          const finalHtml = await promise;
+          if (isMounted) setComposedHtml(finalHtml);
+          return;
+        }
+
+        promise = (async () => {
+          let baseSvg: string | undefined;
+          if (isModularDevice && equipModel?.baseSvgUrl && equipModel.baseSvgUrl.startsWith("custom-model-base-")) {
+            baseSvg = await loadBaseEquipmentSvgRaw(equipModel.baseSvgUrl);
+          } else {
+            const targetModelName = isModularDevice && equipModel?.baseSvgUrl
+              ? equipModel.baseSvgUrl.replace(/\.svg$/i, "").replace(/^\[\d+U\]\s*/, "")
+              : modelName;
+            baseSvg = await resolveDeviceSvgContent(targetModelName, viewSide);
+          }
+          if (!baseSvg) throw new Error("No base SVG found");
+
+          const parser = new DOMParser();
+          const baseDoc = parser.parseFromString(baseSvg, "image/svg+xml");
+          const baseSvgEl = baseDoc.querySelector("svg");
+          if (!baseSvgEl) return baseSvg;
 
         if (!baseSvgEl.getAttribute('viewBox')) {
           const w = baseSvgEl.getAttribute('width') || '984';
@@ -297,7 +334,17 @@ export function useSvgComposer(
 
         const finalHtml = new XMLSerializer().serializeToString(baseDoc);
         _composedHtmlCache.set(_cacheKey, finalHtml);
-        if (isMounted) setComposedHtml(finalHtml);
+        return finalHtml;
+        })();
+
+        _composingPromises.set(_cacheKey, promise);
+        
+        try {
+          const finalHtml = await promise;
+          if (isMounted) setComposedHtml(finalHtml);
+        } finally {
+          _composingPromises.delete(_cacheKey);
+        }
       } catch (e) {
         console.error("Compose Error:", e);
       }
@@ -305,9 +352,45 @@ export function useSvgComposer(
 
     compose();
     return () => { isMounted = false; };
-  }, [modelName, cardsKey, equipModel, isModularDevice, cardSvgMap, modulesKey, _cacheKey, generatedPortMap, insertedCards, insertedModules, viewSide]);
+  }, [modelName, cardsKey, equipModel, isModularDevice, cardSvgMap, modulesKey, portsKey, _cacheKey, generatedPortMap, insertedCards, insertedModules, viewSide]);
 
-  return { composedHtml, isModularDevice, generatedPorts, generatedPortMap };
+  // ─── Blob URL 캐싱 ───
+  const blobUrl = useMemo(() => {
+    if (!composedHtml) return undefined;
+    let url = _blobUrlCache.get(_cacheKey);
+    if (!url) {
+      const blob = new Blob([composedHtml], { type: 'image/svg+xml' });
+      url = URL.createObjectURL(blob);
+      _blobUrlCache.set(_cacheKey, url);
+    }
+    return url;
+  }, [composedHtml, _cacheKey]);
+
+  // ─── WebP 자동 생성 ───
+  useEffect(() => {
+    if (!composedHtml || !equipModel) return;
+    const cachedWebp = _webpUrlCache.get(_cacheKey);
+    if (cachedWebp) {
+      setWebpUrl(cachedWebp);
+      return;
+    }
+
+    let isMounted = true;
+    import("../utils/imageUtils").then(({ convertSvgToPngAsync }) => {
+      // 렌더링 부하 방지를 위해 비동기로 생성
+      convertSvgToPngAsync(composedHtml, equipModel.equipmentSize?.width || 984, equipModel.equipmentSize?.height || 200)
+        .then((url) => {
+          if (!isMounted) return;
+          _webpUrlCache.set(_cacheKey, url);
+          setWebpUrl(url);
+        })
+        .catch(console.error);
+    });
+
+    return () => { isMounted = false; };
+  }, [composedHtml, _cacheKey, equipModel]);
+
+  return { composedHtml, blobUrl, webpUrl, isModularDevice, generatedPorts, generatedPortMap };
 }
 
 // ─── 내부 합성 헬퍼 ───

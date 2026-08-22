@@ -734,7 +734,7 @@ export const DevicePanel = () => {
                       return sorted.map((rd) => {
                         const needsComposer = (rd.insertedCards?.length || 0) > 0;
                         const SvgComposerFallback = ({ device }: { device: any }) => {
-                          const { composedHtml } = useSvgComposer(
+                          const { composedHtml, blobUrl, webpUrl } = useSvgComposer(
                             needsComposer ? device.modelName : undefined,
                             needsComposer ? (device.insertedCards || []) : [],
                             needsComposer ? (device.insertedModules || []) : [],
@@ -742,11 +742,10 @@ export const DevicePanel = () => {
                             needsComposer ? (device.defaultViewSide || "front") : "front"
                           );
                           const thumbUrl = useMemo(() => {
-                            if (composedHtml) {
-                              return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(composedHtml)))}`;
-                            }
+                            if (webpUrl) return webpUrl;
+                            if (blobUrl) return blobUrl;
                             return resolveDeviceImage(device.modelName, device.defaultViewSide || "front");
-                          }, [device.defaultViewSide, device.modelName, composedHtml]);
+                          }, [device.defaultViewSide, device.modelName, webpUrl, blobUrl]);
                           
                           return <img src={thumbUrl} alt="Device Thumb" />;
                         };

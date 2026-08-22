@@ -717,7 +717,7 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
         widthType: selectedCard.widthType,
         shelfNo: 1,
         slotNo: globalSlotNo,
-        positionIndex: slot.row * 2 + (colValue - 1), // 호환용
+        positionIndex: slot.row * selectedModel.cardArea!.columns + (colValue - 1),
         svgHeight: selectedCard.svgHeight,
         slotId: slot.slotId,
         cardSizeType: slot.slotType,

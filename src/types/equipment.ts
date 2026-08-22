@@ -90,6 +90,13 @@ export interface EquipmentModel {
   slots?: SlotDefinition[];
   /** row-based layout용 행 정의 (IXR-6, IXR-10 등) */
   rows?: EquipmentRow[];
+  
+  _rowHeights?: number[]; 
+  _rowGaps?: number[]; 
+  _rowColumns?: number[];
+  gridMerges?: { r: number; c: number; rs: number; cs: number }[];
+  gridColWidths?: number[];
+  gridRowHeights?: number[];
 }
 
 /** 카드 정의 (카드 라이브러리에 표시) */

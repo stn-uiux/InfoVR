@@ -143,7 +143,27 @@ export function applyPortStatuses(
   }
 
   return ports.map((port) => {
-    const newStatus = portStatusMap[port.realPortNumber];
+    let newStatus = portStatusMap[port.realPortNumber];
+    
+    // Fallback: 부분 일치 (샘플 데이터나 포트 번호만 있는 경우)
+    if (!newStatus) {
+      const partialKey1 = port.localPort;
+      const partialKey2 = port.portType !== "unknown" && port.portType !== "port" ? `${port.portType}-${port.localPort}` : port.localPort;
+      
+      const prefixMatch = port.realPortNumber.match(/^(\d+\/\d+\/)/);
+      const prefix = prefixMatch ? prefixMatch[1] : "";
+
+      newStatus = 
+        portStatusMap[partialKey1] || 
+        portStatusMap[partialKey2] || 
+        portStatusMap[`port-${partialKey1}`] || 
+        portStatusMap[`port-${partialKey2}`] ||
+        (prefix ? portStatusMap[`${prefix}${partialKey1}`] : undefined) ||
+        (prefix ? portStatusMap[`${prefix}${partialKey2}`] : undefined) ||
+        (prefix ? portStatusMap[`${prefix}port-${partialKey1}`] : undefined) ||
+        (prefix ? portStatusMap[`${prefix}port-${partialKey2}`] : undefined);
+    }
+
     if (newStatus && newStatus !== port.status) {
       return { ...port, status: newStatus };
     }

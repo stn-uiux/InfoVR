@@ -744,6 +744,8 @@ const MemoDeviceMesh = memo(({ device, rackHeight, rackWidth, rackId, isObstruct
   );
 });
 
+const EMPTY_ARRAY: any[] = [];
+
 const DeviceMesh = ({
   device,
   rackHeight,
@@ -857,11 +859,15 @@ const DeviceMesh = ({
 
   // Always generate SVG if there are inserted cards AND no cached PNG is available
   const needsComposer = !device.devicePngRaw && (device.insertedCards?.length || 0) > 0;
-  const { composedHtml } = useSvgComposer(
+  const stableInsertedCards = device.insertedCards || EMPTY_ARRAY;
+  const stableInsertedModules = device.insertedModules || EMPTY_ARRAY;
+  const stablePortStates = device.portStates || EMPTY_ARRAY;
+
+  const { composedHtml, blobUrl, webpUrl } = useSvgComposer(
     needsComposer ? device.modelName : undefined,
-    needsComposer ? (device.insertedCards || []) : [],
-    needsComposer ? (device.insertedModules || []) : [],
-    needsComposer ? (device.portStates || []) : [],
+    needsComposer ? stableInsertedCards : EMPTY_ARRAY,
+    needsComposer ? stableInsertedModules : EMPTY_ARRAY,
+    needsComposer ? stablePortStates : EMPTY_ARRAY,
     needsComposer ? (device.defaultViewSide || "front") : "front"
   );
 
@@ -870,12 +876,15 @@ const DeviceMesh = ({
       if (device.devicePngRaw) {
         return device.devicePngRaw;
       }
-      if (composedHtml) {
-        return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(composedHtml)))}`;
+      if (webpUrl) {
+        return webpUrl;
+      }
+      if (blobUrl) {
+        return blobUrl;
       }
       return resolveDeviceImage(device.modelName, device.defaultViewSide || "front");
     },
-    [device.defaultViewSide, device.modelName, composedHtml, device.devicePngRaw],
+    [device.defaultViewSide, device.modelName, webpUrl, blobUrl, device.devicePngRaw],
   );
 
   const resolvedUrl = thumbUrl;
