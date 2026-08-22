@@ -2879,6 +2879,7 @@ export const useStore = create<AppState>()(
           isCanvasReady,
           _importDirty,
           customModels,
+          isSyncingPorts,
           ...rest
         } = state;
         return rest;
@@ -2898,6 +2899,8 @@ export const useStore = create<AppState>()(
           ...persistedState,
           isEditMode: false,
           isCanvasReady: false,
+          isSyncingPorts: false,
+          pendingImportFile: null,
           customModels: cleanedCustomModels,
           racks: persistedState.baselineRacks ? structuredClone(persistedState.baselineRacks) : (persistedState.racks ? structuredClone(persistedState.racks) : []),
           importedModels: persistedState.baselineModels ? structuredClone(persistedState.baselineModels) : (persistedState.importedModels ? structuredClone(persistedState.importedModels) : []),

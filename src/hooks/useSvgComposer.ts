@@ -554,9 +554,9 @@ export function drawBlankSlots(
     rect.setAttribute("y", y.toString());
     rect.setAttribute("width", w.toString());
     rect.setAttribute("height", h.toString());
-    rect.setAttribute("fill", "#666666"); // 연한 회색 (섀시의 빈 공간임을 명확하게 표시)
-    rect.setAttribute("stroke", "#444444");
-    rect.setAttribute("stroke-width", "1");
+    rect.setAttribute("fill", "transparent");
+    rect.setAttribute("stroke", "none");
+    rect.setAttribute("stroke-width", "0");
     baseSvgEl.appendChild(rect);
   };
 

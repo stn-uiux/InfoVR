@@ -59,9 +59,15 @@ export const PortErrorSynchronizer = () => {
       setIsSyncingPorts(true);
 
       try {
-        const allRacks = [...racks];
-        Object.entries(layouts).forEach(([nid, layout]) => {
-        if (nid !== activeNodeId) {
+        // useStore.getState()로 최신 racks를 읽어야 무한 루프 방지
+        // (racks를 useEffect 의존성에 넣으면 updateDevicePortStates가 racks 참조를
+        //  변경할 때마다 effect가 재실행되어 무한 루프 발생)
+        const currentState = useStore.getState();
+        const currentActiveNodeId = currentState.activeNodeId;
+        const currentLayouts = currentState.layouts;
+        const allRacks = [...currentState.racks];
+        Object.entries(currentLayouts).forEach(([nid, layout]) => {
+        if (nid !== currentActiveNodeId) {
           allRacks.push(...(layout.racks || []));
         }
       });
@@ -169,7 +175,7 @@ export const PortErrorSynchronizer = () => {
         clearTimeout(debounceTimer);
       }
     };
-  }, [deviceFingerprint, racks, layouts, activeNodeId, updateDevicePortStates, setIsSyncingPorts]);
+  }, [deviceFingerprint, updateDevicePortStates, setIsSyncingPorts]);
 
   return null;
 };
