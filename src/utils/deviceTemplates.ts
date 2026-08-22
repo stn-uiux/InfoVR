@@ -75,12 +75,39 @@ export function getEffectiveTemplates(
     }
   }
 
-  // 기본 모델은 커스텀 모델에 동일 이름(기본타입)이 없을 경우에만 포함.
-  // 커스텀 모델이 생성된(확장된) 모든 modelName들을 Set으로 수집.
-  const customModelNames = new Set(customTemplates.map((t) => t.modelName));
-  const filteredDefaults = DEVICE_TEMPLATES.filter(
-    (t) => !deletedDefaultTemplates.includes(t.modelName) && !customModelNames.has(t.modelName),
-  );
+  // 기본 모델 순서를 유지하면서 커스텀 모델을 적절한 위치에 삽입
+  const result: DeviceTemplate[] = [];
+  const addedCustomBaseNames = new Set<string>();
 
-  return [...customTemplates, ...filteredDefaults];
+  for (const defaultTpl of DEVICE_TEMPLATES) {
+    if (deletedDefaultTemplates.includes(defaultTpl.modelName)) continue;
+
+    // 현재 defaultTpl 모델명과 동일한 베이스 모델을 가진 커스텀 템플릿(들) 찾기
+    const matchingCustoms = customModels.find(m => m.modelName === defaultTpl.modelName);
+
+    if (matchingCustoms) {
+      // 오버라이드된 커스텀 모델의 템플릿들을 추가
+      const relatedTemplates = customTemplates.filter(ct => 
+        (ct.customModelId === matchingCustoms.modelId) || (ct.modelName.startsWith(matchingCustoms.modelName))
+      );
+      result.push(...relatedTemplates);
+      addedCustomBaseNames.add(matchingCustoms.modelName);
+    } else {
+      // 커스텀으로 오버라이드 되지 않았다면 기본 템플릿 그대로 추가
+      result.push(defaultTpl);
+    }
+  }
+
+  // DEVICE_TEMPLATES에 없었던(완전히 새로 생성된) 커스텀 모델들 맨 뒤에 추가
+  for (const m of customModels) {
+    if (!addedCustomBaseNames.has(m.modelName)) {
+      const relatedTemplates = customTemplates.filter(ct => 
+        (ct.customModelId === m.modelId) || (ct.modelName.startsWith(m.modelName))
+      );
+      result.push(...relatedTemplates);
+      addedCustomBaseNames.add(m.modelName);
+    }
+  }
+
+  return result;
 }
