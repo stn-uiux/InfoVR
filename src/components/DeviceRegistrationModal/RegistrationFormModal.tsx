@@ -224,7 +224,7 @@ export const RegistrationFormModal = ({
               <div style={{ flex: 1 }}>
                 <FormSelect
                   options={effectiveTemplates.map((t, i) => ({
-                    label: `[${t.uSize}U] ${t.modelName}${t.variant ? ` (${t.variant.variantName})` : ''}`,
+                    label: `[${t.uSize}U] ${t.modelName}${t.isCustom ? ' ★' : ''}`,
                     value: i,
                   }))}
                   value={selectedModelIdx}
