@@ -172,14 +172,11 @@ for (const [path, mod] of Object.entries(ixrUrlModules)) {
   const filename = path.split("/").pop() ?? "";
   const cardType = filename.replace(/\.svg$/i, "");
   let widthType: CardWidthType = "half";
-  let svgWidth = 492;
 
   if (filename.includes("-full")) {
     widthType = "full";
-    svgWidth = 984;
   } else if (filename.includes("-sixth")) {
     widthType = "sixth";
-    svgWidth = 164;
   }
 
   _cardDefinitions.push({
@@ -188,7 +185,7 @@ for (const [path, mod] of Object.entries(ixrUrlModules)) {
     svgUrl: mod.default,
     widthType,
     cardGroup: "ixr",
-    svgWidth,
+    svgWidth: 492,
     svgHeight: 116,
   });
 }

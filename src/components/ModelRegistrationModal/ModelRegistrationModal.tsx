@@ -855,7 +855,6 @@ export const ModelRegistrationModal: React.FC = () => {
 
     const dims = parseSvgDimensions(modelSvgRaw || baseChassisRaw || "");
     const parsedRowColumns = rowColumnsArr.map((c) => parseInt(c) || caColumns);
-    // columnWidth는 최대 열 수 기준으로 자동 계산
     const effectiveMaxCols = parsedRowColumns.length > 0 ? Math.max(...parsedRowColumns, 1) : caColumns;
     const effectiveColWidth = caWidth / effectiveMaxCols;
 
@@ -867,6 +866,30 @@ export const ModelRegistrationModal: React.FC = () => {
         finalModelPngRaw = await convertSvgToPngAsync(finalModelSvgRaw, dims.width || 860, dims.height || 200);
       } catch (err) {
         console.error("Failed to generate fallback PNG on submit", err);
+      }
+    } else if (modelType === "card-based" && baseChassisRaw) {
+      try {
+        const composerModel = {
+          modelId: "temp",
+          modelName: modelName.trim(),
+          rackUnit: `${unit}U`,
+          baseSvgUrl: "local",
+          baseEquipmentViewSvgRaw: baseChassisRaw,
+          equipmentSize: { width: dims.width, height: dims.height },
+          cardArea: { x: caX, y: caY, width: caWidth, height: caHeight, columns: effectiveMaxCols, columnWidth: effectiveColWidth },
+          _rowHeights: rowHeights.length > 0 ? rowHeights.map(r => parseFloat(r) || 0) : undefined,
+          _rowColumns: rowColumnsArr.length > 0 ? rowColumnsArr.map(c => parseInt(c) || 0) : undefined,
+          _rowGaps: rowGapsArr.length > 0 ? rowGapsArr.map(g => parseFloat(g) || 0) : undefined,
+          gridMerges,
+          gridColWidths,
+          gridRowHeights
+        };
+        const svg = await generateComposedSvgAsync(modelName.trim(), composerModel, []);
+        if (svg) {
+          finalModelPngRaw = await convertSvgToPngAsync(svg, dims.width || 860, dims.height || 200) || undefined;
+        }
+      } catch (err) {
+        console.error("Failed to generate chassis PNG on submit", err);
       }
     }
 
@@ -892,9 +915,9 @@ export const ModelRegistrationModal: React.FC = () => {
             columnWidth: effectiveColWidth,
           }
           : undefined,
-      rowHeights: undefined,
-      rowColumns: undefined,
-      rowGaps: undefined,
+      rowHeights: modelType === "card-based" && rowHeights.length > 0 ? rowHeights.map(r => parseFloat(r) || 0) : undefined,
+      rowColumns: modelType === "card-based" && rowColumnsArr.length > 0 ? rowColumnsArr.map(c => parseInt(c) || 0) : undefined,
+      rowGaps: modelType === "card-based" && rowGapsArr.length > 0 ? rowGapsArr.map(g => parseFloat(g) || 0) : undefined,
       gridMerges: modelType === "card-based" && gridMerges.length > 0 ? gridMerges : undefined,
       gridColWidths: modelType === "card-based" && gridColWidths.length > 0 ? gridColWidths : undefined,
       gridRowHeights: modelType === "card-based" && gridRowHeights.length > 0 ? gridRowHeights : undefined,
@@ -2181,18 +2204,47 @@ export const ModelRegistrationModal: React.FC = () => {
             }
 
             const next = [...variants];
+            let newVariantPngRaw: string | undefined = undefined;
+
+            // 타입 썸네일 PNG 생성
+            const dims = parseSvgDimensions(modelSvgRaw || baseChassisRaw || "");
+            const parsedRowColumns = rowColumnsArr.map((c) => parseInt(c) || caColumns);
+            const effectiveMaxCols = parsedRowColumns.length > 0 ? Math.max(...parsedRowColumns, 1) : caColumns;
+            const effectiveColWidth = caWidth / effectiveMaxCols;
+
+            try {
+              const composerModel = {
+                modelId: "temp",
+                modelName: modelName.trim(),
+                rackUnit: `${unit}U`,
+                baseSvgUrl: "local",
+                baseEquipmentViewSvgRaw: baseChassisRaw || "",
+                equipmentSize: { width: dims.width, height: dims.height },
+                cardArea: { x: caX, y: caY, width: caWidth, height: caHeight, columns: effectiveMaxCols, columnWidth: effectiveColWidth },
+                _rowHeights: rowHeights.length > 0 ? rowHeights.map(r => parseFloat(r) || 0) : undefined,
+                _rowColumns: rowColumnsArr.length > 0 ? rowColumnsArr.map(c => parseInt(c) || 0) : undefined,
+                _rowGaps: rowGapsArr.length > 0 ? rowGapsArr.map(g => parseFloat(g) || 0) : undefined,
+                gridMerges,
+                gridColWidths,
+                gridRowHeights
+              };
+              const svg = await generateComposedSvgAsync(modelName.trim(), composerModel, res.cards);
+              if (svg) {
+                newVariantPngRaw = await convertSvgToPngAsync(svg, dims.width || 860, dims.height || 200) || undefined;
+              }
+            } catch (err) {
+              console.error("Failed to generate variant PNG on save", err);
+            }
+
             if (editingVariantIndex !== null) {
-              next[editingVariantIndex] = { ...next[editingVariantIndex], variantName, insertedCards: res.cards };
+              next[editingVariantIndex] = { ...next[editingVariantIndex], variantName, insertedCards: res.cards, variantPngRaw: newVariantPngRaw };
             } else {
-              next.push({ variantId: `var-${Date.now()}`, variantName, isDefault: next.length === 0, insertedCards: res.cards });
+              next.push({ variantId: `var-${Date.now()}`, variantName, isDefault: next.length === 0, insertedCards: res.cards, variantPngRaw: newVariantPngRaw });
             }
             setVariants(next);
 
             // Auto-save to store
-            const dims = parseSvgDimensions(modelSvgRaw || "");
-            const parsedRowColumns = rowColumnsArr.map((c) => parseInt(c) || caColumns);
-            const effectiveMaxCols = parsedRowColumns.length > 0 ? Math.max(...parsedRowColumns, 1) : caColumns;
-            const effectiveColWidth = caWidth / effectiveMaxCols;
+
 
             const finalModelSvgRaw = modelType === "card-based" ? "" : (modelSvgRaw || "");
             let finalModelPngRaw: string | undefined = undefined;
@@ -2204,6 +2256,31 @@ export const ModelRegistrationModal: React.FC = () => {
                 finalModelPngRaw = await convertSvgToPngAsync(finalModelSvgRaw, dims.width || 860, dims.height || 200);
               } catch (err) {
                 console.error("Failed to generate fallback PNG on variant save", err);
+              }
+            } else if (modelType === "card-based" && baseChassisRaw) {
+              // Auto-save 시 섀시 깡통 PNG 썸네일 생성
+              try {
+                const composerModel = {
+                  modelId: "temp",
+                  modelName: modelName.trim(),
+                  rackUnit: `${unit}U`,
+                  baseSvgUrl: "local",
+                  baseEquipmentViewSvgRaw: baseChassisRaw,
+                  equipmentSize: { width: dims.width, height: dims.height },
+                  cardArea: { x: caX, y: caY, width: caWidth, height: caHeight, columns: effectiveMaxCols, columnWidth: effectiveColWidth },
+                  _rowHeights: rowHeights.length > 0 ? rowHeights.map(r => parseFloat(r) || 0) : undefined,
+                  _rowColumns: rowColumnsArr.length > 0 ? rowColumnsArr.map(c => parseInt(c) || 0) : undefined,
+                  _rowGaps: rowGapsArr.length > 0 ? rowGapsArr.map(g => parseFloat(g) || 0) : undefined,
+                  gridMerges,
+                  gridColWidths,
+                  gridRowHeights
+                };
+                const svg = await generateComposedSvgAsync(modelName.trim(), composerModel, []);
+                if (svg) {
+                  finalModelPngRaw = await convertSvgToPngAsync(svg, dims.width || 860, dims.height || 200) || undefined;
+                }
+              } catch (err) {
+                console.error("Failed to generate chassis PNG on variant save", err);
               }
             }
 
@@ -2219,9 +2296,9 @@ export const ModelRegistrationModal: React.FC = () => {
               modelType,
               baseEquipmentViewSvgRaw: modelType === "card-based" ? baseChassisRaw || undefined : undefined,
               cardArea: modelType === "card-based" ? { x: caX, y: caY, width: caWidth, height: caHeight, columns: effectiveMaxCols, columnWidth: effectiveColWidth } : undefined,
-              rowHeights: undefined,
-              rowColumns: undefined,
-              rowGaps: undefined,
+              rowHeights: modelType === "card-based" && rowHeights.length > 0 ? rowHeights.map(r => parseFloat(r) || 0) : undefined,
+              rowColumns: modelType === "card-based" && rowColumnsArr.length > 0 ? rowColumnsArr.map(c => parseInt(c) || 0) : undefined,
+              rowGaps: modelType === "card-based" && rowGapsArr.length > 0 ? rowGapsArr.map(g => parseFloat(g) || 0) : undefined,
               gridMerges: modelType === "card-based" && gridMerges.length > 0 ? gridMerges : undefined,
               gridColWidths: modelType === "card-based" && gridColWidths.length > 0 ? gridColWidths : undefined,
               gridRowHeights: modelType === "card-based" && gridRowHeights.length > 0 ? gridRowHeights : undefined,
