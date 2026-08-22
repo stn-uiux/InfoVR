@@ -52,8 +52,8 @@ export async function convertSvgToPngAsync(svgRaw: string, width: number, height
       ctx.drawImage(img, 0, 0, width, height);
       
       try {
-        const pngDataUrl = canvas.toDataURL("image/png");
-        resolve(pngDataUrl);
+        const webpDataUrl = canvas.toDataURL("image/webp", 0.8);
+        resolve(webpDataUrl);
       } catch (err) {
         reject(err);
       }

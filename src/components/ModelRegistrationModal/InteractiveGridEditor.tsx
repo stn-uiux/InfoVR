@@ -1209,17 +1209,7 @@ export default function InteractiveGridEditor({
             나누기
           </button>
           </div>
-          <button
-            className="comm-btn comm-btn-primary comm-btn-sm"
-            onClick={(e) => {
-              e.preventDefault();
-              if (onSave) onSave();
-            }}
-            style={{ marginLeft: "auto" }}
-            title="현재 카드 영역 및 기본 섀시 정보 저장"
-          >
-            저장
-          </button>
+
         </div>,
         toolbarContainer
       )}
