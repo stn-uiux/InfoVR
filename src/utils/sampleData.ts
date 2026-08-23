@@ -93,18 +93,18 @@ const generateRegisteredDevices = (
 export const sampleNodes: HierarchyNode[] = getDefaultNodes();
 
 // ── 전산실별 장비 수량 (축소된 규모) ──────────────────────────────────────────
-// 기존: 강남 420개, 기타 240~420개 → 총 3000+ 장비
-// 변경: 강남 120개, 기타 60~80개 → 총 ~700 장비
+// 기존: 강남 120개, 기타 60~80개 → 총 ~700 장비
+// 변경: 전산실당 장비 대수 200~500대로 대폭 증가
 const ROOM_CONFIG: Record<string, { deviceCount: number; rackCount: number; cols: number }> = {
-  [GANGNAM_ROOM_1_NODE_ID]: { deviceCount: 120, rackCount: 20, cols: 10 },
-  [GANGNAM_ROOM_2_NODE_ID]: { deviceCount: 70, rackCount: 12, cols: 6 },
-  [GANGNAM_ROOM_3_NODE_ID]: { deviceCount: 60, rackCount: 10, cols: 5 },
-  [GANGBUK_ROOM_1_NODE_ID]: { deviceCount: 60, rackCount: 10, cols: 5 },
-  [GANGBUK_ROOM_2_NODE_ID]: { deviceCount: 50, rackCount: 8, cols: 4 },
-  [GWACHEON_ROOM_1_NODE_ID]: { deviceCount: 80, rackCount: 14, cols: 7 },
-  [GWACHEON_ROOM_2_NODE_ID]: { deviceCount: 60, rackCount: 10, cols: 5 },
-  [DAEJEON_ROOM_NODE_ID]: { deviceCount: 70, rackCount: 12, cols: 6 },
-  [SEJONG_ROOM_NODE_ID]: { deviceCount: 50, rackCount: 8, cols: 4 },
+  [GANGNAM_ROOM_1_NODE_ID]: { deviceCount: 500, rackCount: 40, cols: 10 },
+  [GANGNAM_ROOM_2_NODE_ID]: { deviceCount: 350, rackCount: 30, cols: 10 },
+  [GANGNAM_ROOM_3_NODE_ID]: { deviceCount: 200, rackCount: 16, cols: 8 },
+  [GANGBUK_ROOM_1_NODE_ID]: { deviceCount: 300, rackCount: 24, cols: 8 },
+  [GANGBUK_ROOM_2_NODE_ID]: { deviceCount: 250, rackCount: 20, cols: 10 },
+  [GWACHEON_ROOM_1_NODE_ID]: { deviceCount: 400, rackCount: 32, cols: 8 },
+  [GWACHEON_ROOM_2_NODE_ID]: { deviceCount: 250, rackCount: 20, cols: 10 },
+  [DAEJEON_ROOM_NODE_ID]: { deviceCount: 300, rackCount: 24, cols: 8 },
+  [SEJONG_ROOM_NODE_ID]: { deviceCount: 200, rackCount: 16, cols: 8 },
 };
 
 export const sampleRegisteredDevices: RegisteredDevice[] = sampleNodes.flatMap((node, idx) => {
@@ -142,7 +142,13 @@ const generateGroupRacks = (
     const col = localIdx % colsPerRow;
 
     const width = RACK_WIDTH_STANDARD;
-    const rackSize = RACK_SIZES[localIdx % RACK_SIZES.length];
+    
+    // 자연스러운 랜덤(결정론적 난수) 효과를 위해 인덱스를 섞어서 선택
+    // 48U가 가장 많도록 분포를 조정할 수도 있지만 단순 해시 방식 사용
+    const hash = (localIdx * 17 + 31) % 100;
+    let rackSize: 24 | 32 | 48 = 48; // 60% probability for 48U
+    if (hash < 20) rackSize = 24;      // 20% probability for 24U
+    else if (hash < 40) rackSize = 32; // 20% probability for 32U
 
     const hasError = errorIndexes.includes(localIdx);
     const devices: Device[] = [];
