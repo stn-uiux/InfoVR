@@ -561,6 +561,7 @@ function App() {
         <div style={{ position: "absolute", bottom: "24px", right: "24px", zIndex: 10, display: "flex", flexDirection: "column", gap: "8px", fontSize: "12px", textAlign: "right" }}>
           <a href="/docs/arcVRack_feature_summary.html" target="_blank" rel="noreferrer" style={{ color: "var(--color-text-secondary, #a1a1aa)", textDecoration: "none" }} onMouseOver={(e) => e.currentTarget.style.color = "var(--color-primary, #646cff)"} onMouseOut={(e) => e.currentTarget.style.color = "var(--color-text-secondary, #a1a1aa)"}>기능명세서</a>
           <a href="/docs/arcVRack_ui_design_spec.html" target="_blank" rel="noreferrer" style={{ color: "var(--color-text-secondary, #a1a1aa)", textDecoration: "none" }} onMouseOver={(e) => e.currentTarget.style.color = "var(--color-primary, #646cff)"} onMouseOut={(e) => e.currentTarget.style.color = "var(--color-text-secondary, #a1a1aa)"}>화면 설계서</a>
+          <a href="/docs/completion_report.html" target="_blank" rel="noreferrer" style={{ color: "var(--color-text-secondary, #a1a1aa)", textDecoration: "none" }} onMouseOver={(e) => e.currentTarget.style.color = "var(--color-primary, #646cff)"} onMouseOut={(e) => e.currentTarget.style.color = "var(--color-text-secondary, #a1a1aa)"}>완료보고서</a>
         </div>
       )}
 
