@@ -226,9 +226,14 @@ export function useSvgComposer(
 
   // 카드 SVG async fallback
   useEffect(() => {
-    if (!isModularDevice || cardSvgMap.size > 0) return;
-    let isMounted = true;
+    if (!isModularDevice) return;
     const uniqueFileNames = [...new Set(insertedCards.map((c) => c.cardFileName))];
+    
+    // 이미 모두 로드되었는지 확인
+    const allLoaded = uniqueFileNames.every(fn => cardSvgMap.has(fn));
+    if (allLoaded) return;
+
+    let isMounted = true;
     Promise.all(
       uniqueFileNames.map(async (fn) => {
         const raw = await loadCardSvgRaw(fn);
@@ -236,9 +241,17 @@ export function useSvgComposer(
       })
     ).then((results) => {
       if (!isMounted) return;
-      const map = new Map<string, string>();
-      for (const [fn, raw] of results) { if (raw) map.set(fn, raw); }
-      setCardSvgMap(map);
+      setCardSvgMap(prev => {
+        const next = new Map(prev);
+        let changed = false;
+        for (const [fn, raw] of results) { 
+          if (raw && !next.has(fn)) {
+            next.set(fn, raw);
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
     });
     return () => { isMounted = false; };
   }, [isModularDevice, cardsKey]);
@@ -398,11 +411,6 @@ export function useSvgComposer(
     
     if (!targetHtml) return;
 
-    // 모든 모델(섀시형 포함)은 실장된 카드/모듈의 고합인 _cacheKey를 사용하여 타입(Variant)별로 유니크한 썸네일을 캐싱합니다.
-    // 캐시 오염을 방지하기 위해 모든 카드의 SVG 데이터가 로드되었는지 확인합니다.
-    const isAllCardsLoaded = insertedCards.every((card) => cardSvgMap.has(card.cardFileName));
-    if (!isAllCardsLoaded) return;
-
     const webpCacheKey = `webp::${_cacheKey}`;
 
     const cachedWebp = _webpUrlCache.get(webpCacheKey);
@@ -412,15 +420,31 @@ export function useSvgComposer(
     }
 
     let isMounted = true;
-    import("../utils/imageUtils").then(({ convertSvgToPngAsync }) => {
-      // 렌더링 부하 방지를 위해 비동기로 생성
-      convertSvgToPngAsync(targetHtml, equipModel.equipmentSize?.width || 984, equipModel.equipmentSize?.height || 200)
-        .then((url) => {
-          if (!isMounted) return;
-          _webpUrlCache.set(webpCacheKey, url);
-          setWebpUrl(url);
-        })
-        .catch(console.error);
+    
+    import("../utils/indexedDBStorage").then(({ idbStorage }) => {
+      idbStorage.getItem(webpCacheKey).then((savedUrl) => {
+        if (!isMounted) return;
+        if (savedUrl) {
+          _webpUrlCache.set(webpCacheKey, savedUrl);
+          setWebpUrl(savedUrl);
+        } else {
+          // 캐시 오염을 방지하기 위해 WebP를 새로 생성하기 전에는 모든 카드의 SVG 데이터가 로드되었는지 확인합니다.
+          const isAllCardsLoaded = insertedCards.every((card) => cardSvgMap.has(card.cardFileName));
+          if (!isAllCardsLoaded) return;
+
+          import("../utils/imageUtils").then(({ convertSvgToPngAsync }) => {
+            // 렌더링 부하 방지를 위해 비동기로 생성
+            convertSvgToPngAsync(targetHtml, equipModel.equipmentSize?.width || 984, equipModel.equipmentSize?.height || 200)
+              .then((url) => {
+                if (!isMounted) return;
+                _webpUrlCache.set(webpCacheKey, url);
+                idbStorage.setItem(webpCacheKey, url).catch(console.error);
+                setWebpUrl(url);
+              })
+              .catch(console.error);
+          });
+        }
+      }).catch(console.error);
     });
 
     return () => { isMounted = false; };
