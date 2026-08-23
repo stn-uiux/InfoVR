@@ -15,7 +15,8 @@ import { CardThumbnail } from "../CardThumbnail";
 import { StnModal } from "../StnModal";
 import { cardDefinitions, equipmentModels, loadBaseEquipmentSvgRaw, getCardsForModel } from "../../utils/cardAssets";
 import { DEVICE_TEMPLATES } from "../../utils/deviceTemplates";
-import { getDeviceViewSides, resolveDeviceImage, resolveDeviceSvgContent } from "../../utils/deviceAssets";
+import { getDeviceViewSides, resolveDeviceImage, resolveDeviceSvgContent, isChassisModel } from "../../utils/deviceAssets";
+import { DEFAULT_CHASSIS_CARDS } from "../../utils/defaultChassisCards";
 import { useSvgComposer } from "../../hooks/useSvgComposer";
 
 const DynamicListThumb = ({
@@ -27,13 +28,16 @@ const DynamicListThumb = ({
   onHover,
   onHoverMove,
   onHoverLeave,
+  insertedCards,
 }: any) => {
   const { webpUrl } = useSvgComposer(
-    isChassis && !displayThumbPng && !displayThumb ? modelName : undefined,
-    [], [], [], "front"
+    isChassis ? modelName : undefined,
+    isChassis ? (insertedCards || []) : [], 
+    [], [], "front"
   );
 
-  const finalImgUrl = (isChassis && !displayThumbPng && !displayThumb) ? webpUrl : staticImgUrl;
+  // 최종 이미지 URL: 섀시형은 webpUrl 최우선, 그 외는 staticImgUrl
+  const finalImgUrl = (isChassis && webpUrl) ? webpUrl : staticImgUrl;
 
   return (
     <div
@@ -41,8 +45,8 @@ const DynamicListThumb = ({
       onMouseEnter={(e) => {
         onHover({ 
           pngRaw: displayThumbPng, 
-          svgRaw: displayThumb, 
-          imgUrl: finalImgUrl, 
+          svgRaw: null, 
+          imgUrl: finalImgUrl || null,
           name: modelName,
         });
         onHoverMove(e);
@@ -50,12 +54,15 @@ const DynamicListThumb = ({
       onMouseMove={onHoverMove}
       onMouseLeave={onHoverLeave}
     >
-      {displayThumbPng ? (
+      {/* 1순위: 섀시형 WebP (공통 썸네일) */}
+      {isChassis && webpUrl ? (
+        <img src={webpUrl} alt={modelName} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+      ) : /* 2순위: PNG raw */ displayThumbPng ? (
         <img src={displayThumbPng} alt={modelName} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-      ) : displayThumb ? (
+      ) : /* 3순위: static 이미지 URL (고정형 모델용) */ staticImgUrl ? (
+        <img src={staticImgUrl} alt={modelName} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+      ) : /* 4순위: SVG fallback (거의 사용 안됨) */ displayThumb ? (
         <div dangerouslySetInnerHTML={{ __html: displayThumb }} style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }} />
-      ) : finalImgUrl ? (
-        <img src={finalImgUrl} alt={modelName} />
       ) : (
         <span style={{ fontSize: 18, color: "var(--text-tertiary)" }}>🖥️</span>
       )}
@@ -440,75 +447,7 @@ export const ModelRegistrationModal: React.FC = () => {
   // 행 수 (사용자 설정 우선)
   const defaultRowHeight = 46;
 
-  // Auto-generate missing variant PNGs
-  useEffect(() => {
-    let isCancelled = false;
 
-    // Only run if there is a missing png AND we have the necessary base data
-    if (modelType !== "card-based" && variants.length > 0 && variants.some(v => !v.variantPngRaw) && (baseChassisRaw || modelSvgRaw)) {
-      const generateMissingPngs = async () => {
-        let changed = false;
-        const newVariants = [...variants];
-        for (let i = 0; i < newVariants.length; i++) {
-          if (isCancelled) return;
-          const v = newVariants[i];
-          if (!v.variantPngRaw) {
-            try {
-              const dims = parseSvgDimensions(modelSvgRaw || baseChassisRaw || "");
-              const parsedRowHeights = rowHeights.map((h) => parseFloat(h) || defaultRowHeight);
-              const parsedRowColumns = rowColumnsArr.map((c) => parseInt(c) || caColumns);
-              const parsedRowGaps = rowGapsArr.map((g) => parseFloat(g) || 0);
-              const effectiveMaxCols = parsedRowColumns.length > 0 ? Math.max(...parsedRowColumns, 1) : caColumns;
-              const effectiveColWidth = caWidth / effectiveMaxCols;
-
-              const composed = await generateComposedSvgAsync(
-                modelName.trim(),
-                {
-                  modelId: editingModelId || "temp",
-                  modelName: modelName.trim(),
-                  rackUnit: `${unit}U`,
-                  baseSvgUrl: baseChassisFileName || "",
-                  baseEquipmentViewSvgRaw: baseChassisRaw || "",
-                  equipmentSize: { width: dims.width, height: dims.height },
-                  cardArea: { x: caX, y: caY, width: caWidth, height: caHeight, columns: effectiveMaxCols, columnWidth: effectiveColWidth },
-                  _rowHeights: parsedRowHeights,
-                  _rowColumns: parsedRowColumns,
-                  _rowGaps: parsedRowGaps,
-                  gridMerges: gridMerges,
-                  gridColWidths: gridColWidths,
-                  gridRowHeights: gridRowHeights,
-                } as any,
-                v.insertedCards,
-                [],
-                "front"
-              );
-              if (composed && !isCancelled) {
-                const png = await convertSvgToPngAsync(composed, dims.width || 860, dims.height || 200);
-                if (png && !isCancelled) {
-                  newVariants[i] = { ...v, variantPngRaw: png };
-                  changed = true;
-                }
-              }
-            } catch (err) {
-              console.error("Failed to generate missing variant PNG", err);
-            }
-          }
-        }
-        if (changed && !isCancelled) {
-          setVariants(newVariants);
-        }
-      };
-
-      generateMissingPngs();
-    }
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [
-    variants, baseChassisRaw, modelSvgRaw, modelName, editingModelId, unit, baseChassisFileName,
-    caX, caY, caWidth, caHeight, rowHeights, rowColumnsArr, rowGapsArr, caColumns, gridMerges, gridColWidths, gridRowHeights
-  ]);
 
   const computedRowCount = caRowCount;
   const isChassisDrawn = gridColWidths.length > 0 && gridRowHeights.length > 0 && caWidth > 0 && caHeight > 0;
@@ -914,25 +853,8 @@ export const ModelRegistrationModal: React.FC = () => {
       }
     } else if (modelType === "card-based" && baseChassisRaw) {
       try {
-        const composerModel = {
-          modelId: "temp",
-          modelName: modelName.trim(),
-          rackUnit: `${unit}U`,
-          baseSvgUrl: "local",
-          baseEquipmentViewSvgRaw: baseChassisRaw,
-          equipmentSize: { width: dims.width, height: dims.height },
-          cardArea: { x: caX, y: caY, width: caWidth, height: caHeight, columns: effectiveMaxCols, columnWidth: effectiveColWidth },
-          _rowHeights: rowHeights.length > 0 ? rowHeights.map(r => parseFloat(r) || 0) : undefined,
-          _rowColumns: rowColumnsArr.length > 0 ? rowColumnsArr.map(c => parseInt(c) || 0) : undefined,
-          _rowGaps: rowGapsArr.length > 0 ? rowGapsArr.map(g => parseFloat(g) || 0) : undefined,
-          gridMerges,
-          gridColWidths,
-          gridRowHeights
-        };
-        const svg = await generateComposedSvgAsync(modelName.trim(), composerModel, []);
-        if (svg) {
-          finalModelPngRaw = await convertSvgToPngAsync(svg, dims.width || 860, dims.height || 200) || undefined;
-        }
+        // 섀시형 모델 fallback PNG - WebP는 useSvgComposer에서 동적 생성됨
+        finalModelPngRaw = await convertSvgToPngAsync(baseChassisRaw, dims.width || 860, dims.height || 200) || undefined;
       } catch (err) {
         console.error("Failed to generate chassis PNG on submit", err);
       }
@@ -1463,18 +1385,23 @@ export const ModelRegistrationModal: React.FC = () => {
                             <span className="model-type-tag card-based">
                               {v.isDefault ? "기본" : "추가"}
                             </span>
-                            <div className="model-thumb">
-                              {v.variantPngRaw ? (
-                                <img src={v.variantPngRaw} alt={v.variantName} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                              ) : (
-                                <div
-                                  style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}
-                                  dangerouslySetInnerHTML={{
-                                    __html: modelSvgRaw || baseChassisRaw || ""
-                                  }}
-                                />
-                              )}
-                            </div>
+                            <DynamicListThumb
+                              modelName={modelName}
+                              isChassis={modelType === "card-based"}
+                              displayThumbPng={v.variantPngRaw || null}
+                              displayThumb={(() => {
+                                // 섀시형은 SVG를 넘기지 않음 → webpUrl 사용
+                                if (modelType === "card-based") return null;
+                                const isRear = defaultViewSide === "rear";
+                                if (isRear && rearSvgRaw) return rearSvgRaw;
+                                return modelSvgRaw || null;
+                              })()}
+                              staticImgUrl={null}
+                              insertedCards={v.insertedCards || []}
+                              onHover={setHoveredListThumb}
+                              onHoverMove={(e: any) => setHoveredListThumbPos({ x: e.clientX, y: e.clientY })}
+                              onHoverLeave={() => setHoveredListThumb(null)}
+                            />
                             <div className="model-info-wrapper">
                               <div className="model-info-header">
                                 <div className="model-info">
@@ -1729,20 +1656,31 @@ export const ModelRegistrationModal: React.FC = () => {
                     const eqModel = equipmentModels.find((m) => m.modelName === tmpl.modelName);
                     const isCardBased = !!overrideModel || !!eqModel;
                     const displayUnit = overrideModel ? overrideModel.unit : tmpl.uSize;
-                    let displayThumbPng = overrideModel ? overrideModel.modelPngRaw : null;
-                    let displayThumb = overrideModel
-                      ? (overrideModel.defaultViewSide === "rear" && overrideModel.rearSvgRaw ? overrideModel.rearSvgRaw : (overrideModel.modelSvgRaw || overrideModel.baseEquipmentViewSvgRaw))
-                      : null;
+                    
+                    // 섀시형: displayThumb(SVG)를 넘기지 않음 → DynamicListThumb 내부에서 webpUrl 사용
+                    // 고정형: PNG → staticImgUrl → SVG fallback 순서
+                    let displayThumbPng: string | null = null;
+                    let displayThumb: string | null = null;
 
                     if (overrideModel && overrideModel.variants) {
                       const defaultVariant = overrideModel.variants.find(v => v.variantName === "기본타입");
                       if (defaultVariant && defaultVariant.variantPngRaw) {
                         displayThumbPng = defaultVariant.variantPngRaw;
-                        displayThumb = null;
                       }
                     }
+                    if (!displayThumbPng && overrideModel) {
+                      displayThumbPng = overrideModel.modelPngRaw || null;
+                    }
 
-                    const imgUrl = (!displayThumb && !displayThumbPng) ? resolveDeviceImage(tmpl.modelName) : null;
+                    // 고정형만 SVG fallback 허용 (섀시형은 webpUrl 사용)
+                    if (!isCardBased && !displayThumbPng && overrideModel) {
+                      const om = overrideModel as any;
+                      displayThumb = om.defaultViewSide === "rear" && om.rearSvgRaw 
+                        ? om.rearSvgRaw 
+                        : (om.modelSvgRaw || null);
+                    }
+
+                    const imgUrl = resolveDeviceImage(tmpl.modelName);
                     const variantCount = overrideModel?.variants?.length || 0;
                     return (
                       <div key={`default-${tmpl.modelName}`} className="mrm-model-row">
@@ -1755,6 +1693,15 @@ export const ModelRegistrationModal: React.FC = () => {
                           displayThumbPng={displayThumbPng}
                           displayThumb={displayThumb}
                           staticImgUrl={imgUrl}
+                          insertedCards={(() => {
+                            if (overrideModel?.variants?.length) {
+                              const defaultVariant = overrideModel.variants.find((v: any) => v.variantName === "기본타입");
+                              if (defaultVariant?.insertedCards) return defaultVariant.insertedCards;
+                              // 첫번째 variant의 cards라도 반환
+                              if (overrideModel.variants[0]?.insertedCards) return overrideModel.variants[0].insertedCards;
+                            }
+                            return DEFAULT_CHASSIS_CARDS[tmpl.modelName] || [];
+                          })()}
                           onHover={setHoveredListThumb}
                           onHoverMove={(e: any) => setHoveredListThumbPos({ x: e.clientX, y: e.clientY })}
                           onHoverLeave={() => setHoveredListThumb(null)}
@@ -1986,7 +1933,7 @@ export const ModelRegistrationModal: React.FC = () => {
                           </span>
                           <DynamicListThumb
                             modelName={tmpl.modelName}
-                            isChassis={Boolean(tmpl.cardArea || tmpl.slots || tmpl.rows)}
+                            isChassis={Boolean((tmpl as any).cardArea || (tmpl as any).slots || (tmpl as any).rows)}
                             displayThumbPng={null}
                             displayThumb={null}
                             staticImgUrl={imgUrl}
@@ -2047,49 +1994,39 @@ export const ModelRegistrationModal: React.FC = () => {
                         <span className={`model-type-tag ${model.modelType}`}>
                           {model.modelType === "normal" ? "고정형" : "섀시형"}
                         </span>
-                        <div
-                          className="model-thumb"
-                          onMouseEnter={(e) => {
-                            let svgFallback = (model.defaultViewSide === "rear" && model.rearSvgRaw ? model.rearSvgRaw : (model.modelSvgRaw || model.baseEquipmentViewSvgRaw)) || undefined;
-                            let pngFallback = model.modelPngRaw;
+                        <DynamicListThumb
+                          modelName={model.modelName}
+                          isChassis={model.modelType === "card-based"}
+                          displayThumbPng={(() => {
                             if (model.variants) {
                               const defaultVariant = model.variants.find(v => v.variantName === "기본타입");
                               if (defaultVariant && defaultVariant.variantPngRaw) {
-                                pngFallback = defaultVariant.variantPngRaw;
-                                svgFallback = undefined;
+                                return defaultVariant.variantPngRaw;
                               }
                             }
-                            setHoveredListThumb({ pngRaw: pngFallback, svgRaw: svgFallback, name: model.modelName });
-                            setHoveredListThumbPos({ x: e.clientX, y: e.clientY });
-                          }}
-                          onMouseMove={(e) => {
-                            setHoveredListThumbPos({ x: e.clientX, y: e.clientY });
-                          }}
-                          onMouseLeave={() => {
-                            setHoveredListThumb(null);
-                          }}
-                        >
-                          {(() => {
-                            let pngRaw = model.modelPngRaw;
-                            let svgRaw = (model.defaultViewSide === "rear" && model.rearSvgRaw ? model.rearSvgRaw : (model.modelSvgRaw || model.baseEquipmentViewSvgRaw)) || "";
-                            if (model.variants) {
-                              const defaultVariant = model.variants.find(v => v.variantName === "기본타입");
-                              if (defaultVariant && defaultVariant.variantPngRaw) {
-                                pngRaw = defaultVariant.variantPngRaw;
-                                svgRaw = "";
-                              }
-                            }
-                            if (pngRaw) {
-                              return <img src={pngRaw} alt={model.modelName} style={{ width: "100%", height: "100%", objectFit: "contain" }} />;
-                            }
-                            return (
-                              <div
-                                style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}
-                                dangerouslySetInnerHTML={{ __html: svgRaw }}
-                              />
-                            );
+                            return model.modelPngRaw || null;
                           })()}
-                        </div>
+                          displayThumb={(() => {
+                            // 섀시형은 SVG를 넘기지 않음 → webpUrl 사용
+                            if (model.modelType === "card-based") return null;
+                            const isRear = model.defaultViewSide === "rear";
+                            if (isRear && model.rearSvgRaw) return model.rearSvgRaw;
+                            return model.modelSvgRaw || null;
+                          })()}
+                          staticImgUrl={null}
+                          insertedCards={(() => {
+                            if (model.variants) {
+                              const defaultVariant = model.variants.find(v => v.variantName === "기본타입");
+                              if (defaultVariant && defaultVariant.insertedCards) {
+                                return defaultVariant.insertedCards;
+                              }
+                            }
+                            return (model as any).insertedCards || [];
+                          })()}
+                          onHover={setHoveredListThumb}
+                          onHoverMove={(e: any) => setHoveredListThumbPos({ x: e.clientX, y: e.clientY })}
+                          onHoverLeave={() => setHoveredListThumb(null)}
+                        />
                         <div className="model-info-wrapper">
                           <div className="model-info-header">
                             <div className="model-info">
@@ -2258,9 +2195,9 @@ export const ModelRegistrationModal: React.FC = () => {
                 gridColWidths,
                 gridRowHeights
               };
-              const svg = await generateComposedSvgAsync(modelName.trim(), composerModel, res.cards);
-              if (svg) {
-                newVariantPngRaw = await convertSvgToPngAsync(svg, dims.width || 860, dims.height || 200) || undefined;
+              // 섀시형 variant PNG fallback - WebP는 useSvgComposer에서 동적 생성됨
+              if (baseChassisRaw) {
+                newVariantPngRaw = await convertSvgToPngAsync(baseChassisRaw, dims.width || 860, dims.height || 200) || undefined;
               }
             } catch (err) {
               console.error("Failed to generate variant PNG on save", err);
@@ -2290,25 +2227,8 @@ export const ModelRegistrationModal: React.FC = () => {
             } else if (modelType === "card-based" && baseChassisRaw) {
               // Auto-save 시 섀시 깡통 PNG 썸네일 생성
               try {
-                const composerModel = {
-                  modelId: "temp",
-                  modelName: modelName.trim(),
-                  rackUnit: `${unit}U`,
-                  baseSvgUrl: "local",
-                  baseEquipmentViewSvgRaw: baseChassisRaw,
-                  equipmentSize: { width: dims.width, height: dims.height },
-                  cardArea: { x: caX, y: caY, width: caWidth, height: caHeight, columns: effectiveMaxCols, columnWidth: effectiveColWidth },
-                  _rowHeights: rowHeights.length > 0 ? rowHeights.map(r => parseFloat(r) || 0) : undefined,
-                  _rowColumns: rowColumnsArr.length > 0 ? rowColumnsArr.map(c => parseInt(c) || 0) : undefined,
-                  _rowGaps: rowGapsArr.length > 0 ? rowGapsArr.map(g => parseFloat(g) || 0) : undefined,
-                  gridMerges,
-                  gridColWidths,
-                  gridRowHeights
-                };
-                const svg = await generateComposedSvgAsync(modelName.trim(), composerModel, []);
-                if (svg) {
-                  finalModelPngRaw = await convertSvgToPngAsync(svg, dims.width || 860, dims.height || 200) || undefined;
-                }
+                // 섀시형 모델 fallback PNG - WebP는 useSvgComposer에서 동적 생성됨
+                finalModelPngRaw = await convertSvgToPngAsync(baseChassisRaw, dims.width || 860, dims.height || 200) || undefined;
               } catch (err) {
                 console.error("Failed to generate chassis PNG on variant save", err);
               }
@@ -2377,12 +2297,10 @@ export const ModelRegistrationModal: React.FC = () => {
             maxWidth: "80vw"
           }}
         >
-          {hoveredListThumb.pngRaw ? (
-            <img src={hoveredListThumb.pngRaw} alt={hoveredListThumb.name} style={{ width: "100%", height: "auto", objectFit: "contain" }} />
-          ) : hoveredListThumb.svgRaw ? (
-            <div dangerouslySetInnerHTML={{ __html: hoveredListThumb.svgRaw }} style={{ width: "100%", height: "auto", display: "flex", alignItems: "center", justifyContent: "center" }} />
-          ) : hoveredListThumb.imgUrl ? (
+          {hoveredListThumb.imgUrl ? (
             <img src={hoveredListThumb.imgUrl} alt={hoveredListThumb.name} style={{ width: "100%", height: "auto", objectFit: "contain" }} />
+          ) : hoveredListThumb.pngRaw ? (
+            <img src={hoveredListThumb.pngRaw} alt={hoveredListThumb.name} style={{ width: "100%", height: "auto", objectFit: "contain" }} />
           ) : (
             <span style={{ fontSize: 24, color: "var(--text-tertiary)" }}>🖥️</span>
           )}

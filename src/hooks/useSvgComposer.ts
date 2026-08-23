@@ -6,7 +6,7 @@
  */
 import { useEffect, useState, useMemo } from 'react';
 import { equipmentModels, loadCardSvgRaw, loadCardSvgRawSync, loadBaseEquipmentSvgRaw } from '../utils/cardAssets';
-import { resolveDeviceSvgContent } from '../utils/deviceAssets';
+import { resolveDeviceSvgContent, isChassisModel } from '../utils/deviceAssets';
 import { moduleDefinitions } from '../utils/moduleAssets';
 import { useStore } from '../store/useStore';
 import { generatePortMap, buildPortStatusMapFromPortStates, applyPortStatuses } from '../utils/portUtils';
@@ -142,6 +142,8 @@ export function useSvgComposer(
           modelId: m.modelId,
           rackUnit: `${m.unit}U`,
           baseSvgUrl: `custom-model-base-${m.modelId}`,
+          baseEquipmentViewSvgRaw: m.modelSvgRaw,
+          rearSvgRaw: m.rearSvgRaw,
           equipmentSize: m.equipmentSize || defaultTemplate?.equipmentSize,
           cardArea: m.cardArea || defaultTemplate?.cardArea,
           _rowHeights: m.rowHeights,
@@ -191,7 +193,7 @@ export function useSvgComposer(
   );
 
   const [webpUrl, setWebpUrl] = useState<string | undefined>(() =>
-    _webpUrlCache.get(_cacheKey)
+    _webpUrlCache.get(`webp::${_cacheKey}`)
   );
 
   // _cacheKey 변경 시 캐시 히트를 즉시 반영
@@ -200,7 +202,7 @@ export function useSvgComposer(
     if (cached) setComposedHtml(cached);
     else setComposedHtml("");
 
-    setWebpUrl(_webpUrlCache.get(_cacheKey));
+    setWebpUrl(_webpUrlCache.get(`webp::${_cacheKey}`));
   }, [_cacheKey]);
 
   const isModularDevice = useMemo(() => {
@@ -272,14 +274,14 @@ export function useSvgComposer(
           return;
         }
 
-        let promise = _composingPromises.get(_cacheKey);
-        if (promise) {
-          const finalHtml = await promise;
+        let existingPromise = _composingPromises.get(_cacheKey);
+        if (existingPromise) {
+          const finalHtml = await existingPromise;
           if (isMounted) setComposedHtml(finalHtml);
           return;
         }
 
-        promise = (async () => {
+        const composePromise = (async () => {
           let baseSvg: string | undefined;
           if (viewSide === "rear") {
             baseSvg = await resolveDeviceSvgContent(modelName, viewSide);
@@ -299,7 +301,7 @@ export function useSvgComposer(
           const parser = new DOMParser();
           const baseDoc = parser.parseFromString(baseSvg, "image/svg+xml");
           const baseSvgEl = baseDoc.querySelector("svg");
-          if (!baseSvgEl) return baseSvg;
+          if (!baseSvgEl) return { finalHtml: baseSvg, baseComposedHtml: baseSvg };
 
         if (!baseSvgEl.getAttribute('viewBox')) {
           const w = baseSvgEl.getAttribute('width') || '984';
@@ -353,10 +355,10 @@ export function useSvgComposer(
         return { finalHtml, baseComposedHtml };
         })();
 
-        _composingPromises.set(_cacheKey, promise.then(res => res.finalHtml));
+        _composingPromises.set(_cacheKey, composePromise.then(res => res.finalHtml));
         
         try {
-          const { finalHtml, baseComposedHtml } = await promise;
+          const { finalHtml, baseComposedHtml } = await composePromise;
           if (isMounted) {
             setComposedHtml(finalHtml);
             setBaseHtmlForWebp(baseComposedHtml);
@@ -391,16 +393,13 @@ export function useSvgComposer(
   useEffect(() => {
     if (!equipModel || !modelName) return;
     
-    const isChassis = equipModel.templateType === "chassis";
-    // 섀시형 모델인 경우 카드 합성 전 base SVG를 사용, 일반 모델은 최종 합성본 사용
-    const targetHtml = isChassis ? baseHtmlForWebp : composedHtml;
+    const isChassis = isChassisModel(modelName);
+    const targetHtml = composedHtml;
     
     if (!targetHtml) return;
 
-    // 섀시 모델은 모델명+뷰사이드 기준으로 1개만 캐싱하여 전역 공유 (메모리, 성능 최적화)
-    const webpCacheKey = isChassis 
-      ? `webp::${modelName}::${viewSide}` 
-      : `webp::${_cacheKey}`;
+    // 모든 모델(섀시형 포함)은 실장된 카드/모듈의 고합인 _cacheKey를 사용하여 타입(Variant)별로 유니크한 썸네일을 캐싱합니다.
+    const webpCacheKey = `webp::${_cacheKey}`;
 
     const cachedWebp = _webpUrlCache.get(webpCacheKey);
     if (cachedWebp) {

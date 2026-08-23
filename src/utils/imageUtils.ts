@@ -39,7 +39,6 @@ export async function convertSvgToPngAsync(svgRaw: string, width: number, height
     const svgDataUrl = URL.createObjectURL(blob);
     
     const img = new Image();
-    img.crossOrigin = "anonymous";
     
     img.onload = () => {
       // Clean up blob URL immediately
@@ -59,19 +58,21 @@ export async function convertSvgToPngAsync(svgRaw: string, width: number, height
       }
       
       ctx.clearRect(0, 0, targetWidth, targetHeight);
-      ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
-      
       try {
-        const webpDataUrl = canvas.toDataURL("image/webp", 0.8);
-        resolve(webpDataUrl);
+        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+        const dataUrl = canvas.toDataURL("image/webp", 0.9);
+        resolve(dataUrl);
       } catch (err) {
-        reject(err);
+        console.error("Canvas toDataURL failed:", err);
+        // Fallback to resolving with the SVG data URL if canvas fails
+        resolve(svgDataUrl);
       }
     };
     
-    img.onerror = (err) => {
-      URL.revokeObjectURL(svgDataUrl);
-      reject(err);
+    img.onerror = (e) => {
+      console.error("SVG Image load failed:", e);
+      // Fallback to the SVG itself so the UI doesn't break
+      resolve(svgDataUrl);
     };
     
     img.src = svgDataUrl;

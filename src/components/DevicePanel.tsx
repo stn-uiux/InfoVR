@@ -5,6 +5,7 @@ import type { Device, PortState, RegisteredDevice } from "../types";
 import type { GeneratedPort } from "../types/equipment";
 import { getHighestError } from "../utils/errorHelpers";
 import { resolveDeviceImage, isChassisModel } from "../utils/deviceAssets";
+import { DEFAULT_CHASSIS_CARDS } from "../utils/defaultChassisCards";
 import { generatePortMap } from "../utils/portUtils";
 import { useSvgComposer } from "../hooks/useSvgComposer";
 import { getNodeName } from "../utils/nodeUtils";
@@ -54,6 +55,33 @@ const DeviceTileImage = ({ src, alt }: { src: string; alt: string }) => {
 };
 
 export const DevicePanel = () => {
+  const DynamicDeviceTileImage = ({ 
+    modelName, 
+    viewSide, 
+    alt, 
+    staticImageSrc, 
+    isChassis,
+    insertedCards,
+    insertedModules
+  }: { 
+    modelName: string; 
+    viewSide: string; 
+    alt: string; 
+    staticImageSrc: string | undefined; 
+    isChassis: boolean;
+    insertedCards: any[];
+    insertedModules: any[];
+  }) => {
+    const { webpUrl } = useSvgComposer(
+      isChassis ? modelName : undefined,
+      isChassis ? insertedCards : [],
+      isChassis ? insertedModules : [],
+      [], viewSide as any
+    );
+    const finalSrc = isChassis && webpUrl ? webpUrl : staticImageSrc;
+    if (!finalSrc) return null;
+    return <img className="device-tile-image" src={finalSrc} alt={alt} />;
+  };
   // Phase 2: 개별 셀렉터로 불필요 리렌더 방지
   const racks = useStore((s) => s.racks);
   const registeredDevices = useStore((s) => s.registeredDevices);
@@ -343,7 +371,15 @@ export const DevicePanel = () => {
               setHighlightedDevice(device.itemId, 2500);
             }}
           >
-            {hasImage && <DeviceTileImage key={imageSrc} src={imageSrc!} alt={displayName} />}
+            <DynamicDeviceTileImage 
+              modelName={regDev?.modelName ?? device.modelName ?? ""} 
+              viewSide={viewSide} 
+              alt={displayName} 
+              staticImageSrc={imageSrc} 
+              isChassis={isChassisModel(regDev?.modelName ?? device.modelName ?? "")} 
+              insertedCards={regDev?.insertedCards ?? device.insertedCards ?? []}
+              insertedModules={regDev?.insertedModules ?? device.insertedModules ?? []} 
+            />
 
             <div
               className={
@@ -735,10 +771,11 @@ export const DevicePanel = () => {
                         }
                       });
                       return sorted.map((rd) => {
-                        const needsComposer = isChassisModel(rd.modelName) || (rd.insertedCards?.length || 0) > 0;
+                        const needsComposer = isChassisModel(rd.modelName || "") || (rd.insertedCards?.length || 0) > 0;
                         const SvgComposerFallback = ({ device }: { device: any }) => {
+                          const isChassis = isChassisModel(device.modelName);
                           const { composedHtml, blobUrl, webpUrl } = useSvgComposer(
-                            needsComposer ? device.modelName : undefined,
+                            needsComposer ? (device.modelName || "") : undefined,
                             needsComposer ? (device.insertedCards || []) : [],
                             needsComposer ? (device.insertedModules || []) : [],
                             [],

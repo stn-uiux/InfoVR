@@ -10,6 +10,7 @@ import { ErrorMarker } from "./ErrorMarker";
 import { U_HEIGHT, GRID_SPACING, DEVICE_DEPTH } from "./constants";
 import { getHighestError } from "../utils/errorHelpers";
 import { resolveDeviceImage, isChassisModel } from "../utils/deviceAssets";
+import { DEFAULT_CHASSIS_CARDS } from "../utils/defaultChassisCards";
 import { useSvgComposer } from "../hooks/useSvgComposer";
 
 // ─── Phase 1-A: 모듈 레벨 공유 Geometry (모든 Rack이 재사용) ───
@@ -861,12 +862,13 @@ const DeviceMesh = ({
     }
   });
 
-  // Always generate SVG if it's a chassis model, or if there are inserted cards AND no cached PNG is available
-  const needsComposer = !device.devicePngRaw && (isChassisModel(device.modelName) || (device.insertedCards?.length || 0) > 0);
+  // Always generate SVG if it's a chassis model (to override old big devicePngRaw), or if there are inserted cards AND no cached PNG is available
+  const needsComposer = isChassisModel(device.modelName || "") || (!device.devicePngRaw && (device.insertedCards?.length || 0) > 0);
   const stableInsertedCards = device.insertedCards || EMPTY_ARRAY;
   const stableInsertedModules = device.insertedModules || EMPTY_ARRAY;
   const stablePortStates = device.portStates || EMPTY_ARRAY;
 
+  const isChassis = isChassisModel(device.modelName || "");
   const { composedHtml, blobUrl, webpUrl } = useSvgComposer(
     needsComposer ? device.modelName : undefined,
     needsComposer ? stableInsertedCards : EMPTY_ARRAY,
@@ -877,6 +879,9 @@ const DeviceMesh = ({
 
   const thumbUrl = useMemo(
     () => {
+      if (isChassis && webpUrl) {
+        return webpUrl;
+      }
       if (device.devicePngRaw) {
         return device.devicePngRaw;
       }
