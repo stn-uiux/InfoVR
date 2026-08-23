@@ -3,6 +3,7 @@ import { useTexture, Billboard, Html, Edges } from "@react-three/drei";
 import { type ThreeEvent, useThree, useFrame } from "@react-three/fiber";
 import { BoxGeometry, CanvasTexture, Color, DoubleSide, Euler, Mesh, MeshStandardMaterial, Object3D, Plane, RepeatWrapping, Vector3, Group, MathUtils } from 'three';
 import { useStore } from "../store/useStore";
+import { getEffectiveCards } from "../utils/sampleUtils";
 import type { AppState } from "../store/useStore";
 import { useTheme } from "../contexts/ThemeContext";
 import type { Rack as RackType, Device } from "../types";
@@ -863,8 +864,14 @@ const DeviceMesh = ({
   });
 
   // Always generate SVG if it's a chassis model (to override old big devicePngRaw), or if there are inserted cards AND no cached PNG is available
-  const needsComposer = isChassisModel(device.modelName || "") || (!device.devicePngRaw && (device.insertedCards?.length || 0) > 0);
-  const stableInsertedCards = device.insertedCards || EMPTY_ARRAY;
+  const customModels = useStore((s) => s.customModels);
+  
+  const stableInsertedCards = useMemo(() => {
+    return getEffectiveCards(device, customModels);
+  }, [device.insertedCards, device.modelName, customModels]);
+
+  const needsComposer = isChassisModel(device.modelName || "") || (!device.devicePngRaw && stableInsertedCards.length > 0);
+
   const stableInsertedModules = device.insertedModules || EMPTY_ARRAY;
   const stablePortStates = device.portStates || EMPTY_ARRAY;
 

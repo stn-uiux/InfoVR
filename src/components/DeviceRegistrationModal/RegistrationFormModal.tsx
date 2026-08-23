@@ -9,6 +9,7 @@ import { useStore } from "../../store/useStore";
 import { getEffectiveTemplates } from "../../utils/deviceTemplates";
 import { getDeviceViewSides, hasDeviceSvgAsset } from "../../utils/deviceAssets";
 import type { VendorName, HierarchyNode, RegisteredDevice } from "../../types";
+import { getEffectiveCards } from "../../utils/sampleUtils";
 
 
 
@@ -105,7 +106,7 @@ export const RegistrationFormModal = ({
           setIp(device.IPAddr || "");
           setMac(device.macAddr || "");
           if (device.vendor) setVendor(device.vendor);
-          setInsertedCards(device.insertedCards || []);
+          setInsertedCards(getEffectiveCards(device as any, customModels));
           setInsertedModules(device.insertedModules || []);
 
           setDefaultViewSide(device.defaultViewSide || "front");

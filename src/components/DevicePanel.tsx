@@ -5,6 +5,7 @@ import type { Device, PortState, RegisteredDevice } from "../types";
 import type { GeneratedPort } from "../types/equipment";
 import { getHighestError } from "../utils/errorHelpers";
 import { resolveDeviceImage, isChassisModel } from "../utils/deviceAssets";
+import { getEffectiveCards } from "../utils/sampleUtils";
 import { DEFAULT_CHASSIS_CARDS } from "../utils/defaultChassisCards";
 import { generatePortMap } from "../utils/portUtils";
 import { useSvgComposer } from "../hooks/useSvgComposer";
@@ -72,9 +73,12 @@ export const DevicePanel = () => {
     insertedCards: any[];
     insertedModules: any[];
   }) => {
+    const customModels = useStore((s) => s.customModels);
+    const effectiveCards = getEffectiveCards({ modelName, insertedCards }, customModels);
+    
     const { webpUrl } = useSvgComposer(
       isChassis ? modelName : undefined,
-      isChassis ? insertedCards : [],
+      isChassis ? effectiveCards : [],
       isChassis ? insertedModules : [],
       [], viewSide as any
     );
@@ -771,12 +775,17 @@ export const DevicePanel = () => {
                         }
                       });
                       return sorted.map((rd) => {
-                        const needsComposer = isChassisModel(rd.modelName || "") || (rd.insertedCards?.length || 0) > 0;
                         const SvgComposerFallback = ({ device }: { device: any }) => {
                           const isChassis = isChassisModel(device.modelName);
+                          const customModels = useStore((s) => s.customModels);
+                          const stableInsertedCards = useMemo(() => {
+                            return getEffectiveCards(device, customModels);
+                          }, [device.insertedCards, device.modelName, customModels]);
+                          
+                          const needsComposer = isChassis || (!device.devicePngRaw && stableInsertedCards.length > 0);
                           const { composedHtml, blobUrl, webpUrl } = useSvgComposer(
                             needsComposer ? (device.modelName || "") : undefined,
-                            needsComposer ? (device.insertedCards || []) : [],
+                            needsComposer ? stableInsertedCards : [],
                             needsComposer ? (device.insertedModules || []) : [],
                             [],
                             needsComposer ? (device.defaultViewSide || "front") : "front"
@@ -786,8 +795,7 @@ export const DevicePanel = () => {
                             if (blobUrl) return blobUrl;
                             return resolveDeviceImage(device.modelName, device.defaultViewSide || "front");
                           }, [device.defaultViewSide, device.modelName, webpUrl, blobUrl]);
-                          
-                          return <img src={thumbUrl} alt="Device Thumb" />;
+                          return <img src={thumbUrl} alt={device.title || device.modelName} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />;
                         };
                         const thumb = resolveDeviceImage(rd.modelName, rd.defaultViewSide || "front");
                         const isSelected = selectedRegDeviceId === rd.deviceId;
@@ -821,34 +829,7 @@ export const DevicePanel = () => {
                             }}
                           >
                             <div className="reg-device-item-thumb">
-                              {needsComposer ? (
-                                <SvgComposerFallback device={rd} />
-                              ) : thumb ? (
-                                <img
-                                  src={thumb}
-                                  alt={rd.title || rd.modelName}
-                                  style={{
-                                    width: "100%",
-                                    height: "100%",
-                                    objectFit: "contain",
-                                    display: "block",
-                                  }}
-                                  onError={(e) => {
-                                    (
-                                      e.target as HTMLImageElement
-                                    ).style.display = "none";
-                                  }}
-                                />
-                              ) : (
-                                <span
-                                  style={{
-                                    fontSize: "10px",
-                                    color: "var(--text-tertiary)",
-                                  }}
-                                >
-                                  No IMG
-                                </span>
-                              )}
+                              <SvgComposerFallback device={rd} />
                             </div>
                             <div className="reg-device-item-info">
                               <div

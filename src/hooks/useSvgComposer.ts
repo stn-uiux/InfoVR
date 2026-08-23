@@ -399,6 +399,10 @@ export function useSvgComposer(
     if (!targetHtml) return;
 
     // 모든 모델(섀시형 포함)은 실장된 카드/모듈의 고합인 _cacheKey를 사용하여 타입(Variant)별로 유니크한 썸네일을 캐싱합니다.
+    // 캐시 오염을 방지하기 위해 모든 카드의 SVG 데이터가 로드되었는지 확인합니다.
+    const isAllCardsLoaded = insertedCards.every((card) => cardSvgMap.has(card.cardFileName));
+    if (!isAllCardsLoaded) return;
+
     const webpCacheKey = `webp::${_cacheKey}`;
 
     const cachedWebp = _webpUrlCache.get(webpCacheKey);
@@ -420,7 +424,7 @@ export function useSvgComposer(
     });
 
     return () => { isMounted = false; };
-  }, [composedHtml, baseHtmlForWebp, _cacheKey, equipModel, modelName, viewSide]);
+  }, [composedHtml, baseHtmlForWebp, _cacheKey, equipModel, modelName, viewSide, insertedCards, cardSvgMap]);
 
   return { composedHtml, blobUrl, webpUrl, isModularDevice, generatedPorts, generatedPortMap };
 }

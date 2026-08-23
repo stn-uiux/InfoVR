@@ -10,19 +10,22 @@ import type { EquipmentViewSide, InsertedModule, ModuleType } from '../types/equ
 import { moduleDefinitions } from '../utils/moduleAssets';
 import { getDeviceViewSides } from '../utils/deviceAssets';
 import type { Device, PortState } from '../types';
+import type { CustomEquipmentModel } from '../types/equipment';
+import { getEffectiveCards } from '../utils/sampleUtils';
 // ─── SvgPortView ─── (SVG 프리뷰 + 포트 상호작용)
-const SvgPortView = memo(({ device, portStates, tooltipRef, editable, viewSide = "front" }: {
+const SvgPortView = memo(({ device, portStates, tooltipRef, editable, viewSide = "front", customModels }: {
   device: Device;
   portStates: PortState[];
   tooltipRef: React.RefObject<HTMLDivElement>;
   editable?: boolean;
   viewSide?: EquipmentViewSide;
+  customModels: CustomEquipmentModel[];
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const { composedHtml, isModularDevice, generatedPorts, generatedPortMap } = useSvgComposer(
     device.modelName,
-    device.insertedCards || [],
+    getEffectiveCards(device, customModels),
     device.insertedModules || [],
     portStates,
     viewSide,
@@ -54,8 +57,8 @@ export const DeviceModal = ({ deviceId, onClose }: { deviceId: string; onClose: 
   const tooltipRef = useRef<HTMLDivElement>(null);
 
   // Store 셀렉터
-  const { rawDevice, rackName, registeredDevice } = useStore(useShallow(useCallback((s) => {
-    if (!deviceId) return { rawDevice: null, rackName: "", registeredDevice: null };
+  const { rawDevice, rackName, registeredDevice, customModels } = useStore(useShallow(useCallback((s) => {
+    if (!deviceId) return { rawDevice: null, rackName: "", registeredDevice: null, customModels: s.customModels };
     let rawDevice = null;
     let rackName = "";
     for (const r of s.racks) {
@@ -68,7 +71,7 @@ export const DeviceModal = ({ deviceId, onClose }: { deviceId: string; onClose: 
     }
     const targetId = rawDevice?.deviceId || deviceId;
     const registeredDevice = s.registeredDevices.find(rd => rd.deviceId === targetId) || null;
-    return { rawDevice, rackName, registeredDevice };
+    return { rawDevice, rackName, registeredDevice, customModels: s.customModels };
   }, [deviceId])));
 
   const updateRegisteredDevice = useStore((s) => s.updateRegisteredDevice);
@@ -231,6 +234,7 @@ export const DeviceModal = ({ deviceId, onClose }: { deviceId: string; onClose: 
                       tooltipRef={tooltipRef as React.RefObject<HTMLDivElement>}
                       editable={isEditMode}
                       viewSide={side}
+                      customModels={customModels}
                     />
                   </div>
                 ))}
