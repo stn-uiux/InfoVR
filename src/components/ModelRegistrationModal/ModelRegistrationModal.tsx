@@ -16,7 +16,52 @@ import { StnModal } from "../StnModal";
 import { cardDefinitions, equipmentModels, loadBaseEquipmentSvgRaw, getCardsForModel } from "../../utils/cardAssets";
 import { DEVICE_TEMPLATES } from "../../utils/deviceTemplates";
 import { getDeviceViewSides, resolveDeviceImage, resolveDeviceSvgContent } from "../../utils/deviceAssets";
-import { generateComposedSvgAsync } from "../../hooks/useSvgComposer";
+import { useSvgComposer } from "../../hooks/useSvgComposer";
+
+const DynamicListThumb = ({
+  modelName,
+  isChassis,
+  displayThumbPng,
+  displayThumb,
+  staticImgUrl,
+  onHover,
+  onHoverMove,
+  onHoverLeave,
+}: any) => {
+  const { webpUrl } = useSvgComposer(
+    isChassis && !displayThumbPng && !displayThumb ? modelName : undefined,
+    [], [], [], "front"
+  );
+
+  const finalImgUrl = (isChassis && !displayThumbPng && !displayThumb) ? webpUrl : staticImgUrl;
+
+  return (
+    <div
+      className="model-thumb"
+      onMouseEnter={(e) => {
+        onHover({ 
+          pngRaw: displayThumbPng, 
+          svgRaw: displayThumb, 
+          imgUrl: finalImgUrl, 
+          name: modelName,
+        });
+        onHoverMove(e);
+      }}
+      onMouseMove={onHoverMove}
+      onMouseLeave={onHoverLeave}
+    >
+      {displayThumbPng ? (
+        <img src={displayThumbPng} alt={modelName} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+      ) : displayThumb ? (
+        <div dangerouslySetInnerHTML={{ __html: displayThumb }} style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }} />
+      ) : finalImgUrl ? (
+        <img src={finalImgUrl} alt={modelName} />
+      ) : (
+        <span style={{ fontSize: 18, color: "var(--text-tertiary)" }}>🖥️</span>
+      )}
+    </div>
+  );
+};
 
 import { convertSvgToPngAsync } from "../../utils/imageUtils";
 
@@ -1704,34 +1749,16 @@ export const ModelRegistrationModal: React.FC = () => {
                         <span className={`model-type-tag ${isCardBased ? "card-based" : "normal"}`}>
                           {isCardBased ? "섀시형" : "고정형"}
                         </span>
-                        <div
-                          className="model-thumb"
-                          onMouseEnter={(e) => {
-                            setHoveredListThumb({ 
-                              pngRaw: displayThumbPng, 
-                              svgRaw: displayThumb, 
-                              imgUrl, 
-                              name: tmpl.modelName,
-                            });
-                            setHoveredListThumbPos({ x: e.clientX, y: e.clientY });
-                          }}
-                          onMouseMove={(e) => {
-                            setHoveredListThumbPos({ x: e.clientX, y: e.clientY });
-                          }}
-                          onMouseLeave={() => {
-                            setHoveredListThumb(null);
-                          }}
-                        >
-                          {displayThumbPng ? (
-                            <img src={displayThumbPng} alt={tmpl.modelName} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                          ) : displayThumb ? (
-                            <div dangerouslySetInnerHTML={{ __html: displayThumb }} style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }} />
-                          ) : imgUrl ? (
-                            <img src={imgUrl} alt={tmpl.modelName} />
-                          ) : (
-                            <span style={{ fontSize: 18, color: "var(--text-tertiary)" }}>🖥️</span>
-                          )}
-                        </div>
+                        <DynamicListThumb
+                          modelName={tmpl.modelName}
+                          isChassis={isCardBased}
+                          displayThumbPng={displayThumbPng}
+                          displayThumb={displayThumb}
+                          staticImgUrl={imgUrl}
+                          onHover={setHoveredListThumb}
+                          onHoverMove={(e: any) => setHoveredListThumbPos({ x: e.clientX, y: e.clientY })}
+                          onHoverLeave={() => setHoveredListThumb(null)}
+                        />
                         <div className="model-info-wrapper">
                           <div className="model-info-header">
                             <div className="model-info">
@@ -1957,13 +1984,16 @@ export const ModelRegistrationModal: React.FC = () => {
                           <span className={`model-type-tag normal`}>
                             고정형
                           </span>
-                          <div className="model-thumb">
-                            {imgUrl ? (
-                              <img src={imgUrl} alt={tmpl.modelName} />
-                            ) : (
-                              <span style={{ fontSize: 18, color: "var(--text-tertiary)" }}>🖥️</span>
-                            )}
-                          </div>
+                          <DynamicListThumb
+                            modelName={tmpl.modelName}
+                            isChassis={Boolean(tmpl.cardArea || tmpl.slots || tmpl.rows)}
+                            displayThumbPng={null}
+                            displayThumb={null}
+                            staticImgUrl={imgUrl}
+                            onHover={setHoveredListThumb}
+                            onHoverMove={(e: any) => setHoveredListThumbPos({ x: e.clientX, y: e.clientY })}
+                            onHoverLeave={() => setHoveredListThumb(null)}
+                          />
                           <div className="model-info-wrapper">
                             <div className="model-info-header">
                               <div className="model-info">

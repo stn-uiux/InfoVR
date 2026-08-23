@@ -761,7 +761,15 @@ export const useStore = create<AppState>()(
           selectedModelId: null,
           undoStack: [],
           redoStack: [],
-          _importDirty: true, // Mark dirty so it can be saved if desired
+          baselineRacks: [],
+          baselineModels: [],
+          baselineNodes: [],
+          baselineRegisteredDevices: [],
+          baselineNodeEnvironments: {},
+          baselineLayouts: {},
+          baselineActiveNodeId: null,
+          baselineActiveSceneNodeId: null,
+          _importDirty: false,
         });
       },
 
@@ -840,23 +848,30 @@ export const useStore = create<AppState>()(
 
         // Phase 3-A: 단일 structuredClone으로 baseline 스냅샷
         const { nodes: currentNodes } = get();
-        const snapshot = structuredClone({ racks, importedModels, nodes: currentNodes, registeredDevices: get().registeredDevices, nodeEnvironments: get().nodeEnvironments, layouts: updatedLayouts });
-        set({
-          layouts: updatedLayouts,
-          baselineRacks: snapshot.racks,
-          baselineModels: snapshot.importedModels,
-          baselineNodes: snapshot.nodes,
-          baselineRegisteredDevices: snapshot.registeredDevices,
-          baselineNodeEnvironments: snapshot.nodeEnvironments,
-          baselineLayouts: snapshot.layouts,
-          baselineActiveNodeId: get().activeNodeId,
-          baselineActiveSceneNodeId: get().activeSceneNodeId,
-          undoStack: [],
-          redoStack: [],
-          showUnsavedDialog: false,
-          pendingAction: null,
-          _importDirty: false,
-        });
+        try {
+          const snapshot = structuredClone({ racks, importedModels, nodes: currentNodes, registeredDevices: get().registeredDevices, nodeEnvironments: get().nodeEnvironments, layouts: updatedLayouts });
+          console.log("saveChanges snapshot created:", snapshot);
+          
+          set({
+            layouts: updatedLayouts,
+            baselineRacks: snapshot.racks,
+            baselineModels: snapshot.importedModels,
+            baselineNodes: snapshot.nodes,
+            baselineRegisteredDevices: snapshot.registeredDevices,
+            baselineNodeEnvironments: snapshot.nodeEnvironments,
+            baselineLayouts: snapshot.layouts,
+            baselineActiveNodeId: get().activeNodeId,
+            baselineActiveSceneNodeId: get().activeSceneNodeId,
+            undoStack: [],
+            redoStack: [],
+            showUnsavedDialog: false,
+            pendingAction: null,
+            _importDirty: false,
+          });
+          console.log("saveChanges set complete.");
+        } catch (e) {
+          console.error("saveChanges error:", e);
+        }
 
         // 2. Execute pending action DIRECTLY (bypass dirty checks since we just saved)
         if (pendingAction) {

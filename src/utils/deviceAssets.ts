@@ -11,6 +11,22 @@
 
 import { useStore } from "../store/useStore";
 import type { EquipmentViewSide } from "../types/equipment";
+import { equipmentModels } from "./cardAssets";
+
+interface ModelCheck {
+  cardArea?: any;
+  slots?: any;
+  rows?: any;
+}
+
+export const isChassisModel = (modelName: string): boolean => {
+  const customModels = useStore.getState().customModels;
+  const model = customModels.find(m => m.modelName === modelName) || 
+                equipmentModels.find(m => m.modelName === modelName);
+  
+  if (!model) return false;
+  return Boolean((model as ModelCheck).cardArea || (model as ModelCheck).slots || (model as ModelCheck).rows);
+};
 
 // ── Custom Model Helpers ─────────────────────────────────────────────────────
 const customSvgDataUrlCache = new Map<string, string>();

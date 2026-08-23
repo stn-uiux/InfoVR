@@ -1,4 +1,7 @@
 async function inlineImagesInSvg(svgRaw: string): Promise<string> {
+  // If there are no images in the SVG, skip DOM parsing entirely to save CPU
+  if (!svgRaw.includes('<image')) return svgRaw;
+
   const parser = new DOMParser();
   const doc = parser.parseFromString(svgRaw, "image/svg+xml");
   const images = doc.querySelectorAll("image");
@@ -31,25 +34,32 @@ async function inlineImagesInSvg(svgRaw: string): Promise<string> {
 export async function convertSvgToPngAsync(svgRaw: string, width: number, height: number): Promise<string> {
   const inlinedSvg = await inlineImagesInSvg(svgRaw);
   return new Promise((resolve, reject) => {
-    // Create a data URL from the SVG string
-    const svgDataUrl = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(inlinedSvg)))}`;
+    // Avoid btoa and encodeURIComponent, which block the main thread for large strings
+    const blob = new Blob([inlinedSvg], { type: 'image/svg+xml;charset=utf-8' });
+    const svgDataUrl = URL.createObjectURL(blob);
     
     const img = new Image();
     img.crossOrigin = "anonymous";
     
     img.onload = () => {
+      // Clean up blob URL immediately
+      URL.revokeObjectURL(svgDataUrl);
+      
+      const targetWidth = Math.max(1, Math.round(width / 2));
+      const targetHeight = Math.max(1, Math.round(height / 2));
+
       const canvas = document.createElement("canvas");
-      // Scale up the canvas for higher resolution if needed, but we stick to original size for now
-      canvas.width = width;
-      canvas.height = height;
+      // Reduce the canvas resolution by half to reduce memory and storage
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
       const ctx = canvas.getContext("2d");
       
       if (!ctx) {
         return reject(new Error("Failed to get 2D context"));
       }
       
-      ctx.clearRect(0, 0, width, height);
-      ctx.drawImage(img, 0, 0, width, height);
+      ctx.clearRect(0, 0, targetWidth, targetHeight);
+      ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
       
       try {
         const webpDataUrl = canvas.toDataURL("image/webp", 0.8);
@@ -60,6 +70,7 @@ export async function convertSvgToPngAsync(svgRaw: string, width: number, height
     };
     
     img.onerror = (err) => {
+      URL.revokeObjectURL(svgDataUrl);
       reject(err);
     };
     

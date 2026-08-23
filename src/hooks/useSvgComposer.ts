@@ -107,7 +107,13 @@ export function useSvgComposer(
   portStates: PortState[],
   viewSide: EquipmentViewSide = "front",
 ): SvgComposerResult {
-  const cardsKey = insertedCards.map(c => c.instanceId).join(',');
+  const cardsKey = useMemo(() => 
+    insertedCards
+      .map(c => `${c.cardFileName}@${c.slotId || c.rowId || c.positionIndex}`)
+      .sort()
+      .join(','),
+    [insertedCards]
+  );
   const modulesKey = useMemo(() =>
     insertedModules
       .map(m => `${m.portId}-${m.moduleType}-${m.hitboxId || ""}`)
@@ -255,6 +261,7 @@ export function useSvgComposer(
     let isMounted = true;
 
     const compose = async () => {
+      if (!modelName) return;
       if (isModularDevice && insertedCards.length > 0 && cardSvgMap.size === 0) {
         return;
       }
@@ -274,7 +281,9 @@ export function useSvgComposer(
 
         promise = (async () => {
           let baseSvg: string | undefined;
-          if (isModularDevice && equipModel?.baseSvgUrl && equipModel.baseSvgUrl.startsWith("custom-model-base-")) {
+          if (viewSide === "rear") {
+            baseSvg = await resolveDeviceSvgContent(modelName, viewSide);
+          } else if (isModularDevice && equipModel?.baseSvgUrl && equipModel.baseSvgUrl.startsWith("custom-model-base-")) {
             baseSvg = await loadBaseEquipmentSvgRaw(equipModel.baseSvgUrl);
           } else {
             const targetModelName = isModularDevice && equipModel?.baseSvgUrl
@@ -282,7 +291,10 @@ export function useSvgComposer(
               : modelName;
             baseSvg = await resolveDeviceSvgContent(targetModelName, viewSide);
           }
-          if (!baseSvg) throw new Error("No base SVG found");
+          if (!baseSvg) {
+            console.error("No base SVG found for modelName:", modelName, "viewSide:", viewSide);
+            throw new Error("No base SVG found");
+          }
 
           const parser = new DOMParser();
           const baseDoc = parser.parseFromString(baseSvg, "image/svg+xml");
@@ -302,6 +314,10 @@ export function useSvgComposer(
 
         // ─── 빈 슬롯 영역 배경 덮기 ───
         drawBlankSlots(baseSvgEl, baseDoc, equipModel);
+
+        // ─── 베이스 SVG HTML (카드 합성 전) ───
+        // 섀시형 모델의 공통 썸네일 생성을 위해 카드 합성 전 상태를 저장합니다.
+        const baseComposedHtml = new XMLSerializer().serializeToString(baseDoc);
 
         // ─── 카드 합성 ───
         composeCards(baseSvgEl, baseDoc, parser, insertedCards, cardSvgMap, equipModel);
@@ -334,14 +350,17 @@ export function useSvgComposer(
 
         const finalHtml = new XMLSerializer().serializeToString(baseDoc);
         _composedHtmlCache.set(_cacheKey, finalHtml);
-        return finalHtml;
+        return { finalHtml, baseComposedHtml };
         })();
 
-        _composingPromises.set(_cacheKey, promise);
+        _composingPromises.set(_cacheKey, promise.then(res => res.finalHtml));
         
         try {
-          const finalHtml = await promise;
-          if (isMounted) setComposedHtml(finalHtml);
+          const { finalHtml, baseComposedHtml } = await promise;
+          if (isMounted) {
+            setComposedHtml(finalHtml);
+            setBaseHtmlForWebp(baseComposedHtml);
+          }
         } finally {
           _composingPromises.delete(_cacheKey);
         }
@@ -353,6 +372,8 @@ export function useSvgComposer(
     compose();
     return () => { isMounted = false; };
   }, [modelName, cardsKey, equipModel, isModularDevice, cardSvgMap, modulesKey, portsKey, _cacheKey, generatedPortMap, insertedCards, insertedModules, viewSide]);
+
+  const [baseHtmlForWebp, setBaseHtmlForWebp] = useState<string>("");
 
   // ─── Blob URL 캐싱 ───
   const blobUrl = useMemo(() => {
@@ -368,8 +389,20 @@ export function useSvgComposer(
 
   // ─── WebP 자동 생성 ───
   useEffect(() => {
-    if (!composedHtml || !equipModel) return;
-    const cachedWebp = _webpUrlCache.get(_cacheKey);
+    if (!equipModel || !modelName) return;
+    
+    const isChassis = equipModel.templateType === "chassis";
+    // 섀시형 모델인 경우 카드 합성 전 base SVG를 사용, 일반 모델은 최종 합성본 사용
+    const targetHtml = isChassis ? baseHtmlForWebp : composedHtml;
+    
+    if (!targetHtml) return;
+
+    // 섀시 모델은 모델명+뷰사이드 기준으로 1개만 캐싱하여 전역 공유 (메모리, 성능 최적화)
+    const webpCacheKey = isChassis 
+      ? `webp::${modelName}::${viewSide}` 
+      : `webp::${_cacheKey}`;
+
+    const cachedWebp = _webpUrlCache.get(webpCacheKey);
     if (cachedWebp) {
       setWebpUrl(cachedWebp);
       return;
@@ -378,17 +411,17 @@ export function useSvgComposer(
     let isMounted = true;
     import("../utils/imageUtils").then(({ convertSvgToPngAsync }) => {
       // 렌더링 부하 방지를 위해 비동기로 생성
-      convertSvgToPngAsync(composedHtml, equipModel.equipmentSize?.width || 984, equipModel.equipmentSize?.height || 200)
+      convertSvgToPngAsync(targetHtml, equipModel.equipmentSize?.width || 984, equipModel.equipmentSize?.height || 200)
         .then((url) => {
           if (!isMounted) return;
-          _webpUrlCache.set(_cacheKey, url);
+          _webpUrlCache.set(webpCacheKey, url);
           setWebpUrl(url);
         })
         .catch(console.error);
     });
 
     return () => { isMounted = false; };
-  }, [composedHtml, _cacheKey, equipModel]);
+  }, [composedHtml, baseHtmlForWebp, _cacheKey, equipModel, modelName, viewSide]);
 
   return { composedHtml, blobUrl, webpUrl, isModularDevice, generatedPorts, generatedPortMap };
 }

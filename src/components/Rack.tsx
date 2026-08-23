@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback, forwardRef, Suspense, memo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, forwardRef, Suspense, memo, useDeferredValue } from "react";
 import { useTexture, Billboard, Html, Edges } from "@react-three/drei";
 import { type ThreeEvent, useThree, useFrame } from "@react-three/fiber";
 import { BoxGeometry, CanvasTexture, Color, DoubleSide, Euler, Mesh, MeshStandardMaterial, Object3D, Plane, RepeatWrapping, Vector3, Group, MathUtils } from 'three';
@@ -9,7 +9,7 @@ import type { Rack as RackType, Device } from "../types";
 import { ErrorMarker } from "./ErrorMarker";
 import { U_HEIGHT, GRID_SPACING, DEVICE_DEPTH } from "./constants";
 import { getHighestError } from "../utils/errorHelpers";
-import { resolveDeviceImage } from "../utils/deviceAssets";
+import { resolveDeviceImage, isChassisModel } from "../utils/deviceAssets";
 import { useSvgComposer } from "../hooks/useSvgComposer";
 
 // ─── Phase 1-A: 모듈 레벨 공유 Geometry (모든 Rack이 재사용) ───
@@ -548,7 +548,9 @@ export const Rack = memo(({
             const state = useStore.getState();
             if (state.selectedRackId !== rackId || state.focusedRackId !== rackId) {
               state.selectRack(rackId);
-              state.focusRack(rackId);
+              if (!state.isEditMode) {
+                state.focusRack(rackId);
+              }
             }
           }}
           onPointerOver={isObstructing ? undefined : (e) => {
@@ -591,59 +593,61 @@ export const Rack = memo(({
           <meshBasicMaterial transparent opacity={0} depthWrite={false} />
         </mesh>
 
-        {/* Phase 1: 호버 태그 항상 마운트 — DOM 마운트/언마운트 비용 제거 */}
+        {/* Phase 1: 호버 태그 — DOM 마운트 비용 방지 대신 수백 개의 Html 컴포넌트가 프레임을 저하시키는 것을 방지하기 위해 isHovered 상태에서만 렌더링 */}
         <Billboard position={[0, height / 2 + 0.15, 0]} visible={isHovered}>
-          <Html center zIndexRange={[0, 10]} style={{ pointerEvents: "none" }}>
-            <div
-              style={{
-                background: isDarkMode
-                  ? "rgba(23, 24, 28, 0.85)"
-                  : "rgba(255, 255, 255, 0.9)",
-                color: isDarkMode ? "#ebedef" : "#202226",
-                padding: "4px 12px",
-                borderRadius: "16px",
-                fontSize: "12px",
-                fontWeight: 600,
-                border: isDarkMode
-                  ? isSelected
-                    ? "1px solid #FFFFFF"
-                    : "1px solid rgba(255, 255, 255, 0.1)"
-                  : isSelected
-                    ? "1px solid #1a73e8"
-                    : "1px solid rgba(0, 0, 0, 0.08)",
-                boxShadow: isDarkMode
-                  ? "0 4px 15px rgba(0, 0, 0, 0.4)"
-                  : "0 4px 12px rgba(0, 0, 0, 0.1)",
-                whiteSpace: "nowrap",
-                backdropFilter: "blur(8px)",
-                pointerEvents: "none",
-                userSelect: "none",
-                display: isHovered ? "flex" : "none",
-                alignItems: "center",
-                gap: "6px",
-                fontFamily: "Inter, system-ui, sans-serif",
-              }}
-            >
-              <span
+          {isHovered && (
+            <Html center zIndexRange={[0, 10]} style={{ pointerEvents: "none" }}>
+              <div
                 style={{
-                  width: "6px",
-                  height: "6px",
-                  borderRadius: "50%",
                   background: isDarkMode
+                    ? "rgba(23, 24, 28, 0.85)"
+                    : "rgba(255, 255, 255, 0.9)",
+                  color: isDarkMode ? "#ebedef" : "#202226",
+                  padding: "4px 12px",
+                  borderRadius: "16px",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  border: isDarkMode
                     ? isSelected
-                      ? "#FFFFFF"
-                      : "#4d5261"
-                    : "#1a73e8",
-                  display: "inline-block",
+                      ? "1px solid #FFFFFF"
+                      : "1px solid rgba(255, 255, 255, 0.1)"
+                    : isSelected
+                      ? "1px solid #1a73e8"
+                      : "1px solid rgba(0, 0, 0, 0.08)",
+                  boxShadow: isDarkMode
+                    ? "0 4px 15px rgba(0, 0, 0, 0.4)"
+                    : "0 4px 12px rgba(0, 0, 0, 0.1)",
+                  whiteSpace: "nowrap",
+                  backdropFilter: "blur(8px)",
+                  pointerEvents: "none",
+                  userSelect: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  fontFamily: "Inter, system-ui, sans-serif",
                 }}
-              />
-              <span>{`${rackSize}U`}</span>
-              <span style={{ opacity: 0.4 }}>|</span>
-              <span>
-                {rackTitle || `Rack ${rackId.slice(0, 4).toUpperCase()}`}
-              </span>
-            </div>
-          </Html>
+              >
+                <span
+                  style={{
+                    width: "6px",
+                    height: "6px",
+                    borderRadius: "50%",
+                    background: isDarkMode
+                      ? isSelected
+                        ? "#FFFFFF"
+                        : "#4d5261"
+                      : "#1a73e8",
+                    display: "inline-block",
+                  }}
+                />
+                <span>{`${rackSize}U`}</span>
+                <span style={{ opacity: 0.4 }}>|</span>
+                <span>
+                  {rackTitle || `Rack ${rackId.slice(0, 4).toUpperCase()}`}
+                </span>
+              </div>
+            </Html>
+          )}
         </Billboard>
 
         {isInternalFocused && !isEditMode && (
@@ -857,8 +861,8 @@ const DeviceMesh = ({
     }
   });
 
-  // Always generate SVG if there are inserted cards AND no cached PNG is available
-  const needsComposer = !device.devicePngRaw && (device.insertedCards?.length || 0) > 0;
+  // Always generate SVG if it's a chassis model, or if there are inserted cards AND no cached PNG is available
+  const needsComposer = !device.devicePngRaw && (isChassisModel(device.modelName) || (device.insertedCards?.length || 0) > 0);
   const stableInsertedCards = device.insertedCards || EMPTY_ARRAY;
   const stableInsertedModules = device.insertedModules || EMPTY_ARRAY;
   const stablePortStates = device.portStates || EMPTY_ARRAY;
@@ -887,7 +891,7 @@ const DeviceMesh = ({
     [device.defaultViewSide, device.modelName, webpUrl, blobUrl, device.devicePngRaw],
   );
 
-  const resolvedUrl = thumbUrl;
+  const resolvedUrl = useDeferredValue(thumbUrl);
 
   return (
     <group

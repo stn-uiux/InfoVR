@@ -4,7 +4,7 @@ import { useStore, checkFrontClearanceViolation } from "../store/useStore";
 import type { Device, PortState, RegisteredDevice } from "../types";
 import type { GeneratedPort } from "../types/equipment";
 import { getHighestError } from "../utils/errorHelpers";
-import { resolveDeviceImage } from "../utils/deviceAssets";
+import { resolveDeviceImage, isChassisModel } from "../utils/deviceAssets";
 import { generatePortMap } from "../utils/portUtils";
 import { useSvgComposer } from "../hooks/useSvgComposer";
 import { getNodeName } from "../utils/nodeUtils";
@@ -335,7 +335,10 @@ export const DevicePanel = () => {
             onClick={() => {
               selectDevice(device.itemId);
               if (selectedRackId) {
-                focusRack(selectedRackId);
+                const state = useStore.getState();
+                if (!state.isEditMode) {
+                  focusRack(selectedRackId);
+                }
               }
               setHighlightedDevice(device.itemId, 2500);
             }}
@@ -732,7 +735,7 @@ export const DevicePanel = () => {
                         }
                       });
                       return sorted.map((rd) => {
-                        const needsComposer = (rd.insertedCards?.length || 0) > 0;
+                        const needsComposer = isChassisModel(rd.modelName) || (rd.insertedCards?.length || 0) > 0;
                         const SvgComposerFallback = ({ device }: { device: any }) => {
                           const { composedHtml, blobUrl, webpUrl } = useSvgComposer(
                             needsComposer ? device.modelName : undefined,
