@@ -528,12 +528,12 @@ export const DevicePanel = () => {
               display: "flex",
               alignItems: "center",
               cursor: isEditMode ? "pointer" : "default",
-              backgroundColor: "var(--severity-success-bg)",
+              backgroundColor: isEditMode ? "var(--severity-success-bg)" : "transparent",
               transition: "background 0.1s",
               marginBottom: "2px",
               borderRadius: "var(--radius-sm)",
             }}
-            title="Click to add device at this slot"
+            title={isEditMode ? "Click to add device at this slot" : undefined}
           >
             <div
               style={{
@@ -554,7 +554,7 @@ export const DevicePanel = () => {
                 color: "var(--severity-success-text)",
               }}
             >
-              + Available
+              {isEditMode ? "+ Available" : ""}
             </div>
             <div
               style={{

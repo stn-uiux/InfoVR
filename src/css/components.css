@@ -516,8 +516,8 @@
   animation: dt-spin 0.7s linear infinite;
 }
 
-.device-tile {
-  /* Gradient overlay for text legibility */
+.device-tile-image {
+  width: 100%;
 }
 
 .device-tile-overlay {
