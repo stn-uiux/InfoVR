@@ -5,6 +5,37 @@
  * 캐싱을 통해 재열기 시 즉시 렌더링합니다.
  */
 import { useEffect, useState, useMemo } from 'react';
+
+// ─── WebP 생성 로딩 추적 (InitialLoader 연동용) ───
+let pendingComposerTasks = 0;
+const composerListeners = new Set<(count: number) => void>();
+const incrementComposerTask = () => {
+  pendingComposerTasks++;
+  composerListeners.forEach(l => l(pendingComposerTasks));
+};
+const decrementComposerTask = () => {
+  pendingComposerTasks = Math.max(0, pendingComposerTasks - 1);
+  composerListeners.forEach(l => l(pendingComposerTasks));
+};
+export const useComposerTaskProgress = () => {
+  const [count, setCount] = useState(pendingComposerTasks);
+  useEffect(() => {
+    composerListeners.add(setCount);
+    return () => { composerListeners.delete(setCount); };
+  }, []);
+  return count;
+};
+
+// ─── 비동기 작업을 감싸서 안전하게 카운트를 증감시키는 유틸리티 ───
+export const withComposerTask = async <T>(task: () => Promise<T>): Promise<T> => {
+  incrementComposerTask();
+  try {
+    return await task();
+  } finally {
+    decrementComposerTask();
+  }
+};
+
 import { equipmentModels, loadCardSvgRaw, loadCardSvgRawSync, loadBaseEquipmentSvgRaw } from '../utils/cardAssets';
 import { resolveDeviceSvgContent, isChassisModel } from '../utils/deviceAssets';
 import { moduleDefinitions } from '../utils/moduleAssets';
@@ -234,12 +265,13 @@ export function useSvgComposer(
     if (allLoaded) return;
 
     let isMounted = true;
-    Promise.all(
-      uniqueFileNames.map(async (fn) => {
-        const raw = await loadCardSvgRaw(fn);
-        return [fn, raw] as const;
-      })
-    ).then((results) => {
+    withComposerTask(async () => {
+      const results = await Promise.all(
+        uniqueFileNames.map(async (fn) => {
+          const raw = await loadCardSvgRaw(fn);
+          return [fn, raw] as const;
+        })
+      );
       if (!isMounted) return;
       setCardSvgMap(prev => {
         const next = new Map(prev);
@@ -252,7 +284,7 @@ export function useSvgComposer(
         }
         return changed ? next : prev;
       });
-    });
+    }).catch(console.error);
     return () => { isMounted = false; };
   }, [isModularDevice, cardsKey]);
 
@@ -384,7 +416,7 @@ export function useSvgComposer(
       }
     };
 
-    compose();
+    withComposerTask(compose).catch(console.error);
     return () => { isMounted = false; };
   }, [modelName, cardsKey, equipModel, isModularDevice, cardSvgMap, modulesKey, portsKey, _cacheKey, generatedPortMap, insertedCards, insertedModules, viewSide]);
 
@@ -406,11 +438,6 @@ export function useSvgComposer(
   useEffect(() => {
     if (!equipModel || !modelName) return;
     
-    const isChassis = isChassisModel(modelName);
-    const targetHtml = composedHtml;
-    
-    if (!targetHtml) return;
-
     const webpCacheKey = `webp::${_cacheKey}`;
 
     const cachedWebp = _webpUrlCache.get(webpCacheKey);
@@ -421,31 +448,34 @@ export function useSvgComposer(
 
     let isMounted = true;
     
-    import("../utils/indexedDBStorage").then(({ idbStorage }) => {
-      idbStorage.getItem(webpCacheKey).then((savedUrl) => {
-        if (!isMounted) return;
-        if (savedUrl) {
-          _webpUrlCache.set(webpCacheKey, savedUrl);
-          setWebpUrl(savedUrl);
-        } else {
-          // 캐시 오염을 방지하기 위해 WebP를 새로 생성하기 전에는 모든 카드의 SVG 데이터가 로드되었는지 확인합니다.
-          const isAllCardsLoaded = insertedCards.every((card) => cardSvgMap.has(card.cardFileName));
-          if (!isAllCardsLoaded) return;
+    withComposerTask(async () => {
+      const { idbStorage } = await import("../utils/indexedDBStorage");
+      const savedUrl = await idbStorage.getItem(webpCacheKey);
+      
+      if (!isMounted) return;
+      
+      if (savedUrl) {
+        _webpUrlCache.set(webpCacheKey, savedUrl);
+        setWebpUrl(savedUrl);
+      } else {
+        // 캐시에 없을 경우 새로 생성해야 함
+        const targetHtml = composedHtml;
+        if (!targetHtml) return;
 
-          import("../utils/imageUtils").then(({ convertSvgToPngAsync }) => {
-            // 렌더링 부하 방지를 위해 비동기로 생성
-            convertSvgToPngAsync(targetHtml, equipModel.equipmentSize?.width || 984, equipModel.equipmentSize?.height || 200)
-              .then((url) => {
-                if (!isMounted) return;
-                _webpUrlCache.set(webpCacheKey, url);
-                idbStorage.setItem(webpCacheKey, url).catch(console.error);
-                setWebpUrl(url);
-              })
-              .catch(console.error);
-          });
-        }
-      }).catch(console.error);
-    });
+        // 캐시 오염을 방지하기 위해 WebP를 새로 생성하기 전에는 모든 카드의 SVG 데이터가 로드되었는지 확인합니다.
+        const isAllCardsLoaded = insertedCards.every((card) => cardSvgMap.has(card.cardFileName));
+        if (!isAllCardsLoaded) return;
+
+        const { convertSvgToPngAsync } = await import("../utils/imageUtils");
+        const url = await convertSvgToPngAsync(targetHtml, equipModel.equipmentSize?.width || 984, equipModel.equipmentSize?.height || 200);
+        
+        if (!isMounted) return;
+        
+        _webpUrlCache.set(webpCacheKey, url);
+        idbStorage.setItem(webpCacheKey, url).catch(console.error);
+        setWebpUrl(url);
+      }
+    }).catch(console.error);
 
     return () => { isMounted = false; };
   }, [composedHtml, baseHtmlForWebp, _cacheKey, equipModel, modelName, viewSide, insertedCards, cardSvgMap]);

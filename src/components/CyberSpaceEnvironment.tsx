@@ -13,16 +13,24 @@ const NEON_BLUE = new THREE.Color(0.2, 0.6, 2.0).multiplyScalar(2);
 
 function SceneEnvironment({ fogColor, fogIntensity }: { fogColor: string, fogIntensity: number }) {
   const scene = useThree(state => state.scene);
+  const isEditMode = useStore(state => state.isEditMode);
+  
   useEffect(() => {
     // CSS 배경(그라데이션)이 투과되어 보이도록 3D 솔리드 배경 제거
     scene.background = null;
-    // Adjusted fog back to match space project's visual depth
-    scene.fog = new THREE.Fog(fogColor, 20 / Math.max(0.1, fogIntensity), 150 / Math.max(0.1, fogIntensity));
+    
+    if (isEditMode) {
+      scene.fog = null;
+    } else {
+      // Adjusted fog back to match space project's visual depth
+      scene.fog = new THREE.Fog(fogColor, 20 / Math.max(0.1, fogIntensity), 150 / Math.max(0.1, fogIntensity));
+    }
+    
     return () => {
       scene.background = null;
       scene.fog = null;
     };
-  }, [scene, fogColor, fogIntensity]);
+  }, [scene, fogColor, fogIntensity, isEditMode]);
   return null;
 }
 
@@ -242,6 +250,7 @@ export function CyberSpaceEnvironment() {
     csFloorColor,
     csFogColor,
     racks,
+    isEditMode,
   } = useStore();
 
   const activeNodeId = useStore((state) => state.activeNodeId);
@@ -258,7 +267,8 @@ export function CyberSpaceEnvironment() {
 
   return (
     <>
-      <SceneEnvironment fogColor={csFogColor} fogIntensity={csFogIntensity} />
+      <group visible={!isEditMode}>
+        <SceneEnvironment fogColor={csFogColor} fogIntensity={csFogIntensity} />
 
       {csIsLightMode ? (
         <>
@@ -322,8 +332,9 @@ export function CyberSpaceEnvironment() {
           />
         </group>
       )}
+      </group>
 
-      <EffectComposer>
+      <EffectComposer enabled={!isEditMode}>
         <N8AO aoRadius={1} intensity={csAoIntensity} distanceFalloff={0.2} color="black" />
         <Bloom luminanceThreshold={csIsLightMode ? 2.0 : 0.8} mipmapBlur levels={7} intensity={0.7 * Math.max(0.5, csBrightness) * csBloomIntensity} />
         <Vignette eskil={false} offset={0.1} darkness={csIsLightMode ? 0.25 : 0.5} />

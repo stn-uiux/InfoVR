@@ -529,7 +529,7 @@ export const Scene = () => {
         )}
 
         {/* Universal High-Quality Environment (Lights, Floor, Post-Processing) */}
-        {!isEditMode && <CyberSpaceEnvironment />}
+        <CyberSpaceEnvironment />
 
         {/* Racks (filtered by active group) */}
         {groupRacks.map((rack) => (
