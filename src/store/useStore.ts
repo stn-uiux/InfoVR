@@ -674,13 +674,23 @@ export const useStore = create<AppState>()(
           currentLayouts[get().activeSceneNodeId!] = { racks, importedModels };
         }
 
-        const isDirty =
-          JSON.stringify(nodes) !== JSON.stringify(baseNodes) ||
-          JSON.stringify(registeredDevices) !== JSON.stringify(baseRegDevices) ||
-          JSON.stringify(nodeEnvironments) !== JSON.stringify(baseNodeEnvs) ||
-          !layoutsEqual(currentLayouts, baseLayouts);
+        const isDirtyNodes = JSON.stringify(nodes) !== JSON.stringify(baseNodes);
+        const isDirtyRegDevices = JSON.stringify(registeredDevices) !== JSON.stringify(baseRegDevices);
+        const isDirtyNodeEnvs = JSON.stringify(nodeEnvironments) !== JSON.stringify(baseNodeEnvs);
+        const isDirtyLayouts = !layoutsEqual(currentLayouts, baseLayouts);
+
+        const isDirty = isDirtyNodes || isDirtyRegDevices || isDirtyNodeEnvs || isDirtyLayouts;
+
+        if (isDirty) {
+          console.log("getIsDirty => TRUE");
+          if (isDirtyNodes) console.log("- nodes changed", { current: nodes, base: baseNodes });
+          if (isDirtyRegDevices) console.log("- registeredDevices changed", { current: registeredDevices, base: baseRegDevices });
+          if (isDirtyNodeEnvs) console.log("- nodeEnvironments changed", { current: nodeEnvironments, base: baseNodeEnvs });
+          if (isDirtyLayouts) console.log("- layouts changed", { current: currentLayouts, base: baseLayouts });
+        }
 
         return isDirty;
+
       },
 
       getDirtyNodeIds: () => {
@@ -1154,40 +1164,9 @@ export const useStore = create<AppState>()(
             m.modelId === modelId ? updatedModel : m
           );
 
-          // 변경된 모델 정보를 기존 인스턴스(등록 장비 & 랙 장비)에 전파
-          const registeredDevices = state.registeredDevices.map((dev) => {
-            // Check if dev matches ANY variant of the OLD model
-            let matchedVariant = oldModel.variants?.find((v) => {
-              const oldVariantName = v.variantName === "기본타입" ? oldModel.modelName : `${oldModel.modelName} ${v.variantName}`;
-              return dev.modelName === oldVariantName;
-            });
-            if (!matchedVariant && dev.modelName === oldModel.modelName) {
-              matchedVariant = oldModel.variants?.[0];
-            }
-
-            if (matchedVariant || dev.modelName === oldModel.modelName) {
-              const newVariant = updatedModel.variants?.find(v => v.variantId === matchedVariant?.variantId) 
-                              || updatedModel.variants?.find(v => v.variantName === matchedVariant?.variantName)
-                              || updatedModel.variants?.[0];
-              
-              const newDevModelName = newVariant 
-                 ? (newVariant.variantName === "기본타입" ? updatedModel.modelName : `${updatedModel.modelName} ${newVariant.variantName}`)
-                 : updatedModel.modelName;
-
-              return {
-                ...dev,
-                modelName: newDevModelName,
-                size: updatedModel.unit ?? dev.size,
-                insertedCards: newVariant?.insertedCards || [],
-              };
-            }
-            return dev;
-          });
-
-          // 2. 랙에 탑재된 장비 업데이트
-          const racks = state.racks.map((rack) => {
-            let changed = false;
-            const newDevices = rack.devices.map((dev) => {
+          // Helper to apply model updates to a list of devices
+          const applyToDevices = (devices: RegisteredDevice[]) => {
+            return devices.map((dev) => {
               let matchedVariant = oldModel.variants?.find((v) => {
                 const oldVariantName = v.variantName === "기본타입" ? oldModel.modelName : `${oldModel.modelName} ${v.variantName}`;
                 return dev.modelName === oldVariantName;
@@ -1197,14 +1176,14 @@ export const useStore = create<AppState>()(
               }
 
               if (matchedVariant || dev.modelName === oldModel.modelName) {
-                changed = true;
-                const newVariant = updatedModel.variants?.find(v => v.variantId === matchedVariant?.variantId)
+                const newVariant = updatedModel.variants?.find(v => v.variantId === matchedVariant?.variantId) 
                                 || updatedModel.variants?.find(v => v.variantName === matchedVariant?.variantName)
                                 || updatedModel.variants?.[0];
+                
                 const newDevModelName = newVariant 
-                  ? (newVariant.variantName === "기본타입" ? updatedModel.modelName : `${updatedModel.modelName} ${newVariant.variantName}`)
-                  : updatedModel.modelName;
-                  
+                   ? (newVariant.variantName === "기본타입" ? updatedModel.modelName : `${updatedModel.modelName} ${newVariant.variantName}`)
+                   : updatedModel.modelName;
+
                 return {
                   ...dev,
                   modelName: newDevModelName,
@@ -1214,11 +1193,86 @@ export const useStore = create<AppState>()(
               }
               return dev;
             });
-            return changed ? { ...rack, devices: newDevices } : rack;
-          });
+          };
+
+          // Helper to apply model updates to racks
+          const applyToRacks = (racksList: Rack[]) => {
+            return racksList.map((rack) => {
+              let changed = false;
+              const newDevices = rack.devices.map((dev) => {
+                let matchedVariant = oldModel.variants?.find((v) => {
+                  const oldVariantName = v.variantName === "기본타입" ? oldModel.modelName : `${oldModel.modelName} ${v.variantName}`;
+                  return dev.modelName === oldVariantName;
+                });
+                if (!matchedVariant && dev.modelName === oldModel.modelName) {
+                  matchedVariant = oldModel.variants?.[0];
+                }
+
+                if (matchedVariant || dev.modelName === oldModel.modelName) {
+                  changed = true;
+                  const newVariant = updatedModel.variants?.find(v => v.variantId === matchedVariant?.variantId)
+                                  || updatedModel.variants?.find(v => v.variantName === matchedVariant?.variantName)
+                                  || updatedModel.variants?.[0];
+                  const newDevModelName = newVariant 
+                    ? (newVariant.variantName === "기본타입" ? updatedModel.modelName : `${updatedModel.modelName} ${newVariant.variantName}`)
+                    : updatedModel.modelName;
+                    
+                  return {
+                    ...dev,
+                    modelName: newDevModelName,
+                    size: updatedModel.unit ?? dev.size,
+                    insertedCards: newVariant?.insertedCards || [],
+                  };
+                }
+                return dev;
+              });
+              return changed ? { ...rack, devices: newDevices } : rack;
+            });
+          };
+
+          // 1. 현재 상태 업데이트
+          const registeredDevices = applyToDevices(state.registeredDevices);
+          const racks = applyToRacks(state.racks);
+
+          const layouts = { ...state.layouts };
+          if (state.activeNodeId && state.layouts[state.activeNodeId]) {
+            layouts[state.activeNodeId] = {
+              ...layouts[state.activeNodeId],
+              racks: applyToRacks(layouts[state.activeNodeId].racks),
+            };
+          }
+
+          // 2. Baseline 상태 동기화 (Edit Mode의 Unsaved 상태를 트리거하지 않도록)
+          const baselineRegisteredDevices = state.baselineRegisteredDevices 
+            ? applyToDevices(state.baselineRegisteredDevices) 
+            : state.baselineRegisteredDevices;
+            
+          const baselineRacks = state.baselineRacks 
+            ? applyToRacks(state.baselineRacks) 
+            : state.baselineRacks;
+
+          const baselineLayouts = state.baselineLayouts ? { ...state.baselineLayouts } : state.baselineLayouts;
+          if (baselineLayouts) {
+            Object.keys(baselineLayouts).forEach((nodeId) => {
+              if (baselineLayouts[nodeId]) {
+                baselineLayouts[nodeId] = {
+                  ...baselineLayouts[nodeId],
+                  racks: applyToRacks(baselineLayouts[nodeId].racks),
+                };
+              }
+            });
+          }
 
           saveCustomModelsToProject(customModels);
-          return { customModels, registeredDevices, racks };
+          return { 
+            customModels, 
+            registeredDevices, 
+            racks, 
+            layouts,
+            baselineRegisteredDevices,
+            baselineRacks,
+            baselineLayouts
+          };
         });
       },
 

@@ -460,7 +460,9 @@ export function useSvgComposer(
       } else {
         // 캐시에 없을 경우 새로 생성해야 함
         const targetHtml = composedHtml;
-        if (!targetHtml) return;
+        const expectedHtml = _composedHtmlCache.get(_cacheKey);
+        if (!targetHtml || targetHtml !== expectedHtml) return;
+
 
         // 캐시 오염을 방지하기 위해 WebP를 새로 생성하기 전에는 모든 카드의 SVG 데이터가 로드되었는지 확인합니다.
         const isAllCardsLoaded = insertedCards.every((card) => cardSvgMap.has(card.cardFileName));
