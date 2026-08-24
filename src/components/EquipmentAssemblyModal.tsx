@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { StnModal } from "./StnModal";
 import type { CardDefinition, CardWidthType, InsertedCard, EquipmentModel, SlotDefinition, EquipmentRow, EquipmentSubSlot } from "../types/equipment";
 import { getColSpan } from "../types/equipment";
 import {
@@ -18,15 +19,6 @@ import { CardThumbnail } from "./CardThumbnail";
 
 /* ────── 스타일 ────── */
 const STYLES = `
-.eam-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;animation:eam-fi .25s ease-out}
-@keyframes eam-fi{from{opacity:0}to{opacity:1}}
-.eam-modal{background:var(--modal-bg);border:1px solid var(--border-medium);border-radius:20px;box-shadow:0 24px 80px rgba(0,0,0,.6);width:1400px;max-width:98vw;height:90vh;display:flex;flex-direction:column;overflow:hidden;animation:eam-zi .3s cubic-bezier(.16,1,.3,1)}
-@keyframes eam-zi{from{transform:scale(.96) translateY(16px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
-.eam-header{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;background:var(--bg-tertiary);border-bottom:1px solid var(--border-weak)}
-.eam-header h2{font-size:18px;font-weight:700;color:var(--text-primary);margin:0;display:flex;align-items:center;gap:12px}
-.eam-header .icon-box{width:34px;height:34px;background:linear-gradient(135deg,var(--theme-primary),#4872d8);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px}
-.eam-close{background:var(--bg-tertiary);border:1px solid var(--border-medium);color:var(--text-secondary);width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;transition:all .2s;font-size:18px;line-height:0}
-.eam-close:hover{background:var(--severity-critical);color:#fff;border-color:var(--severity-critical);transform:rotate(90deg)}
 .eam-body{flex:1;display:flex;overflow:hidden}
 .eam-sidebar{width:240px;background:var(--bg-secondary);border-right:1px solid var(--border-weak);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;padding:16px 12px;gap:8px}
 .eam-sidebar-title{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-tertiary);font-weight:700;padding:4px 8px;margin-bottom:4px}
@@ -854,18 +846,15 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
 
   if (!open) return null;
 
-  return createPortal(
-    <div className="eam-overlay" onClick={onClose}>
-      <div className="eam-modal" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
-        <div className="eam-header">
-          <h2>
-            {selectedModel ? `장비 구성 – ${selectedModel.modelName}` : "새 장비 등록"}
-          </h2>
-          <button className="eam-close" onClick={onClose}>×</button>
-        </div>
-
-        <div className="eam-body">
+  return (
+    <StnModal
+      isOpen={open}
+      onClose={onClose}
+      title={selectedModel ? `장비 구성 – ${selectedModel.modelName}` : "새 장비 등록"}
+      className="eam-stn-override"
+      icon="fluent:board-24-regular"
+    >
+      <div className="eam-body">
           {!selectedModel ? (
             <div style={{ padding: 40, textAlign: "center", color: "var(--text-tertiary)" }}>
               장비 모델이 선택되지 않았습니다.
@@ -1254,7 +1243,6 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
             </>
           )}
         </div>
-      </div>
 
       {/* 툴팁 오버레이 */}
       {hoveredTooltipCard && (
@@ -1286,8 +1274,7 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
 
       {/* 경고 토스트 */}
       {warning && <div className="eam-warn">{warning}</div>}
-    </div>,
-    document.body,
+    </StnModal>
   );
 };
 
