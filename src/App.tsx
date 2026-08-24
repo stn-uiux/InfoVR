@@ -1,4 +1,4 @@
-import React, { useRef, useMemo } from "react";
+import React, { useRef, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Icon } from "@iconify/react";
 import { Loader } from "@react-three/drei";
@@ -109,6 +109,34 @@ const DeviceDeleteConfirmModal = () => {
       </div>
     </>,
     document.body,
+  );
+};
+
+/* ---------- Docs Dropdown Component ---------- */
+const DocsDropdown = () => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="docs-dropdown-container">
+      {isOpen && (
+        <div className="docs-dropdown-menu">
+          <div className="docs-dropdown-header">관련 문서 (Docs)</div>
+          <a href="/docs/arcVRack_feature_summary.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:document-one-page-24-regular" /> 기능명세서</a>
+          <a href="/docs/arcVRack_ui_design_spec.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:design-ideas-24-regular" /> 화면 설계서</a>
+          <a href="/docs/completion_report.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:document-checkmark-24-regular" /> 완료보고서</a>
+          <a href="/docs/arcVRack_wbs.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:calendar-ltr-24-regular" /> 개발 WBS</a>
+          <a href="/docs/arcVRack_deployment_roadmap.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:rocket-24-regular" /> 배포 로드맵</a>
+        </div>
+      )}
+      <button
+        className="comm-btn comm-btn-md comm-btn-secondary docs-dropdown-btn"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <Icon icon="fluent:document-multiple-24-regular" style={{ fontSize: "16px" }} />
+        관련 문서
+        <Icon icon={isOpen ? "fluent:chevron-down-24-regular" : "fluent:chevron-up-24-regular"} style={{ marginLeft: "8px" }} />
+      </button>
+    </div>
   );
 };
 
@@ -556,14 +584,8 @@ function App() {
       {/* 2D UI Overlay - Fit to Models (Fixed next to Gizmo) */}
       <FitToModelsButton />
 
-      {/* Docs Links in Edit Mode */}
-      {isEditMode && (
-        <div style={{ position: "absolute", bottom: "24px", right: "24px", zIndex: 10, display: "flex", flexDirection: "column", gap: "8px", fontSize: "12px", textAlign: "right" }}>
-          <a href="/docs/arcVRack_feature_summary.html" target="_blank" rel="noreferrer" style={{ color: "var(--color-text-secondary, #a1a1aa)", textDecoration: "none" }} onMouseOver={(e) => e.currentTarget.style.color = "var(--color-primary, #646cff)"} onMouseOut={(e) => e.currentTarget.style.color = "var(--color-text-secondary, #a1a1aa)"}>기능명세서</a>
-          <a href="/docs/arcVRack_ui_design_spec.html" target="_blank" rel="noreferrer" style={{ color: "var(--color-text-secondary, #a1a1aa)", textDecoration: "none" }} onMouseOver={(e) => e.currentTarget.style.color = "var(--color-primary, #646cff)"} onMouseOut={(e) => e.currentTarget.style.color = "var(--color-text-secondary, #a1a1aa)"}>화면 설계서</a>
-          <a href="/docs/completion_report.html" target="_blank" rel="noreferrer" style={{ color: "var(--color-text-secondary, #a1a1aa)", textDecoration: "none" }} onMouseOver={(e) => e.currentTarget.style.color = "var(--color-primary, #646cff)"} onMouseOut={(e) => e.currentTarget.style.color = "var(--color-text-secondary, #a1a1aa)"}>완료보고서</a>
-        </div>
-      )}
+      {/* Docs Links (Always visible) */}
+      <DocsDropdown />
 
       <DeviceTooltip />
       <Toast />

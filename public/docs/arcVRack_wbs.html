@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ArcVRack 개발 WBS</title>
+  <style>
+    :root {
+      --primary: #3b82f6;
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.3;
+      margin: 0;
+      padding: 16px 12px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      font-size: 20px;
+      margin-top: 0;
+      padding-bottom: 8px;
+      margin-bottom: 8px;
+      border-bottom: 2px solid var(--border);
+      color: var(--primary);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 12px;
+    }
+
+    th,
+    td {
+      border: 1px solid var(--border);
+      padding: 6px 10px;
+      text-align: left;
+    }
+
+    th {
+      background: rgba(255, 255, 255, 0.05);
+      color: #e2e8f0;
+      font-weight: 600;
+    }
+
+    tr:nth-child(even) {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .phase {
+      background: rgba(59, 130, 246, 0.1) !important;
+      font-weight: 700;
+      color: #93c5fd;
+    }
+
+    .status-done {
+      color: #34d399;
+      font-weight: 600;
+    }
+
+    .status-wip {
+      color: #fbbf24;
+      font-weight: 600;
+    }
+
+    .status-todo {
+      color: #94a3b8;
+      font-weight: 600;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>📅 ArcVRack 개발 WBS (Work Breakdown Structure)</h1>
+    <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 16px;">
+      <strong>프로젝트명:</strong> ArcVRack (3D Server Room Architecture)<br>
+      <strong>작성일자:</strong> 2026년 8월 24일
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 3%;">ID</th>
+          <th style="width: 22%;">분류 / 태스크명</th>
+          <th>상세 업무 내용</th>
+          <th style="width: 9%;">담당자</th>
+          <th style="width: 6%;">진척도</th>
+          <th style="width: 6%;">상태</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Phase 1 -->
+        <tr class="phase">
+          <td>1.0</td>
+          <td colspan="5">기획 및 아키텍처 설계 (Planning & Architecture)</td>
+        </tr>
+        <tr>
+          <td>1.1</td>
+          <td>요구사항 명세</td>
+          <td>3D 공간 관제, 포트 맵핑, 썸네일 자동화 등 핵심 요구사항 도출</td>
+          <td>기획/개발</td>
+          <td>100%</td>
+          <td class="status-done">완료</td>
+        </tr>
+        <tr>
+          <td>1.2</td>
+          <td>화면 및 UI/UX 설계</td>
+          <td>Figma 기반 플로팅 사이드바, 다크/라이트 테마 레이아웃 설계</td>
+          <td>디자인</td>
+          <td>100%</td>
+          <td class="status-done">완료</td>
+        </tr>
+        <tr>
+          <td>1.3</td>
+          <td>기술 스택 선정 및 세팅</td>
+          <td>Vite, React 18, Three.js, R3F, Zustand 기반 보일러플레이트 구축</td>
+          <td>프론트엔드</td>
+          <td>100%</td>
+          <td class="status-done">완료</td>
+        </tr>
+        <tr>
+          <td>1.4</td>
+          <td>데이터 영속성 아키텍처 설계</td>
+          <td>IndexedDB 및 LocalStorage 기반 상태 관리 및 JSON 내보내기/불러오기 설계</td>
+          <td>프론트엔드</td>
+          <td>100%</td>
+          <td class="status-done">완료</td>
+        </tr>
+
+        <!-- Phase 2 -->
+        <tr class="phase">
+          <td>2.0</td>
+          <td colspan="5">3D 가상 공간 (CyberSpace) 개발</td>
+        </tr>
+        <tr>
+          <td>2.1</td>
+          <td>3D 엔진 기본 세팅</td>
+          <td>R3F Canvas, 카메라 설정(OrbitControls), 글로벌 조명(GlobalFocusLights) 세팅</td>
+          <td>프론트엔드</td>
+          <td>100%</td>
+          <td class="status-done">완료</td>
+        </tr>
+        <tr>
+          <td>2.2</td>
+          <td>CyberSpace Environment</td>
+          <td>바닥 반사(MeshReflectorMaterial), 벽체, 네온 조명, Post-processing(Bloom) 적용</td>
+          <td>프론트엔드</td>
+          <td>100%</td>
+          <td class="status-done">완료</td>
+        </tr>
+        <tr>
+          <td>2.3</td>
+          <td>장비 및 에셋 배치 시스템</td>
+          <td>랙 생성, 크기 조절, 충돌 감지, 배치 알고리즘(드래그 앤 드롭) 구현</td>
+          <td>프론트엔드</td>
+          <td>100%</td>
+          <td class="status-done">완료</td>
+        </tr>
+        <tr>
+          <td>2.4</td>
+          <td>커스텀 에셋 임포터</td>
+          <td>GLTF/GLB 파일 파싱 및 사용자 정의 에셋(책상, 파티션 등) 배치 기능 구현</td>
+          <td>프론트엔드</td>
+          <td>100%</td>
+          <td class="status-done">완료</td>
+        </tr>
+
+        <!-- Phase 3 -->
+        <tr class="phase">
+          <td>3.0</td>
+          <td colspan="5">모델 관리 및 이미지 합성 파이프라인</td>
+        </tr>
+        <tr>
+          <td>3.1</td>
+          <td>장비 모델 및 섀시 시스템 구축</td>
+          <td>기본 모델 18종 내장, 커스텀 모델 CRUD 로직 및 Variant(타입) 시스템 설계</td>
+          <td>프론트엔드</td>
+          <td>100%</td>
+          <td class="status-done">완료</td>
+        </tr>
+        <tr>
+          <td>3.2</td>
+          <td>장비 구성 모달 (Equipment Assembly)</td>
+          <td>슬롯 기반 카드 삽입/제거 인터랙션 UI (Uniform, Mixed, Row-based 레이아웃)</td>
+          <td>프론트엔드</td>
+          <td>100%</td>
+          <td class="status-done">완료</td>
+        </tr>
+        <tr>
+          <td>3.3</td>
+          <td>자동 썸네일 합성 (WebP/SVG)</td>
+          <td>구성된 섀시 카드를 기반으로 SVG를 조합하고 IndexedDB에 WebP 캐싱 처리 파이프라인 개발</td>
+          <td>프론트엔드</td>
+          <td>100%</td>
+          <td class="status-done">완료</td>
+        </tr>
+
+        <!-- Phase 4 -->
+        <tr class="phase">
+          <td>4.0</td>
+          <td colspan="5">포트 맵핑 및 AI 비전 마법사</td>
+        </tr>
+        <tr>
+          <td>4.1</td>
+          <td>포트 맵핑 에디터 뷰</td>
+          <td>SVG 기반 장비 외관 랜더링 및 인터랙티브 포트 클릭/매핑 기능 구현</td>
+          <td>프론트엔드</td>
+          <td>100%</td>
+          <td class="status-done">완료</td>
+        </tr>
+        <tr>
+          <td>4.2</td>
+          <td>AI 비전 매핑 자동화</td>
+          <td>이미지 자르기(Perspective) 툴 구현 및 Gemini AI API 연동으로 자동 포트 감지</td>
+          <td>AI/프론트</td>
+          <td>100%</td>
+          <td class="status-done">완료</td>
+        </tr>
+
+        <!-- Phase 5 -->
+        <tr class="phase">
+          <td>5.0</td>
+          <td colspan="5">성능 최적화 및 안정화 (Optimization)</td>
+        </tr>
+        <tr>
+          <td>5.1</td>
+          <td>렌더링 깜빡임/프리즈 해결</td>
+          <td>비동기 렌더링 Lock Manager 도입, EffectComposer 상시 마운트 전환 등 셰이더 컴파일 병목 해결</td>
+          <td>프론트엔드</td>
+          <td>100%</td>
+          <td class="status-done">완료</td>
+        </tr>
+        <tr>
+          <td>5.2</td>
+          <td>대규모 데이터 렌더링 (샘플 데이터)</td>
+          <td>200~500대 장비 난수 배치 (결정론적 알고리즘) 및 R3F 드로우콜 최적화</td>
+          <td>프론트엔드</td>
+          <td>100%</td>
+          <td class="status-done">완료</td>
+        </tr>
+        <tr>
+          <td>5.3</td>
+          <td>빌드 오류 픽스 (TypeScript)</td>
+          <td>verbatimModuleSyntax 등 빌드 시 발생하는 TS 에러, 린트(Lint) 경고 모두 수정</td>
+          <td>프론트엔드</td>
+          <td>100%</td>
+          <td class="status-done">완료</td>
+        </tr>
+
+        <!-- Phase 6 -->
+        <tr class="phase">
+          <td>6.0</td>
+          <td colspan="5">배포 및 문서화 (Deployment & Docs)</td>
+        </tr>
+        <tr>
+          <td>6.1</td>
+          <td>사용자 문서 작성</td>
+          <td>기능명세서, 화면설계서, 완료보고서 HTML 퍼블리싱</td>
+          <td>기획/개발</td>
+          <td>100%</td>
+          <td class="status-done">완료</td>
+        </tr>
+        <tr>
+          <td>6.2</td>
+          <td>오픈소스/독립 환경 분리 (arcVRoom)</td>
+          <td>독립 3D 환경 에디터 라우트 분리 및 최종 테스트</td>
+          <td>프론트엔드</td>
+          <td>100%</td>
+          <td class="status-done">완료</td>
+        </tr>
+        <tr>
+          <td>6.3</td>
+          <td>Vercel/Production 배포</td>
+          <td>프로덕션 빌드 (npm run build) 검증 및 정적 호스팅 배포 연동</td>
+          <td>DevOps</td>
+          <td>100%</td>
+          <td class="status-done">완료</td>
+        </tr>
+        <!-- Phase 7 -->
+        <tr class="phase">
+          <td>7.0</td>
+          <td colspan="5">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span>백엔드 연동 및 운영 환경 인프라 구축 (Backend & Infra)</span>
+              <a href="arcVRack_deployment_roadmap.html" target="_blank"
+                style="font-size: 11px; background: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 2px 8px; border-radius: 4px; text-decoration: none;">로드맵
+                ↗</a>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td>7.1</td>
+          <td>백엔드 아키텍처 및 DB 설계</td>
+          <td>Node.js/Python 등 스택 선정 및 PostgreSQL/MongoDB 스키마(계층형 트리) 모델링</td>
+          <td>백엔드</td>
+          <td>0%</td>
+          <td class="status-todo">대기</td>
+        </tr>
+        <tr>
+          <td>7.2</td>
+          <td>API 명세 및 마이그레이션</td>
+          <td>장비 모델, 랙 좌표, 포트 맵핑 API 설계 및 IndexedDB를 Server 연동으로 교체</td>
+          <td>풀스택</td>
+          <td>0%</td>
+          <td class="status-todo">대기</td>
+        </tr>
+        <tr>
+          <td>7.3</td>
+          <td>인증/인가 보안 및 스토리지</td>
+          <td>JWT 기반 로그인, 관리자/뷰어 권한 분리 및 커스텀 모델 S3 스토리지 연동</td>
+          <td>백엔드</td>
+          <td>0%</td>
+          <td class="status-todo">대기</td>
+        </tr>
+        <tr>
+          <td>7.4</td>
+          <td>프로덕션 CI/CD 및 부하 테스트</td>
+          <td>AWS 등 클라우드 인프라 구축, 자동 배포 파이프라인 구성 및 대용량 트래픽 최적화</td>
+          <td>DevOps</td>
+          <td>0%</td>
+          <td class="status-todo">대기</td>
+        </tr>
+
+        <!-- Phase 8 -->
+        <tr class="phase">
+          <td>8.0</td>
+          <td colspan="5">향후 추가 개발 필요 항목 (Future Enhancements)</td>
+        </tr>
+        <tr>
+          <td>8.1</td>
+          <td>장비 간 케이블 연결 렌더링</td>
+          <td>포트 매핑 데이터를 기반으로 장비 간 물리적 통신선/전원선 SVG(곡선) 시각화 및 라우팅 로직</td>
+          <td>프론트엔드</td>
+          <td>0%</td>
+          <td class="status-todo">대기</td>
+        </tr>
+        <tr>
+          <td>8.2</td>
+          <td>실시간 공간 협업 에디터</td>
+          <td>백엔드 웹소켓 통신을 이용해 여러 사용자가 동시에 3D 랙과 장비를 배치할 수 있는 기능</td>
+          <td>풀스택</td>
+          <td>0%</td>
+          <td class="status-todo">대기</td>
+        </tr>
+        <tr>
+          <td>8.3</td>
+          <td>고급 대시보드 통계</td>
+          <td>전산실 내 유휴 자원(U공간), 소모 전력량 시뮬레이션 및 데이터 시각화 차트</td>
+          <td>프론트엔드</td>
+          <td>0%</td>
+          <td class="status-todo">대기</td>
+        </tr>
+        <tr>
+          <td>8.4</td>
+          <td>전산실 온도 3D 시각화 (Thermal Map)</td>
+          <td>장비 및 랙 단위의 발열/온도 데이터를 연동하여 3D 공간 상에 히트맵(Heatmap) 형태로 시각화</td>
+          <td>프론트엔드</td>
+          <td>0%</td>
+          <td class="status-todo">대기</td>
+        </tr>
+
+      </tbody>
+    </table>
+
+    <div style="margin-top: 40px; text-align: center; color: var(--text-muted); font-size: 14px;">
+      ArcVRack 3D Infrastructure Management System<br>
+      © 2026 STN AI연구소 서비스기획팀
+    </div>
+  </div>
+</body>
+
+</html>

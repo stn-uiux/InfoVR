@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ArcVRack 백엔드 연동 및 배포 로드맵</title>
+  <style>
+    :root {
+      --primary: #3b82f6;
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.3;
+      margin: 0;
+      padding: 16px 12px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      font-size: 20px;
+      margin-top: 0;
+      padding-bottom: 8px;
+      margin-bottom: 8px;
+      border-bottom: 2px solid var(--border);
+      color: var(--primary);
+    }
+
+    h2 {
+      font-size: 20px;
+      margin-top: 40px;
+      margin-bottom: 16px;
+      color: #e2e8f0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+
+    .phase-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .phase-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .phase-badge {
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+      padding: 4px 12px;
+      border-radius: 16px;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .phase-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #93c5fd;
+      margin: 0;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    li {
+      margin-bottom: 8px;
+      color: #cbd5e1;
+    }
+
+    .callout {
+      background: rgba(245, 158, 11, 0.1);
+      border-left: 4px solid #fbbf24;
+      padding: 12px;
+      border-radius: 0 8px 8px 0;
+      margin: 16px 0;
+    }
+
+    .callout-title {
+      font-weight: 700;
+      color: #fbbf24;
+      margin-bottom: 8px;
+      display: block;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>🚀 백엔드 연동 및 프로덕션 배포 로드맵</h1>
+    <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 16px;">
+      현재 ArcVRack은 프론트엔드 중심(Zustand + IndexedDB)으로 완성된 상태입니다.<br>
+      이 문서는 실제 운영(Production) 환경 배포 전까지 <strong>백엔드를 어떻게 구축하고 연동해야 하는지</strong>에 대한 단계별 가이드입니다.
+    </div>
+
+    <div class="callout">
+      <span class="callout-title">현재 데이터 흐름의 한계</span>
+      사용자의 모든 3D 공간 배치, 장비 모델, 포트 연결 데이터가 브라우저 로컬 스토리지(IndexedDB)에 저장되어 있습니다. <br>다른 사용자와 공유하거나 다른 PC에서 접속하려면 반드시 백엔드 중앙
+      데이터베이스 연동이 필요합니다.
+    </div>
+
+    <div class="phase-card">
+      <div class="phase-header">
+        <span class="phase-badge">Phase 1</span>
+        <h3 class="phase-title">백엔드 아키텍처 설계 및 기술 스택 선정</h3>
+      </div>
+      <ul>
+        <li><strong>언어 및 프레임워크 선정:</strong> Node.js(NestJS, Express), Python(FastAPI), Java(Spring Boot) 등 팀의 주력 스택 결정.
+        </li>
+        <li><strong>데이터베이스 선정:</strong> 계층형 트리 데이터(전산실 구조)와 JSON 구조(3D 위치 데이터, 장비 커스텀 메타데이터)를 다루기 좋은 PostgreSQL(추천) 또는
+          MongoDB 선정.</li>
+        <li><strong>인증(Auth) 시스템 설계:</strong> JWT(JSON Web Token) 기반의 로그인 및 사용자/권한 관리(관리자 vs 조회용 뷰어) 체계 설계.</li>
+      </ul>
+    </div>
+
+    <div class="phase-card">
+      <div class="phase-header">
+        <span class="phase-badge">Phase 2</span>
+        <h3 class="phase-title">API 명세 설계 및 데이터베이스 스키마 모델링</h3>
+      </div>
+      <ul>
+        <li><strong>RESTful API 또는 GraphQL 설계:</strong> Swagger를 이용해 장비 모델 CRUD, 랙 배치 좌표 저장, 포트 맵핑 저장 API 명세서 작성.</li>
+        <li><strong>데이터 모델링(스키마):</strong> 프론트엔드의 <code>types.ts</code> (HierarchyNode, Rack, RegisteredDevice 등)를 백엔드
+          ORM Entity(Prisma, TypeORM 등)로 매핑.</li>
+        <li><strong>이미지 스토리지:</strong> 사용자 업로드 커스텀 3D 모델(GLB)과 썸네일(WebP) 이미지를 저장할 AWS S3 버킷 또는 MinIO 스토리지 구성.</li>
+      </ul>
+    </div>
+
+    <div class="phase-card">
+      <div class="phase-header">
+        <span class="phase-badge">Phase 3</span>
+        <h3 class="phase-title">프론트엔드 데이터 통신(API 연동) 마이그레이션</h3>
+      </div>
+      <ul>
+        <li><strong>API 클라이언트 세팅:</strong> Axios 또는 React Query(TanStack Query)를 도입하여 서버 데이터 패칭 및 캐싱 층 구축.</li>
+        <li><strong>Zustand 스토어 개편:</strong> 기존 IndexedDB에 직접 읽고 쓰던 로직을 API 호출 결과로 상태를 업데이트하도록 변경 (비동기 통신 로직 추가).</li>
+        <li><strong>초기 데이터 로딩 최적화:</strong> <code>InitialLoader.tsx</code>에서 백엔드의 대용량 서버룸 및 장비 데이터를 청크(Chunk) 단위로 불러와
+          R3F 씬에 렌더링하도록 수정.</li>
+      </ul>
+    </div>
+
+    <div class="phase-card">
+      <div class="phase-header">
+        <span class="phase-badge">Phase 4</span>
+        <h3 class="phase-title">인증/인가 및 보안 (Security & Auth)</h3>
+      </div>
+      <ul>
+        <li><strong>로그인 페이지 구현:</strong> 시스템 진입 전 인증을 위한 로그인 화면 추가.</li>
+        <li><strong>권한 분리 (Role-based Access):</strong> 일반 뷰어(View Mode)는 3D 뷰 및 조회만 가능하고, 관리자(Admin)만 에디트 모드(Edit
+          Mode)를 활성화할 수 있도록 프론트엔드 라우트 가드(Route Guard) 적용.</li>
+        <li><strong>API 보안:</strong> 모든 API 요청에 Bearer Token 추가 및 백엔드 인가 로직 점검.</li>
+      </ul>
+    </div>
+
+    <div class="phase-card">
+      <div class="phase-header">
+        <span class="phase-badge">Phase 5</span>
+        <h3 class="phase-title">테스트 및 프로덕션 환경 구축 (CI/CD)</h3>
+      </div>
+      <ul>
+        <li><strong>클라우드 인프라 세팅:</strong> AWS (EC2/EKS) 또는 Vercel (Front) + Render/Heroku (Back) 형태의 인프라 구성.</li>
+        <li><strong>CI/CD 파이프라인:</strong> GitHub Actions 등을 통해 main 브랜치 푸시 시 자동 빌드 및 배포되도록 구성.</li>
+        <li><strong>부하 테스트 (Load Testing):</strong> 서버룸 1개당 수백 대의 장비(JSON 데이터)를 클라이언트로 내려줄 때의 트래픽 및 API 응답 속도 최적화 점검.
+        </li>
+      </ul>
+    </div>
+
+    <div style="margin-top: 40px; text-align: center; color: var(--text-muted); font-size: 14px;">
+      ArcVRack 3D Infrastructure Management System<br>
+      © 2026 STN AI연구소 서비스기획팀
+    </div>
+  </div>
+</body>
+
+</html>
