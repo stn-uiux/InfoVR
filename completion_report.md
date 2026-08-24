@@ -1,4 +1,4 @@
-# 🚀 ArcVRack 프로젝트 완료 보고서
+# 🚀 ArcVRack 프로젝트 진행 보고서
 
 **작성일자:** 2026년 8월 19일  
 **프로젝트명:** ArcVRack (3D Server Room Architecture)  
@@ -97,7 +97,7 @@
 | **포트맵핑 마법사** | AI 비전 기반 포트 영역 매핑 독립 페이지 (`/port-wizard`) |
 | **arcVRoom** | 범용 3D 공간 에디터 독립 페이지 (`/arcVRoom`) |
 | **기능명세서.md** | 전체 기능 상세 명세 문서 (v1.5) |
-| **completion_report.md** | 프로젝트 완료 보고서 (본 문서) |
+| **progress_report.md** | 프로젝트 진행 보고서 (본 문서) |
 | **README.md** | 프로젝트 소개 및 기술 문서 |
 
 ---

@@ -124,7 +124,7 @@ const DocsDropdown = () => {
           <div className="docs-dropdown-header">관련 문서 (Docs)</div>
           <a href="/docs/arcVRack_feature_summary.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:document-one-page-24-regular" /> 기능명세서</a>
           <a href="/docs/arcVRack_ui_design_spec.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:design-ideas-24-regular" /> 화면 설계서</a>
-          <a href="/docs/completion_report.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:document-checkmark-24-regular" /> 완료보고서</a>
+          <a href="/docs/progress_report.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:document-checkmark-24-regular" /> 진행보고서</a>
           <a href="/docs/arcVRack_wbs.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:calendar-ltr-24-regular" /> 개발 WBS</a>
           <a href="/docs/arcVRack_deployment_roadmap.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:rocket-24-regular" /> 배포 로드맵</a>
         </div>
@@ -266,7 +266,7 @@ function App() {
   const { active, progress, total } = useProgress();
   const isCanvasReady = useStore((s) => s.isCanvasReady);
   const pendingComposerTasks = useComposerTaskProgress();
-  
+
   // 3D 렌더링 및 썸네일 합성 등의 작업이 진행 중인지 여부
   const is3DLoading = !isCanvasReady || active || pendingComposerTasks > 0;
 
