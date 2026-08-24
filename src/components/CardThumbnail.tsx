@@ -6,6 +6,25 @@ interface CardThumbnailProps extends React.ImgHTMLAttributes<HTMLImageElement> {
 }
 
 const cache = new Map<string, string>();
+const fetchPromises = new Map<string, Promise<string>>();
+
+export const preloadThumbnail = (svgUrl: string) => {
+  if (!svgUrl || cache.has(svgUrl) || fetchPromises.has(svgUrl)) return;
+  const promise = fetch(svgUrl)
+    .then(r => r.text())
+    .then(text => {
+      const styleTag = "<style>#ports-layer { display: none !important; }</style>";
+      const injected = text.replace("</svg>", `${styleTag}</svg>`);
+      const url = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(injected)))}`;
+      cache.set(svgUrl, url);
+      return url;
+    })
+    .catch(err => {
+      console.error("Failed to preload SVG:", err);
+      return svgUrl;
+    });
+  fetchPromises.set(svgUrl, promise);
+};
 
 export const CardThumbnail: React.FC<CardThumbnailProps> = ({ svgUrl, svgRaw, ...props }) => {
   const [dataUrl, setDataUrl] = useState<string>(svgUrl || "");
@@ -27,20 +46,27 @@ export const CardThumbnail: React.FC<CardThumbnailProps> = ({ svgUrl, svgRaw, ..
     }
 
     let active = true;
-    fetch(svgUrl)
-      .then(r => r.text())
-      .then(text => {
-        if (!active) return;
-        const styleTag = "<style>#ports-layer { display: none !important; }</style>";
-        const injected = text.replace("</svg>", `${styleTag}</svg>`);
-        const url = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(injected)))}`;
-        cache.set(svgUrl, url);
-        setDataUrl(url);
-      })
-      .catch(err => {
-        console.error("Failed to inject style into SVG:", err);
-        if (active) setDataUrl(svgUrl); // fallback
-      });
+
+    if (!fetchPromises.has(svgUrl)) {
+      const promise = fetch(svgUrl)
+        .then(r => r.text())
+        .then(text => {
+          const styleTag = "<style>#ports-layer { display: none !important; }</style>";
+          const injected = text.replace("</svg>", `${styleTag}</svg>`);
+          const url = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(injected)))}`;
+          cache.set(svgUrl, url);
+          return url;
+        })
+        .catch(err => {
+          console.error("Failed to inject style into SVG:", err);
+          return svgUrl; // fallback
+        });
+      fetchPromises.set(svgUrl, promise);
+    }
+
+    fetchPromises.get(svgUrl)!.then((url) => {
+      if (active) setDataUrl(url);
+    });
 
     return () => { active = false; };
   }, [svgUrl, svgRaw]);

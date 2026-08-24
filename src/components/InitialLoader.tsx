@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useProgress } from "@react-three/drei";
 import { useStore } from "../store/useStore";
 import { useComposerTaskProgress } from "../hooks/useSvgComposer";
+import { preloadThumbnail } from "./CardThumbnail";
+import { cardDefinitions, equipmentModels } from "../utils/cardAssets";
 
 export const InitialLoader = () => {
   const { active, progress, total } = useProgress();
@@ -15,6 +17,13 @@ export const InitialLoader = () => {
   useEffect(() => {
     if (total > 0 || active) setHasStarted(true);
   }, [total, active]);
+
+  // Preload all thumbnails
+  useEffect(() => {
+    cardDefinitions.forEach((cd) => {
+      if (cd.svgUrl) preloadThumbnail(cd.svgUrl);
+    });
+  }, []);
 
   useEffect(() => {
     if (isReady) return;

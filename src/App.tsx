@@ -1,7 +1,7 @@
 import React, { useRef, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Icon } from "@iconify/react";
-import { Loader } from "@react-three/drei";
+import { Loader, useProgress } from "@react-three/drei";
 import { Scene } from "./components/Scene";
 import { DevicePanel } from "./components/DevicePanel";
 import { DashboardWidgets } from "./components/DashboardWidgets";
@@ -35,6 +35,7 @@ const ModelRegistrationModal = React.lazy(() =>
 );
 import { useTheme } from "./contexts/ThemeContext";
 import { useStore } from "./store/useStore";
+import { useComposerTaskProgress } from "./hooks/useSvgComposer";
 import {
   sampleRacks,
   sampleRegisteredDevices,
@@ -262,7 +263,15 @@ function App() {
     importExportModalRackId !== null ||
     selectedDeviceId !== null;
 
+  const { active, progress, total } = useProgress();
+  const isCanvasReady = useStore((s) => s.isCanvasReady);
+  const pendingComposerTasks = useComposerTaskProgress();
+  
+  // 3D 렌더링 및 썸네일 합성 등의 작업이 진행 중인지 여부
+  const is3DLoading = !isCanvasReady || active || pendingComposerTasks > 0;
+
   const loadSample = () => {
+    // 3D 리렌더링 트리거
     loadState(sampleRacks, undefined, sampleRegisteredDevices, sampleNodes);
   };
 
@@ -458,17 +467,17 @@ function App() {
               />
 
               <button
-                className={`comm-btn comm-btn-md ${isDirty ? "comm-btn-primary" : "comm-btn-secondary"}`}
+                className={`comm-btn comm-btn-md ${isDirty && !(isSyncingPorts || is3DLoading) ? "comm-btn-primary" : "comm-btn-secondary"}`}
                 onClick={saveChanges}
-                disabled={!isDirty || isSyncingPorts}
+                disabled={!isDirty || isSyncingPorts || is3DLoading}
                 title={isDirty ? "Save Unsaved Changes" : "No Changes to Save"}
                 style={{
-                  opacity: isDirty ? 1 : 0.5,
-                  cursor: isDirty ? "pointer" : "not-allowed",
+                  opacity: (isDirty && !(isSyncingPorts || is3DLoading)) ? 1 : 0.5,
+                  cursor: (isDirty && !(isSyncingPorts || is3DLoading)) ? "pointer" : "not-allowed",
                   transition: "all 0.2s ease",
                 }}
               >
-                {isSyncingPorts ? (
+                {isSyncingPorts || is3DLoading ? (
                   <>
                     <Icon icon="line-md:loading-twotone-loop" className="icon" />
                     배치 중...
