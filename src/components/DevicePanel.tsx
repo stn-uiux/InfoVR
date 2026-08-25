@@ -104,6 +104,7 @@ export const DevicePanel = () => {
   const focusRack = useStore((s) => s.focusRack);
   const showToast = useStore((s) => s.showToast);
   const findExistingMount = useStore((s) => s.findExistingMount);
+  const moveDeviceInRack = useStore((s) => (s as any).moveDeviceInRack);
   const rack = useMemo(
     () => racks.find((r) => r.rackId === selectedRackId),
     [racks, selectedRackId],
@@ -126,6 +127,8 @@ export const DevicePanel = () => {
   );
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isDeleteRackModalOpen, setIsDeleteRackModalOpen] = useState(false);
+  const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
+
   // Filter & Sort state for add-device modal
   const [showUnmountedOnly, setShowUnmountedOnly] = useState(false);
   const [sortKey, setSortKey] = useState<
@@ -312,6 +315,41 @@ export const DevicePanel = () => {
     const SLOT_MARGIN = 2;
     const TOTAL_SLOT_HEIGHT = SLOT_HEIGHT + SLOT_MARGIN;
 
+    const handleDragStart = (e: React.DragEvent, deviceId: string) => {
+      e.dataTransfer.setData("application/json", JSON.stringify({ type: "device", deviceId }));
+      e.dataTransfer.effectAllowed = "move";
+    };
+
+    const handleDragOver = (e: React.DragEvent, slot: number) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      if (dragOverSlot !== slot) {
+        setDragOverSlot(slot);
+      }
+    };
+
+    const handleDragLeave = (e: React.DragEvent, slot: number) => {
+      if (dragOverSlot === slot) {
+        setDragOverSlot(null);
+      }
+    };
+
+    const handleDrop = (e: React.DragEvent, slot: number) => {
+      e.preventDefault();
+      setDragOverSlot(null);
+      try {
+        const data = JSON.parse(e.dataTransfer.getData("application/json"));
+        if (data.type === "device" && data.deviceId && rack) {
+          const result = moveDeviceInRack(rack.rackId, data.deviceId, slot);
+          if (!result.success) {
+            showToast(result.reason || "이동할 수 없습니다.", "error");
+          }
+        }
+      } catch (err) {
+        // ignore
+      }
+    };
+
     const usedSlots = new Set<number>();
     rack.devices.forEach((d) => {
       for (let i = 0; i < d.size; i++) {
@@ -352,17 +390,23 @@ export const DevicePanel = () => {
           : UNIFIED_DEVICE_BORDER;
 
         const isHighlighted = highlightedDeviceId === device.itemId;
+        const isDragOver = dragOverSlot === u;
 
         rendered.push(
           <div
             key={`dev-${u}`}
             className={`device-tile ${hasError ? "has-error" : ""} ${isHighlighted ? "is-highlighted" : ""}`}
+            draggable={isEditMode}
+            onDragStart={isEditMode ? (e) => handleDragStart(e, device.itemId) : undefined}
+            onDragOver={isEditMode ? (e) => handleDragOver(e, u) : undefined}
+            onDragLeave={isEditMode ? (e) => handleDragLeave(e, u) : undefined}
+            onDrop={isEditMode ? (e) => handleDrop(e, u) : undefined}
             style={{
               height: `${heightPx}px`,
-              backgroundColor: bg,
+              backgroundColor: isDragOver ? "var(--bg-hover)" : bg,
               border: hasError
                 ? "2px solid var(--severity-critical)"
-                : `1px solid ${borderColor}`,
+                : `1px solid ${isDragOver ? "var(--theme-primary)" : borderColor}`,
             }}
             onClick={() => {
               selectDevice(device.itemId);
@@ -518,17 +562,25 @@ export const DevicePanel = () => {
           </div>,
         );
       } else if (!occupied) {
+        const isDragOver = dragOverSlot === u;
         rendered.push(
           <div
             key={`empty-${u}`}
             onClick={() => isEditMode && openAddModal(u)}
+            onDragOver={isEditMode ? (e) => handleDragOver(e, u) : undefined}
+            onDragLeave={isEditMode ? (e) => handleDragLeave(e, u) : undefined}
+            onDrop={isEditMode ? (e) => handleDrop(e, u) : undefined}
             style={{
               height: `${SLOT_HEIGHT}px`,
               borderBottom: "1px solid var(--border-weak)",
               display: "flex",
               alignItems: "center",
               cursor: isEditMode ? "pointer" : "default",
-              backgroundColor: isEditMode ? "var(--severity-success-bg)" : "transparent",
+              backgroundColor: isDragOver 
+                ? "var(--severity-success-bg)" 
+                : isEditMode 
+                  ? "var(--severity-success-bg-muted, transparent)" 
+                  : "transparent",
               transition: "background 0.1s",
               marginBottom: "2px",
               borderRadius: "var(--radius-sm)",

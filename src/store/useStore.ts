@@ -2164,6 +2164,65 @@ export const useStore = create<AppState>()(
         });
       },
 
+      moveDeviceInRack: (rackId: string, deviceId: string, newPosition: number) => {
+        const { racks, isEditMode, pushUndoState } = get();
+        const rack = racks.find((r) => r.rackId === rackId);
+        if (!rack) return { success: false, reason: "Rack not found" };
+
+        const targetDevice = rack.devices.find((d) => d.itemId === deviceId || d.deviceId === deviceId);
+        if (!targetDevice) return { success: false, reason: "Device not found" };
+
+        if (
+          newPosition < 1 ||
+          newPosition + targetDevice.size - 1 > rack.rackSize
+        ) {
+          return { success: false, reason: "랙 높이를 초과하여 배치할 수 없습니다." };
+        }
+
+        const collision = rack.devices.find((d) => {
+          if (d.itemId === targetDevice.itemId) return false;
+          const dStart = d.position;
+          const dEnd = d.position + d.size - 1;
+          const newStart = newPosition;
+          const newEnd = newPosition + targetDevice.size - 1;
+          return dStart <= newEnd && dEnd >= newStart;
+        });
+
+        if (collision) {
+          return { success: false, reason: `"${collision.title}" 장비와 겹칩니다.` };
+        }
+
+        if (isEditMode) pushUndoState();
+
+        set((state) => {
+          const updateRacksList = (rList: Rack[]) =>
+            rList.map((r) =>
+              r.rackId === rackId
+                ? {
+                  ...r,
+                  devices: r.devices.map(d =>
+                    d.itemId === targetDevice.itemId ? { ...d, position: newPosition } : d
+                  ),
+                }
+                : r,
+            );
+
+          const updatedRacks = updateRacksList(state.racks);
+          const updatedLayouts = { ...state.layouts };
+          for (const [nid, layout] of Object.entries(updatedLayouts)) {
+            if (layout.racks?.some((r) => r.rackId === rackId)) {
+              updatedLayouts[nid] = {
+                ...layout,
+                racks: updateRacksList(layout.racks),
+              };
+            }
+          }
+          return { racks: updatedRacks, layouts: updatedLayouts };
+        });
+
+        return { success: true };
+      },
+
       updateRack: (id, updates) => {
         const { isEditMode, pushUndoState } = get();
         if (isEditMode) pushUndoState();

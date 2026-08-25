@@ -20,9 +20,8 @@ interface ModelCheck {
 }
 
 export const isChassisModel = (modelName: string): boolean => {
-  const customModels = useStore.getState().customModels;
-  const model = customModels.find(m => m.modelName === modelName) || 
-                equipmentModels.find(m => m.modelName === modelName);
+  const custom = findCustomModelByName(modelName);
+  const model = custom || equipmentModels.find(m => m.modelName === modelName);
   
   if (!model) return false;
   return Boolean((model as ModelCheck).cardArea || (model as ModelCheck).slots || (model as ModelCheck).rows);
