@@ -128,12 +128,232 @@
 .device-modal-content {
   background-color: var(--modal-bg);
   border-radius: var(--radius-lg);
-  width: 940px;
+  width: 1200px;
   border: 1px solid var(--modal-border);
   box-shadow: var(--elevation-3);
   max-height: 90vh;
   display: flex;
+  flex-direction: row;
+}
+
+.device-modal-main {
+  flex: 1;
+  display: flex;
   flex-direction: column;
+  min-width: 0;
+}
+
+/* ─── Performance Widget Layout ─── */
+.device-modal-perf-sidebar {
+  width: 320px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--modal-border);
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  overflow-y: auto;
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+}
+
+.perf-widget-header {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.perf-widget-item {
+  margin-bottom: 18px;
+}
+
+.perf-widget-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.perf-widget-value {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.perf-widget-bar-bg {
+  height: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.perf-widget-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--theme-primary), var(--theme-secondary));
+  border-radius: 4px;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.perf-widget-bar-fill.warning {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+.perf-widget-bar-fill.critical {
+  background: linear-gradient(90deg, #e03131, #ff6b6b);
+}
+
+.perf-widget-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.perf-widget-box {
+  background: var(--bg-tertiary);
+  padding: 12px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--border-weak);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.perf-widget-box:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--elevation-2);
+}
+
+.perf-widget-box-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.perf-widget-box-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.perf-widget-status-indicator {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.perf-widget-status-indicator.up {
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
+.perf-widget-status-indicator.down {
+  background: #e03131;
+  box-shadow: 0 0 8px rgba(224, 49, 49, 0.6);
+}
+
+/* ─── Gauge Chart ─── */
+.perf-gauge-wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-tertiary);
+  padding: 16px 20px;
+  border-radius: 8px;
+  border: 1px solid var(--border-weak);
+  gap: 12px;
+}
+
+.perf-gauge-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 1px solid var(--border-weak);
+  padding-bottom: 8px;
+}
+
+.perf-gauge-label {
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.perf-gauge-title-right {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.perf-gauge-content-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.perf-gauge-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  padding-left: 20px;
+}
+
+.perf-gauge-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.perf-gauge-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.perf-gauge-unit {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.perf-gauge-chart-area {
+  position: relative;
+  width: 120px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.perf-gauge {
+  width: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2));
+}
+
+.perf-gauge-inner-text {
+  position: absolute;
+  top: 70%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.perf-gauge-inner-val {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.perf-gauge-inner-unit {
+  font-size: 11px;
+  color: var(--text-secondary);
 }
 
 .device-modal {

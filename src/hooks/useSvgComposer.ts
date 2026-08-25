@@ -890,3 +890,38 @@ export async function generateComposedSvgAsync(
   
   return new XMLSerializer().serializeToString(baseDoc);
 }
+
+export async function preloadAllChassisThumbnails() {
+  const { equipmentModels } = await import("../utils/cardAssets");
+  const { idbStorage } = await import("../utils/indexedDBStorage");
+  const { convertSvgToPngAsync } = await import("../utils/imageUtils");
+  
+  for (const model of equipmentModels) {
+    if (model.cardArea || model.slots || model.rows) {
+      const modelLayoutKey = JSON.stringify({
+        cardArea: model.cardArea,
+        rowHeights: undefined,
+        rowGaps: undefined,
+        rowColumns: undefined,
+      });
+      const cacheKeyFront = `${model.modelName}::front::${modelLayoutKey}::::::`;
+      const webpCacheKeyFront = `webp::${cacheKeyFront}`;
+      
+      const savedFront = await idbStorage.getItem(webpCacheKeyFront);
+      if (!savedFront) {
+        withComposerTask(async () => {
+          try {
+            const svgHtml = await generateComposedSvgAsync(model.modelName, model as any, [], [], "front");
+            if (svgHtml) {
+              const url = await convertSvgToPngAsync(svgHtml, model.equipmentSize?.width || 984, model.equipmentSize?.height || 200);
+              await idbStorage.setItem(webpCacheKeyFront, url);
+              _webpUrlCache.set(webpCacheKeyFront, url);
+            }
+          } catch (e) {
+            console.error("Failed to preload chassis thumbnail:", e);
+          }
+        });
+      }
+    }
+  }
+}

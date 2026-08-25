@@ -22,7 +22,9 @@ async function inlineImagesInSvg(svgRaw: string): Promise<string> {
         img.setAttribute("href", base64Url);
         img.removeAttribute("xlink:href");
       } catch (err) {
-        console.error("Failed to inline image:", href, err);
+        console.error("Failed to inline image, removing to prevent hanging:", href, err);
+        // Remove the image element completely so the browser doesn't try to load it and hang
+        img.remove();
       }
     }
   }

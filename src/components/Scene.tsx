@@ -32,11 +32,30 @@ class EnvironmentErrorBoundary extends React.Component<
 }
 
 /** Wraps <Environment> so a failed HDR fetch doesn't crash the scene */
-const EnvironmentSafe = (props: { preset: string }) => (
-  <EnvironmentErrorBoundary>
-    <Environment preset={props.preset as any} />
-  </EnvironmentErrorBoundary>
-);
+const EnvironmentSafe = (props: { preset: string }) => {
+  const [isOffline, setIsOffline] = React.useState(!navigator.onLine);
+
+  React.useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  if (isOffline) return null;
+
+  return (
+    <EnvironmentErrorBoundary>
+      <Suspense fallback={null}>
+        <Environment preset={props.preset as any} />
+      </Suspense>
+    </EnvironmentErrorBoundary>
+  );
+};
 
 interface CameraControlsRef {
   target: Vector3;
@@ -61,6 +80,9 @@ const SceneReadyMonitor = ({ isReadyToMonitor }: { isReadyToMonitor: boolean }) 
   const setCanvasReady = useStore((s) => s.setCanvasReady);
   const frameCount = useRef(0);
   const activeRef = useRef(false);
+  // 최초 1회 canvas ready 달성 후에는 절대 false로 돌리지 않음
+  // → 샘플 데이터 로드 등 후속 텍스처 로딩 시 암전 방지
+  const hasBeenReadyOnce = useRef(false);
 
   useEffect(() => {
     const origStart = DefaultLoadingManager.onStart;
@@ -88,6 +110,9 @@ const SceneReadyMonitor = ({ isReadyToMonitor }: { isReadyToMonitor: boolean }) 
   }, []);
 
   useFrame(() => {
+    // 이미 한 번 ready가 된 적이 있으면, 후속 로딩에서는 false로 되돌리지 않음
+    if (hasBeenReadyOnce.current) return;
+
     // If not ready to monitor, or if ThreeJS is still actively loading textures/models, reset.
     if (!isReadyToMonitor || activeRef.current) {
       frameCount.current = 0;
@@ -101,6 +126,7 @@ const SceneReadyMonitor = ({ isReadyToMonitor }: { isReadyToMonitor: boolean }) 
       frameCount.current++;
       if (frameCount.current === 5 && !useStore.getState().isCanvasReady) {
         setCanvasReady(true);
+        hasBeenReadyOnce.current = true;
       }
     }
   });

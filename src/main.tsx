@@ -24,6 +24,8 @@ createRoot(document.getElementById("root")!).render(
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<App />} />
+          <Route path="/arcVRoom" element={<App />} />
+          <Route path="/arcVRoom/" element={<App />} />
           <Route
             path="/port-wizard"
             element={
@@ -32,6 +34,7 @@ createRoot(document.getElementById("root")!).render(
               </Suspense>
             }
           />
+          <Route path="*" element={<App />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>

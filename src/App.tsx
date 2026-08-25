@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useState } from "react";
+import React, { useRef, useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Icon } from "@iconify/react";
 import { Loader, useProgress } from "@react-three/drei";
@@ -270,6 +270,16 @@ function App() {
   // 3D 렌더링 및 썸네일 합성 등의 작업이 진행 중인지 여부
   const is3DLoading = !isCanvasReady || active || pendingComposerTasks > 0;
 
+  // 최초 진입 로딩이 완료되었는지 추적 (한 번 true가 되면 다시 false로 돌아가지 않음)
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
+  useEffect(() => {
+    if (!initialLoadDone && isCanvasReady && !active && pendingComposerTasks === 0) {
+      // 약간의 지연을 두고 설정 (InitialLoader와 동기화)
+      const timer = setTimeout(() => setInitialLoadDone(true), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [initialLoadDone, isCanvasReady, active, pendingComposerTasks]);
+
   const loadSample = () => {
     // 3D 리렌더링 트리거
     loadState(sampleRacks, undefined, sampleRegisteredDevices, sampleNodes);
@@ -391,8 +401,8 @@ function App() {
             {/* Port Sentinel & Device Registration */}
             <button
               className="comm-btn comm-btn-md comm-btn-tertiary stn-toolbar-nav-btn stn-toolbar-nav-btn--magic"
-              onClick={() => navigate('/port-wizard')}
-              title="포트맵핑 마법사로 이동"
+              onClick={() => window.open('/port-wizard', '_blank')}
+              title="포트맵핑 마법사 새 창으로 열기"
             >
               포트맵핑 마법사 <Icon icon="mdi:magic" />
             </button>
@@ -599,7 +609,8 @@ function App() {
       <DeviceTooltip />
       <Toast />
       <PortErrorSynchronizer />
-      <Loader />
+      {/* drei Loader는 최초 진입 시에만 표시. 이후 샘플 데이터 등을 불러올 때는 암전 방지를 위해 숨김 */}
+      {!initialLoadDone && <Loader />}
 
       {/* Initial Loading Screen */}
       <InitialLoader />
