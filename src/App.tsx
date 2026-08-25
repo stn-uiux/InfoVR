@@ -122,11 +122,11 @@ const DocsDropdown = () => {
       {isOpen && (
         <div className="docs-dropdown-menu">
           <div className="docs-dropdown-header">관련 문서 (Docs)</div>
-          <a href="/docs/arcVRack_feature_summary.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:document-one-page-24-regular" /> 기능명세서</a>
-          <a href="/docs/arcVRack_ui_design_spec.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:design-ideas-24-regular" /> 화면 설계서</a>
+          <a href="/docs/infoRack_feature_summary.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:document-one-page-24-regular" /> 기능명세서</a>
+          <a href="/docs/infoRack_ui_design_spec.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:design-ideas-24-regular" /> 화면 설계서</a>
           <a href="/docs/progress_report.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:document-checkmark-24-regular" /> 진행보고서</a>
-          <a href="/docs/arcVRack_wbs.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:calendar-ltr-24-regular" /> 개발 WBS</a>
-          <a href="/docs/arcVRack_deployment_roadmap.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:rocket-24-regular" /> 배포 로드맵</a>
+          <a href="/docs/infoRack_wbs.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:calendar-ltr-24-regular" /> 개발 WBS</a>
+          <a href="/docs/infoRack_deployment_roadmap.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:rocket-24-regular" /> 배포 로드맵</a>
         </div>
       )}
       <button
@@ -325,7 +325,7 @@ function App() {
             </svg>
           </div>
           <div className="comm-logo-text-col">
-            <h1 className="comm-logo-h1">ArcVRack</h1>
+            <h1 className="comm-logo-h1">InfoRack</h1>
             <p className="comm-logo-p">3D Server Room Architecture</p>
           </div>
         </div>

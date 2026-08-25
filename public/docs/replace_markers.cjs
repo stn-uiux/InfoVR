@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const htmlPath = path.join(__dirname, 'arcVRack_ui_design_spec.html');
+const htmlPath = path.join(__dirname, 'infoRack_ui_design_spec.html');
 const jsonPath = path.join(__dirname, 'markers.json');
 
 const content = fs.readFileSync(htmlPath, 'utf8');

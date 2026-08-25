@@ -6,7 +6,7 @@
   <img src="https://img.shields.io/badge/Zustand-5-F36D00?style=for-the-badge" alt="Zustand" />
 </p>
 
-# 🏢 ArcVRack
+# 🏢 InfoRack
 
 > **인터랙티브 3D 서버실 시각화 및 장비 관리 시스템**
 >
@@ -68,7 +68,7 @@
 ## 📂 프로젝트 구조
 
 ```
-ArcVRack/
+InfoRack/
 ├── public/
 │   ├── assets/          # 3D 모델 에셋 (GLB)
 │   └── font/            # 커스텀 폰트

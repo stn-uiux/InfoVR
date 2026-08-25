@@ -77,7 +77,7 @@ export const InitialLoader = () => {
           <line x1="12" y1="22.08" x2="12" y2="12"></line>
         </svg>
       </div>
-      <h2 style={{ fontFamily: "Outfit", margin: 0, fontSize: "2rem", letterSpacing: "-0.5px" }}>ArcVRack</h2>
+      <h2 style={{ fontFamily: "Outfit", margin: 0, fontSize: "2rem", letterSpacing: "-0.5px" }}>InfoRack</h2>
       <p style={{ color: "var(--text-tertiary)", marginTop: 8 }}>
         {active ? `3D 자원 불러오는 중... ${Math.round(progress)}%` : "3D 환경을 준비하는 중..."}
       </p>

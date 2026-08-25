@@ -6,7 +6,7 @@ const htmlStart = `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ArcVRack 화면설계서 (Storyboard)</title>
+  <title>InfoRack 화면설계서 (Storyboard)</title>
   <style>
     :root {
       --primary-color: #0f172a;
@@ -470,7 +470,7 @@ while ((match = chapterRegex.exec(md)) !== null) {
 }
 
 let tocHtml = '<button id="sidebarToggleBtn" class="sidebar-toggle-btn">◀</button><nav class="sidebar-nav"><h2>📋 목차</h2><ul>';
-let pagesHtml = '<div class="main-content"><header><h1>📐 ArcVRack 화면설계서</h1><div class="meta-info"><strong>버전:</strong> v1.0 | <strong>작성일:</strong> 2026-08-19 | <strong>관련 문서:</strong> 기능명세서 v1.5</div></header>';
+let pagesHtml = '<div class="main-content"><header><h1>📐 InfoRack 화면설계서</h1><div class="meta-info"><strong>버전:</strong> v1.0 | <strong>작성일:</strong> 2026-08-19 | <strong>관련 문서:</strong> 기능명세서 v1.5</div></header>';
 
 function guessUIType(text) {
   if (text.includes('버튼') || text.includes('Button')) return 'Button';
