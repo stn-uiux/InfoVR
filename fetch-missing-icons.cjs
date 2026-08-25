@@ -5,6 +5,7 @@ const path = require('path');
 const bundlePath = path.join(__dirname, 'src', 'assets', 'icons-bundle.json');
 
 const iconsToFetch = {
+  'material-symbols': ['restore-from-trash', 'visibility', 'visibility-off'],
   'mdi': ['chevron-down', 'format-list-bulleted', 'file-upload-outline', 'package-variant-closed'],
   'fluent': ['chevron-up-24-regular', 'document-multiple-24-regular'],
   'ri': ['box-3-fill'],

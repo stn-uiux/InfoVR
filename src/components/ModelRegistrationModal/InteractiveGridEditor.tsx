@@ -173,29 +173,57 @@ export default function InteractiveGridEditor({
     return () => window.removeEventListener("click", handleClick);
   }, []);
 
-  React.useLayoutEffect(() => {
+  React.useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
 
+    let currentScale = 0;
+
     const updateScale = () => {
-      const vb = svg.viewBox.baseVal;
-      if (!vb || vb.width === 0 || vb.height === 0) return;
+      let vbW = 0, vbH = 0;
+      const vb = svg.viewBox?.baseVal;
+      if (vb && vb.width > 0 && vb.height > 0) {
+        vbW = vb.width;
+        vbH = vb.height;
+      } else {
+        const attr = svg.getAttribute("viewBox");
+        if (attr) {
+          const parts = attr.split(/[\s,]+/).map(Number);
+          if (parts.length >= 4) {
+            vbW = parts[2];
+            vbH = parts[3];
+          }
+        }
+      }
+      if (vbW === 0 || vbH === 0) return;
+
       const rect = svg.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) {
-        const scaleX = rect.width / vb.width;
-        const scaleY = rect.height / vb.height;
+        const scaleX = rect.width / vbW;
+        const scaleY = rect.height / vbH;
         const scale = Math.min(scaleX, scaleY);
-        setInvScale(1 / scale);
+        if (scale > 0 && Math.abs(currentScale - scale) > 0.0001) {
+          currentScale = scale;
+          setInvScale(1 / scale);
+        }
       }
     };
 
     updateScale();
+    const intervalId = setInterval(updateScale, 300);
+
     const resizeObserver = new ResizeObserver(() => {
       updateScale();
     });
     resizeObserver.observe(svg);
+    if (svg.parentElement) {
+      resizeObserver.observe(svg.parentElement);
+    }
 
-    return () => resizeObserver.disconnect();
+    return () => {
+      clearInterval(intervalId);
+      resizeObserver.disconnect();
+    };
   }, [svgRef]);
 
   const rows = rowHeights.length;

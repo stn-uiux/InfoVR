@@ -283,6 +283,7 @@ function ChassisPreviewWithOverlay({
 
             {hasGrid && onGridChange && (
               <InteractiveGridEditor
+                key={`grid-editor-${svgInfo.viewBox}`}
                 svgRef={svgRef}
                 baseX={cardArea.x}
                 baseY={cardArea.y}
@@ -337,6 +338,8 @@ export const ModelRegistrationModal: React.FC = () => {
   const deletedDefaultTemplates = useStore((s) => s.deletedDefaultTemplates);
   const removeDefaultTemplate = useStore((s) => s.removeDefaultTemplate);
   const restoreDefaultTemplate = useStore((s) => s.restoreDefaultTemplate);
+  const layouts = useStore((s) => s.layouts);
+  const registeredDevices = useStore((s) => s.registeredDevices);
 
   // Tabs: "register" | "list"
   const [activeTab, setActiveTab] = useState<"register" | "list">("list");
@@ -1598,6 +1601,40 @@ export const ModelRegistrationModal: React.FC = () => {
 
             {/* Footer */}
             <div className="mrm-actions">
+              {editingModelId && (
+                <button
+                  className="mrm-btn danger"
+                  style={{ marginRight: 'auto', backgroundColor: '#e74c3c', color: 'white' }}
+                  onClick={() => {
+                    let isUsed = false;
+                    if (registeredDevices.some((d) => d.modelName === modelName)) {
+                      isUsed = true;
+                    } else {
+                      const allLayouts = Object.values(layouts);
+                      for (const layout of allLayouts) {
+                        if (layout.racks.some((r) => r.devices.some((d) => d.modelName === modelName))) {
+                          isUsed = true;
+                          break;
+                        }
+                      }
+                    }
+
+                    if (isUsed) {
+                      alert("모델이 사용중이라 삭제가 불가합니다.");
+                      return;
+                    }
+
+                    if (window.confirm("해당 모델 데이터가 사라집니다. 목록으로 돌아가시겠습니까?")) {
+                      removeCustomModel(editingModelId);
+                      showToastMsg(`모델 "${modelName}" 삭제 완료!`, "success");
+                      resetForm();
+                      setActiveTab("list");
+                    }
+                  }}
+                >
+                  삭제
+                </button>
+              )}
               <button className="mrm-btn secondary" onClick={() => {
                 if (isDirty) {
                   if (!window.confirm("작성 중인 내용이 모두 사라집니다. 취소하시겠습니까?")) return;
@@ -1887,23 +1924,13 @@ export const ModelRegistrationModal: React.FC = () => {
                             <button
                               className="action-icon-btn delete-btn"
                               onClick={() => {
-                                if (overrideModel) {
-                                  updateCustomModel(overrideModel.modelId, {
-                                    modelSvgRaw: undefined as any,
-                                    modelPngRaw: undefined as any,
-                                    rearSvgRaw: undefined as any,
-                                    baseEquipmentViewSvgRaw: undefined as any,
-                                  });
-                                  showToastMsg(`기본 모델 "[${tmpl.uSize}U] ${tmpl.modelName}" 이미지가 초기화되었습니다 (카드 영역 및 타입은 유지됨)`, "success");
-                                } else {
-                                  removeDefaultTemplate(tmpl.modelName);
-                                  showToastMsg(`기본 모델 "[${tmpl.uSize}U] ${tmpl.modelName}" 숨김 처리됨`, "success");
-                                }
+                                removeDefaultTemplate(tmpl.modelName);
+                                showToastMsg(`기본 모델 "[${tmpl.uSize}U] ${tmpl.modelName}" 숨김 처리됨`, "success");
                               }}
-                              title={overrideModel ? "수정 내용 초기화" : "기본 모델 숨기기"}
-                              aria-label={overrideModel ? "수정 내용 초기화" : "기본 모델 숨기기"}
+                              title="기본 모델 숨기기"
+                              aria-label="기본 모델 숨기기"
                             >
-                              <Icon icon="material-symbols:delete" style={{ width: 16, height: 16 }} />
+                              <Icon icon="material-symbols:visibility-off" style={{ width: 16, height: 16 }} />
                             </button>
                           </div>
                         </div>
@@ -1925,18 +1952,29 @@ export const ModelRegistrationModal: React.FC = () => {
                   </div>
                   <div className="mrm-models-list" style={{ opacity: 0.6 }}>
                     {DEVICE_TEMPLATES.filter((t) => deletedDefaultTemplates.includes(t.modelName)).map((tmpl) => {
+                      const overrideModel = customModels.find((m) => m.modelName === tmpl.modelName);
+                      const eqModel = equipmentModels.find((m) => m.modelName === tmpl.modelName);
+                      const isCardBased = !!overrideModel || !!eqModel;
                       const imgUrl = resolveDeviceImage(tmpl.modelName);
                       return (
                         <div key={`hidden-${tmpl.modelName}`} className="mrm-model-row" style={{ background: "var(--bg-secondary)" }}>
-                          <span className={`model-type-tag normal`}>
-                            고정형
+                          <span className={`model-type-tag ${isCardBased ? "card-based" : "normal"}`}>
+                            {isCardBased ? "섀시형" : "고정형"}
                           </span>
                           <DynamicListThumb
                             modelName={tmpl.modelName}
-                            isChassis={Boolean((tmpl as any).cardArea || (tmpl as any).slots || (tmpl as any).rows)}
+                            isChassis={isCardBased}
                             displayThumbPng={null}
                             displayThumb={null}
                             staticImgUrl={imgUrl}
+                            insertedCards={(() => {
+                              if (overrideModel?.variants?.length) {
+                                const defaultVariant = overrideModel.variants.find((v: any) => v.variantName === "기본타입");
+                                if (defaultVariant?.insertedCards) return defaultVariant.insertedCards;
+                                if (overrideModel.variants[0]?.insertedCards) return overrideModel.variants[0].insertedCards;
+                              }
+                              return DEFAULT_CHASSIS_CARDS[tmpl.modelName] || [];
+                            })()}
                             onHover={setHoveredListThumb}
                             onHoverMove={(e: any) => setHoveredListThumbPos({ x: e.clientX, y: e.clientY })}
                             onHoverLeave={() => setHoveredListThumb(null)}
@@ -1966,7 +2004,7 @@ export const ModelRegistrationModal: React.FC = () => {
                                 title="숨김 해제 (복구)"
                                 aria-label="숨김 해제"
                               >
-                                <Icon icon="material-symbols:restore" style={{ width: 16, height: 16 }} />
+                                <Icon icon="material-symbols:visibility" style={{ width: 16, height: 16 }} />
                               </button>
                             </div>
                           </div>
