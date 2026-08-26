@@ -116,11 +116,60 @@ function getCardPaintOrder(card: InsertedCard, model: ComposerEquipmentModel): n
   return 0;
 }
 
+// ── LRU 캐시 클래스 ──
+class SimpleLRUCache<K, V> {
+  private max: number;
+  private map: Map<K, V>;
+  private onEvict?: (key: K, value: V) => void;
+
+  constructor(max: number, onEvict?: (key: K, value: V) => void) {
+    this.max = max;
+    this.map = new Map<K, V>();
+    this.onEvict = onEvict;
+  }
+
+  get(key: K): V | undefined {
+    if (!this.map.has(key)) return undefined;
+    const val = this.map.get(key)!;
+    this.map.delete(key);
+    this.map.set(key, val);
+    return val;
+  }
+
+  set(key: K, value: V): this {
+    if (this.map.has(key)) {
+      this.map.delete(key);
+    } else if (this.map.size >= this.max) {
+      const oldestKey = this.map.keys().next().value;
+      if (oldestKey !== undefined) {
+         const oldestVal = this.map.get(oldestKey)!;
+         if (this.onEvict) this.onEvict(oldestKey, oldestVal);
+         this.map.delete(oldestKey);
+      }
+    }
+    this.map.set(key, value);
+    return this;
+  }
+
+  delete(key: K): boolean {
+    if (this.map.has(key)) {
+      const val = this.map.get(key)!;
+      if (this.onEvict) this.onEvict(key, val);
+      return this.map.delete(key);
+    }
+    return false;
+  }
+}
+
 // ── 합성 캐시 ──
-const _composedHtmlCache = new Map<string, string>();
-const _composingPromises = new Map<string, Promise<string>>();
-const _blobUrlCache = new Map<string, string>();
-const _webpUrlCache = new Map<string, string>();
+const CACHE_SIZE = 50;
+const _composedHtmlCache = new SimpleLRUCache<string, string>(CACHE_SIZE);
+const _composingPromises = new Map<string, Promise<string>>(); // 임시 Promise는 Map 유지 (작업 후 삭제되므로 누수 없음)
+const _blobUrlCache = new SimpleLRUCache<string, string>(CACHE_SIZE, (key, url) => {
+  // 캐시가 방출(Evict)될 때 메모리 해제
+  URL.revokeObjectURL(url);
+});
+const _webpUrlCache = new SimpleLRUCache<string, string>(CACHE_SIZE);
 
 export interface SvgComposerResult {
   composedHtml: string;
