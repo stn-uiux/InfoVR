@@ -7,7 +7,11 @@ import "./css/base.css";
 import "./css/layout.css";
 import "./css/components.css";
 import "./css/features.css";
+import "./css/auth.css";
+
 import App from "./App.tsx";
+import { LoginPage } from "./pages/LoginPage";
+import { SignupPage } from "./pages/SignupPage";
 import { ThemeProvider } from "./contexts/ThemeContext.tsx";
 import iconsBundle from "./assets/icons-bundle.json";
 
@@ -23,7 +27,14 @@ createRoot(document.getElementById("root")!).render(
     <ThemeProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<App />} />
+          {/* Auth Routes */}
+          <Route path="/" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          
+          {/* Dashboard Route */}
+          <Route path="/dashboard" element={<App />} />
+          
+          {/* Existing Routes */}
           <Route path="/arcVRoom" element={<App />} />
           <Route path="/arcVRoom/" element={<App />} />
           <Route

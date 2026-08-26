@@ -203,11 +203,19 @@ export interface AppState {
 
   // Toast Notification
   toast: { message: string; type: "success" | "error" } | null;
+  setToast: (toast: { message: string; type: "success" | "error" } | null) => void;
   showToast: (
     message: string,
     type: "success" | "error",
     source?: string,
   ) => void;
+  
+  myPageModalOpen: boolean;
+  setMyPageModalOpen: (open: boolean) => void;
+  settingsModalOpen: boolean;
+  setSettingsModalOpen: (open: boolean) => void;
+  settingsModalTab: 'accounts' | 'permissions';
+  setSettingsModalTab: (tab: 'accounts' | 'permissions') => void;
 
   // Unsaved Changes & Undo
   baselineRacks: Rack[] | null;
@@ -608,15 +616,20 @@ export const useStore = create<AppState>()(
       modelDragOffset: null,
 
       toast: null,
+      setToast: (toast) => set({ toast }),
       showToast: (message, type) => {
         set({ toast: { message, type } });
         setTimeout(() => {
-          const current = get().toast;
-          if (current?.message === message) {
-            set({ toast: null });
-          }
+          set((state) => (state.toast?.message === message ? { toast: null } : state));
         }, 3000);
       },
+
+      myPageModalOpen: false,
+      setMyPageModalOpen: (open) => set({ myPageModalOpen: open }),
+      settingsModalOpen: false,
+      setSettingsModalOpen: (open) => set({ settingsModalOpen: open }),
+      settingsModalTab: 'accounts',
+      setSettingsModalTab: (tab) => set({ settingsModalTab: tab }),
 
       baselineRacks: null,
       baselineModels: null,

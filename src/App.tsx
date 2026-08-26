@@ -13,6 +13,7 @@ import { UnsavedChangesDialog } from "./components/UnsavedChangesDialog";
 import { DeviceModal } from "./components/DeviceModal";
 import { DeviceTooltip } from "./components/DeviceTooltip";
 import { InitialLoader } from "./components/InitialLoader";
+import { SettingsDropdown } from "./components/SettingsDropdown";
 const ImportExportModal = React.lazy(() =>
   import("./components/ImportExportModal").then((m) => ({
     default: m.ImportExportModal,
@@ -33,6 +34,8 @@ const ModelRegistrationModal = React.lazy(() =>
     default: m.ModelRegistrationModal,
   })),
 );
+import { MyPageModal } from "./components/MyPageModal";
+import { AccountPermissionsModal } from "./components/AccountPermissionsModal";
 import { useTheme } from "./contexts/ThemeContext";
 import { useStore } from "./store/useStore";
 import { useComposerTaskProgress } from "./hooks/useSvgComposer";
@@ -549,6 +552,7 @@ function App() {
 
           <CyberSpaceToggle />
           <ThemeToggle />
+          <SettingsDropdown />
         </div>
       </div>
 
@@ -598,6 +602,8 @@ function App() {
       {/* Rack Navigation Carousel (Normal Mode) */}
       <FocusCarousel />
 
+      <MyPageModal />
+      <AccountPermissionsModal />
       <UnsavedChangesDialog />
 
       {/* 2D UI Overlay - Fit to Models (Fixed next to Gizmo) */}
