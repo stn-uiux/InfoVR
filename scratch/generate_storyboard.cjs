@@ -6,7 +6,7 @@ const htmlStart = `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>InfoRack 화면설계서 (Storyboard)</title>
+  <title>InfoVR 화면설계서 (Storyboard)</title>
   <style>
     :root {
       --primary-color: #0f172a;
@@ -175,7 +175,7 @@ const htmlStart = `<!DOCTYPE html>
 <body>
   <div class="container">
     <header>
-      <h1>📐 InfoRack 화면설계서 (Storyboard)</h1>
+      <h1>📐 InfoVR 화면설계서 (Storyboard)</h1>
       <div class="meta-info">
         <strong>버전:</strong> v1.0 | <strong>작성일:</strong> 2026-08-19 | <strong>관련 문서:</strong> 기능명세서 v1.5
       </div>

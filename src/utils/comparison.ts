@@ -14,7 +14,7 @@ function areArraysClose(a: number[], b: number[]): boolean {
 }
 
 /**
- * Deeply compares two objects, specifically tailored for the layouts and nodes in the InfoRack project.
+ * Deeply compares two objects, specifically tailored for the layouts and nodes in the InfoVR project.
  * Handles floating-point numbers with epsilon tolerance for position, rotation, and scale.
  */
 export function layoutsEqual(a: unknown, b: unknown): boolean {
