@@ -2,6 +2,7 @@ import { Icon } from "@iconify/react";
 import React from "react";
 
 import type { RegisteredDevice } from "../../types";
+import { StnBadge } from "../StnBadge";
 
 export interface DeviceRowProps {
   device: RegisteredDevice;
@@ -72,31 +73,20 @@ export const DeviceRow = React.memo(({
         <span className="drm-vendor-tag">{device.vendor}</span>
       </td>
       <td>
-        {(!statusInfo || !statusInfo.placed) ? (
-          <span
-            className="drm-badge"
-            style={{ opacity: 0.5, fontSize: "11px" }}
-          >
+        {statusInfo?.isInstalled === false ? (
+          <StnBadge variant="secondary">
             미실장
-          </span>
+          </StnBadge>
         ) : (
-          <span
-            className="drm-badge"
-            style={{
-              color: "#38bdf8",
-              borderColor: "rgba(56, 189, 248, 0.3)",
-              background: "rgba(56, 189, 248, 0.1)",
-              fontSize: "11px"
-            }}
-          >
+          <StnBadge variant="primary" style={{ color: "#38bdf8", borderColor: "rgba(56, 189, 248, 0.3)", background: "rgba(56, 189, 248, 0.1)" }}>
             실장
-          </span>
+          </StnBadge>
         )}
       </td>
       <td style={{ textAlign: "center" }}>
         <div style={{ display: "flex", gap: "4px", justifyContent: "center" }}>
           <button
-            className="comm-btn comm-btn-sm comm-btn-tertiary"
+            className="comm-btn comm-icon-btn comm-btn-sm comm-btn-tertiary"
             title="수정"
             onClick={(e) => {
               e.stopPropagation();
@@ -106,7 +96,7 @@ export const DeviceRow = React.memo(({
             <Icon icon="material-symbols:edit" className="icon" />
           </button>
           <button
-            className="comm-btn comm-btn-sm comm-btn-tertiary"
+            className="comm-btn comm-icon-btn comm-btn-sm comm-btn-tertiary"
             style={{ color: "var(--severity-critical)" }}
             title="삭제"
             onClick={(e) => onDelete(e, device)}

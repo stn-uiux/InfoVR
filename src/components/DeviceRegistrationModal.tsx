@@ -812,7 +812,7 @@ export const DeviceRegistrationModal = () => {
 
                   {/* Device Table */}
                   <div className="drm-section-card" style={{ flex: 1 }}>
-                    <div className="drm-table-header">
+                    <div className="stn-table-header">
                       {/* First Row: Metadata & Actions */}
                       <div className="drm-header-row">
                         <div className="drm-metadata-cluster">
@@ -851,6 +851,12 @@ export const DeviceRegistrationModal = () => {
                           <button
                             className="comm-btn comm-btn-md comm-btn-primary"
                             onClick={() => {
+                              const state = useStore.getState();
+                              const hasRoom = state.nodes.some(n => n.type === "room");
+                              if (!hasRoom) {
+                                state.showToast("전산실을 먼저 등록해주세요.", "error");
+                                return;
+                              }
                               setEditingDeviceId(null);
                               setIsRegistrationModalOpen(true);
                             }}
@@ -955,11 +961,11 @@ export const DeviceRegistrationModal = () => {
 
                     <div
                       ref={tableContentRef}
-                      className="drm-table-content"
+                      className="stn-table-content"
                       onScroll={handleTableScroll}
                     >
                       {filteredDevices.length > 0 ? (
-                        <table className="drm-table">
+                        <table className="stn-table">
                           <thead>
                             <tr>
                               <th className="col-check">

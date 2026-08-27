@@ -51,7 +51,7 @@ export const ModelImporter = () => {
   const csOffsetZCm = useStore((s) => s.csOffsetZCm);
   const racks = useStore((s) => s.racks);
   const activeNodeId = useStore((s) => s.activeNodeId);
-
+  const nodes = useStore((s) => s.nodes);
   const { width: dynamicWidth, length: dynamicLength } = calculateDynamicRoomSize(
     racks,
     importedModels,
@@ -98,6 +98,13 @@ export const ModelImporter = () => {
 
   const handleModelImportFile = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const state = useStore.getState();
+      const activeNode = state.nodes.find(n => n.nodeId === state.activeNodeId);
+      if (!state.activeNodeId || activeNode?.type !== "room") {
+        e.preventDefault();
+        state.showToast("전산실을 먼저 선택해주세요.", "error");
+        return;
+      }
       const file = e.target.files?.[0];
       if (modelImportRef.current) modelImportRef.current.value = "";
       if (!file) return;
@@ -143,6 +150,12 @@ export const ModelImporter = () => {
   /** Add a built-in default model to the scene */
   const handleAddBuiltin = useCallback(
     (def: BuiltinModelDef) => {
+      const state = useStore.getState();
+      const activeNode = state.nodes.find(n => n.nodeId === state.activeNodeId);
+      if (!state.activeNodeId || activeNode?.type !== "room") {
+        state.showToast("전산실을 먼저 선택해주세요.", "error");
+        return;
+      }
       if (def.type === "Wall") {
         addImportedModel({
           name: "Wall",
@@ -222,6 +235,14 @@ export const ModelImporter = () => {
   const [floatingTop, setFloatingTop] = useState(0);
 
   const toggleFloatingPanel = useCallback((panel: PanelType, e: React.MouseEvent<HTMLButtonElement>) => {
+    if (panel === "serverRoomEnv" || panel === "builtin") {
+      const state = useStore.getState();
+      const activeNode = state.nodes.find(n => n.nodeId === state.activeNodeId);
+      if (!state.activeNodeId || activeNode?.type !== "room") {
+        state.showToast("전산실을 먼저 선택해주세요.", "error");
+        return;
+      }
+    }
     const offsetTop = e.currentTarget.offsetTop;
     setFloatingPanel((prev) => {
       const isOpening = prev !== panel;
@@ -412,7 +433,16 @@ export const ModelImporter = () => {
               <input
                 type="checkbox"
                 checked={cyberSpaceEnabled}
-                onChange={(e) => useStore.getState().setCyberSpaceEnabled(e.target.checked)}
+                onChange={(e) => {
+                  const state = useStore.getState();
+                  const activeNode = state.nodes.find(n => n.nodeId === state.activeNodeId);
+                  if (!state.activeNodeId || activeNode?.type !== "room") {
+                    e.preventDefault();
+                    state.showToast("전산실을 먼저 선택해주세요.", "error");
+                    return;
+                  }
+                  state.setCyberSpaceEnabled(e.target.checked);
+                }}
               />
               <span className="slider"></span>
             </label>
@@ -433,6 +463,13 @@ export const ModelImporter = () => {
                   type="checkbox"
                   checked={csCustomSpaceSize}
                   onChange={(e) => {
+                    const state = useStore.getState();
+                    const activeNode = state.nodes.find(n => n.nodeId === state.activeNodeId);
+                    if (!state.activeNodeId || activeNode?.type !== "room") {
+                      e.preventDefault();
+                      state.showToast("전산실을 먼저 선택해주세요.", "error");
+                      return;
+                    }
                     const checked = e.target.checked;
                     if (checked) {
                       useStore.getState().setCyberSpaceConfig({
@@ -580,14 +617,30 @@ export const ModelImporter = () => {
         <div style={{ borderTop: "1px solid var(--border-color)", marginTop: "12px", paddingTop: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
           <button
             className="comm-btn comm-btn-md comm-btn-primary comm-w-full"
-            onClick={() => window.open('/arcVRoom/', '_blank')}
+            onClick={() => {
+              const state = useStore.getState();
+              const activeNode = state.nodes.find(n => n.nodeId === state.activeNodeId);
+              if (!state.activeNodeId || activeNode?.type !== "room") {
+                state.showToast("전산실을 먼저 선택해주세요.", "error");
+                return;
+              }
+              window.open('/arcVRoom/', '_blank');
+            }}
           >
             <Icon icon="mdi:cube-outline" className="icon" style={{ marginRight: '6px' }} />
             3D공간 제작
           </button>
           <button
             className="comm-btn comm-btn-md comm-btn-secondary comm-w-full"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => {
+              const state = useStore.getState();
+              const activeNode = state.nodes.find(n => n.nodeId === state.activeNodeId);
+              if (!state.activeNodeId || activeNode?.type !== "room") {
+                state.showToast("전산실을 먼저 선택해주세요.", "error");
+                return;
+              }
+              fileInputRef.current?.click();
+            }}
             disabled={isLoading}
           >
             <Icon icon="mdi:file-upload-outline" className="icon" style={{ marginRight: '6px' }} />
@@ -705,6 +758,9 @@ export const ModelImporter = () => {
     );
   };
 
+  const hasRoom = nodes.some(n => n.type === "room");
+  const showInitialTooltip = isEditMode && !hasRoom;
+
   return (
     <>
       <input
@@ -755,7 +811,13 @@ export const ModelImporter = () => {
               <Icon icon="icon-park-solid:network-tree" className="icon" />
             </button>
             {isEditMode && (
-              <>
+              <div style={{
+                display: "contents",
+                ...(showInitialTooltip && {
+                  opacity: 0.3,
+                  pointerEvents: "none"
+                })
+              }}>
                 <button
                   className={`sidebar-tab-btn ${floatingPanel === "serverRoomEnv" ? "active" : ""}`}
                   onClick={(e) => toggleFloatingPanel("serverRoomEnv", e)}
@@ -784,7 +846,7 @@ export const ModelImporter = () => {
                 >
                   <Icon icon="ph:stack-fill" className="icon" />
                 </button>
-              </>
+              </div>
             )}
           </div>
 
@@ -795,9 +857,41 @@ export const ModelImporter = () => {
               style={{
                 height: isEditMode ? `${treeHeight}px` : "100%",
                 flex: isEditMode ? "none" : 1,
+                position: "relative"
               }}
             >
               <HierarchyTree />
+              {showInitialTooltip && !isCollapsed && (
+                <div style={{
+                  position: "absolute",
+                  left: "100%",
+                  top: "40px",
+                  marginLeft: "16px",
+                  width: "260px",
+                  background: "var(--theme-primary)",
+                  color: "#fff",
+                  padding: "16px",
+                  borderRadius: "8px",
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
+                  zIndex: 999,
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px"
+                }}>
+                  <div style={{
+                    position: "absolute",
+                    left: "-8px",
+                    top: "16px",
+                    borderStyle: "solid",
+                    borderWidth: "8px 8px 8px 0",
+                    borderColor: "transparent var(--theme-primary) transparent transparent"
+                  }} />
+                  <Icon icon="mdi:information" style={{ fontSize: "20px" }} />
+                  Root아래에 전산실을 생성하세요
+                </div>
+              )}
             </div>
 
             <div
@@ -815,6 +909,10 @@ export const ModelImporter = () => {
               className="sidebar-panels-area"
               style={{
                 display: isEditMode ? "flex" : "none",
+                ...(showInitialTooltip && {
+                  opacity: 0.3,
+                  pointerEvents: "none"
+                })
               }}
             >
               {isEditMode && renderServerRoomEnvPanel()}

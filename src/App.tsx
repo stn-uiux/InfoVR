@@ -415,13 +415,6 @@ function App() {
               onClick={(e) => {
                 e.stopPropagation();
 
-                const state = useStore.getState();
-                const activeNode = state.nodes.find(n => n.nodeId === state.activeNodeId);
-                if (!state.activeNodeId || activeNode?.type !== "room") {
-                  state.showToast("전산실을 선택하거나 생성해주세요.", "error");
-                  return;
-                }
-
                 // Close other modals
                 setImportExportModalRackId(null);
                 setDeviceRegistrationModalOpen(true);

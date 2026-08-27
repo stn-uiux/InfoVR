@@ -1,7 +1,8 @@
-import React, { useState, useRef, useCallback, useMemo } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import type { CardWidthType } from "../../types/equipment";
-import { getColSpan } from "../../types/equipment";
+import { StnFormField } from "../StnFormField";
+import { StnInput } from "../StnInput";
 
 interface Props {
   open: boolean;
@@ -54,8 +55,6 @@ export const CardRegistrationForm: React.FC<Props> = ({
   const [svgDims, setSvgDims] = useState({ width: 0, height: 0 });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const fileRef = useRef<HTMLInputElement>(null);
-
-
 
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -153,22 +152,16 @@ export const CardRegistrationForm: React.FC<Props> = ({
       >
         <div className="mrm-section-title">새 카드 등록</div>
 
-        <div className="mrm-field">
-          <label>
-            카드명<span className="required">*</span>
-          </label>
-          <input
+        <StnFormField label="카드명" required error={errors.cardName}>
+          <StnInput
             type="text"
             value={cardName}
             onChange={(e) => setCardName(e.target.value)}
             placeholder="예: R-series-custom"
           />
-          {errors.cardName && (
-            <span className="error-hint">{errors.cardName}</span>
-          )}
-        </div>
+        </StnFormField>
 
-        <div className="mrm-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <div className="stn-form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <input
             type="checkbox"
             id="full-type-checkbox"
@@ -181,10 +174,7 @@ export const CardRegistrationForm: React.FC<Props> = ({
           </label>
         </div>
 
-        <div className="mrm-field full-width">
-          <label>
-            카드 SVG 파일<span className="required">*</span>
-          </label>
+        <StnFormField label="카드 SVG 파일" required fullWidth error={errors.file}>
           <input
             type="file"
             accept=".svg"
@@ -213,8 +203,7 @@ export const CardRegistrationForm: React.FC<Props> = ({
               </>
             )}
           </div>
-          {errors.file && <span className="error-hint">{errors.file}</span>}
-        </div>
+        </StnFormField>
 
         {svgRaw && (
           <div className="mrm-svg-preview">

@@ -15,6 +15,7 @@ import {
   getSubtreeEquipmentCount,
   getSubtreeDevices,
   isLeafNode,
+  ROOT_NODE_ID,
 } from "../utils/nodeUtils";
 import { getHighestError } from "../utils/errorHelpers";
 
@@ -95,6 +96,18 @@ export const HierarchyTree = React.memo(() => {
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   // Expand parents if searching
+  useEffect(() => {
+    if (nodes.length === 0) {
+      addNode({
+        nodeId: ROOT_NODE_ID,
+        parentId: null,
+        name: "STN",
+        type: "root",
+        order: 0,
+      });
+    }
+  }, [nodes.length, addNode]);
+
   useEffect(() => {
     if (nodeSearch.trim()) {
       const q = nodeSearch.toLowerCase();
@@ -468,28 +481,6 @@ export const HierarchyTree = React.memo(() => {
             </div>
 
             <div className="tree-node-title-row">
-              {isEditMode && (
-                <button
-                  className="comm-icon-btn"
-                  title="최상위 노드 추가"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const siblings = nodes.filter((n) => n.parentId === null);
-                    const newId = addNode({
-                      parentId: null,
-                      name: "New Root",
-                      type: "root",
-                      order: siblings.length,
-                    });
-                    setRenamingId(newId);
-                    setRenameValue("New Root");
-                    if (isCollapsed) setIsCollapsed(false);
-                  }}
-                  style={{ padding: "4px", display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer" }}
-                >
-                  <Icon icon="material-symbols:add" style={{ fontSize: "20px", color: "var(--text-secondary)" }} />
-                </button>
-              )}
             </div>
           </div>
         </div>

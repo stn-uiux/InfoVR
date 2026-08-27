@@ -39,7 +39,9 @@ export function StnModal({
             <Icon icon="material-symbols:close" />
           </button>
         </div>
-        {children}
+        <div className="stn-modal-body">
+          {children}
+        </div>
       </div>
     </div>,
     document.body

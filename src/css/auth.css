@@ -65,7 +65,6 @@
 }
 
 .auth-card-wrapper:hover {
-  transform: translateY(-5px);
   box-shadow: 0 40px 80px rgba(0, 0, 0, 0.5);
 }
 
@@ -429,7 +428,8 @@
   background: var(--panel-bg, rgba(15, 23, 42, 0.85));
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  transform: translateZ(0); /* Fix for backdrop-filter in some browsers */
+  transform: translateZ(0);
+  /* Fix for backdrop-filter in some browsers */
   border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.1));
   border-radius: 12px;
   box-shadow: var(--panel-shadow, 0 10px 30px rgba(0, 0, 0, 0.5));

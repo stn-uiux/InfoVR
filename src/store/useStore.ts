@@ -15,7 +15,7 @@ import {
   getFrontDirection,
   getEffectiveDimensions,
 } from "../utils/rackGeometry";
-import { migrateGroupNameToNodeId, NONE_NODE_ID } from "../utils/nodeUtils";
+import { migrateGroupNameToNodeId, NONE_NODE_ID, ROOT_NODE_ID } from "../utils/nodeUtils";
 import { Camera, Plane, Raycaster, Vector2, Vector3 } from 'three';
 import { layoutsEqual } from "../utils/comparison";
 import initialCustomModelsData from "../utils/customModels.json";
@@ -345,7 +345,7 @@ export interface AppState {
   toggleModelMove: (id: string) => void;
 
   // Hierarchy Node Management
-  addNode: (node: Omit<HierarchyNode, "nodeId">) => string;
+  addNode: (node: Omit<HierarchyNode, "nodeId"> & { nodeId?: string }) => string;
   renameNode: (nodeId: string, name: string) => void;
   deleteNode: (nodeId: string) => void;
   locateDevice: (registeredDeviceId: string) => boolean;
@@ -534,7 +534,7 @@ export const useStore = create<AppState>()(
       isEditMode: false,
       isCanvasReady: false,
       hoveredRackId: null,
-      nodes: [],
+      nodes: [{ nodeId: ROOT_NODE_ID, parentId: null, name: "STN", type: "root", order: 0 }],
       activeNodeId: null,
       activeSceneNodeId: null,
       pinnedNodeId: null,
@@ -771,7 +771,7 @@ export const useStore = create<AppState>()(
         set({
           racks: [],
           importedModels: [],
-          nodes: [],
+          nodes: [{ nodeId: ROOT_NODE_ID, parentId: null, name: "STN", type: "root", order: 0 }],
           layouts: {},
           nodeEnvironments: {},
           registeredDevices: [],
@@ -786,7 +786,7 @@ export const useStore = create<AppState>()(
           redoStack: [],
           baselineRacks: [],
           baselineModels: [],
-          baselineNodes: [],
+          baselineNodes: [{ nodeId: ROOT_NODE_ID, parentId: null, name: "STN", type: "root", order: 0 }],
           baselineRegisteredDevices: [],
           baselineNodeEnvironments: {},
           baselineLayouts: {},
@@ -2512,7 +2512,7 @@ export const useStore = create<AppState>()(
       addNode: (nodeData) => {
         const { isEditMode, pushUndoState, nodes } = get();
         if (isEditMode) pushUndoState();
-        const newId = `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const newId = nodeData.nodeId || `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
         // Auto-calculate order if not provided
         let finalOrder = nodeData.order;

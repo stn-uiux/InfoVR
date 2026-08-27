@@ -3,6 +3,9 @@ import InteractiveGridEditor, { type GridMerge } from "./InteractiveGridEditor";
 import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useStore } from "../../store/useStore";
+import { StnFormField } from "../StnFormField";
+import { StnInput } from "../StnInput";
+import { StnSelect } from "../StnSelect";
 import type {
   CustomModelType,
   CardWidthType,
@@ -996,77 +999,55 @@ export const ModelRegistrationModal: React.FC = () => {
                 </div>
 
                 <div className="mrm-form-grid" style={{ gridTemplateColumns: "1.2fr 0.8fr 1fr 1.5fr" }}>
-                  <div className="mrm-field">
-                    <label>
-                      모델명<span className="required">*</span>
-                    </label>
-                    <input
+                  <StnFormField label="모델명" required error={errors.modelName}>
+                    <StnInput
                       type="text"
                       value={modelName}
                       onChange={(e) => setModelName(e.target.value)}
                       placeholder="예: 7250 IXR-6"
                     />
-                    {errors.modelName && (
-                      <span className="error-hint">{errors.modelName}</span>
-                    )}
-                  </div>
+                  </StnFormField>
 
-                  <div className="mrm-field">
-                    <label>
-                      Rack Unit (U)<span className="required">*</span>
-                    </label>
-                    <input
+                  <StnFormField label="Rack Unit (U)" required error={errors.unit}>
+                    <StnInput
                       type="number"
                       min={1}
                       max={48}
                       value={unit}
                       onChange={(e) => setUnit(parseInt(e.target.value) || 1)}
                     />
-                    {errors.unit && (
-                      <span className="error-hint">{errors.unit}</span>
-                    )}
-                  </div>
+                  </StnFormField>
 
-                  <div className="mrm-field">
-                    <label>
-                      제조사<span className="mrm-required">*</span>
-                    </label>
-                    <select
-                      className="comm-input"
+                  <StnFormField label="제조사" required>
+                    <StnSelect
                       value={vendor}
-                      onChange={(e) => setVendor(e.target.value)}
-                    >
-                      <option value="" disabled>제조사를 선택하세요</option>
-                      {[
-                        "AXGATE",
-                        "Cisco",
-                        "Ciena",
-                        "Coweaver",
-                        "Dasan",
-                        "Dell",
-                        "Edgecore",
-                        "Juniper",
-                        "Nokia",
-                        "Rebellions",
-                        "Supermicro",
-                        "Ubiquoss",
-                        "Woorinet"
-                      ].map(v => (
-                        <option key={v} value={v}>{v}</option>
-                      ))}
-                    </select>
-                  </div>
+                      onChange={(val) => setVendor(val.toString())}
+                      options={[
+                        { label: "AXGATE", value: "AXGATE" },
+                        { label: "Cisco", value: "Cisco" },
+                        { label: "Ciena", value: "Ciena" },
+                        { label: "Coweaver", value: "Coweaver" },
+                        { label: "Dasan", value: "Dasan" },
+                        { label: "Dell", value: "Dell" },
+                        { label: "Edgecore", value: "Edgecore" },
+                        { label: "Juniper", value: "Juniper" },
+                        { label: "Nokia", value: "Nokia" },
+                        { label: "Rebellions", value: "Rebellions" },
+                        { label: "Supermicro", value: "Supermicro" },
+                        { label: "Ubiquoss", value: "Ubiquoss" },
+                        { label: "Woorinet", value: "Woorinet" }
+                      ]}
+                      placeholder="제조사를 선택하세요"
+                    />
+                  </StnFormField>
 
-                  <div className="mrm-field">
-                    <label>
-                      폼 팩터<span className="required">*</span>
-                    </label>
+                  <StnFormField label="폼 팩터" required>
                     <div className="mrm-type-selector compact">
                       <div
                         className={`mrm-type-card compact ${modelType === "normal" ? "active" : ""}`}
                         onClick={() => setModelType("normal")}
                       >
-                        <div className="type-icon">📦</div>
+                        <div className="type-icon"><Icon icon="humbleicons:server" /></div>
                         <div className="type-info">
                           <div className="type-name">고정형</div>
                           <div className="type-desc">단일 바디 장비</div>
@@ -1076,14 +1057,14 @@ export const ModelRegistrationModal: React.FC = () => {
                         className={`mrm-type-card compact ${modelType === "card-based" ? "active" : ""}`}
                         onClick={() => setModelType("card-based")}
                       >
-                        <div className="type-icon">🗂️</div>
+                        <div className="type-icon"><Icon icon="humbleicons:servers" /></div>
                         <div className="type-info">
                           <div className="type-name">섀시형</div>
                           <div className="type-desc">장비(섀시+카드)</div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </StnFormField>
                 </div>
               </div>
 
