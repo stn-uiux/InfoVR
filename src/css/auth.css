@@ -233,6 +233,16 @@
   color: #3b82f6;
 }
 
+/* Fix browser autofill background and text color */
+.auth-input:-webkit-autofill,
+.auth-input:-webkit-autofill:hover, 
+.auth-input:-webkit-autofill:focus, 
+.auth-input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0px 1000px #131a2c inset !important;
+  -webkit-text-fill-color: #ffffff !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
 /* Button */
 .auth-btn {
   background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
