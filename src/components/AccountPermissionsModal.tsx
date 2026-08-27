@@ -534,7 +534,7 @@ export const AccountPermissionsModal = () => {
   if (!settingsModalOpen) return null;
 
   return (
-    <StnModal isOpen={settingsModalOpen} onClose={handleClose} title="시스템 설정" icon="fluent:settings-24-filled" className="account-permissions-modal" style={{ width: "1100px", maxWidth: "95vw" }}>
+    <StnModal isOpen={settingsModalOpen} onClose={handleClose} title="시스템 설정" icon="fluent:settings-24-filled" className="account-permissions-modal" style={{ width: "1360px", maxWidth: "95vw" }}>
       {/* Tabs */}
       <div className="modal-tabs-header">
         <button onClick={() => { setSettingsModalTab("accounts"); setSelectedIds([]); }} className={`modal-tab-btn ${settingsModalTab === "accounts" ? "active" : ""}`}>
