@@ -174,7 +174,8 @@ const generateGroupRacks = (
 
         // 에러 포트 설정 — portName/portNumber 사전 설정으로 PortErrorSynchronizer 트리거 방지
         if (hasError && devices.length === 0) {
-          const portNum = (localIdx * 3 + 5) % 24 + 1;
+          // 장비의 포트 개수가 적은 경우를 대비하여 1~4 사이의 앞쪽 포트 번호를 주로 할당합니다.
+          const portNum = (localIdx % 4) + 1;
           const errorLevels = ["warning", "minor", "major", "critical"] as const;
           
           let portId = `port-${portNum}`;
