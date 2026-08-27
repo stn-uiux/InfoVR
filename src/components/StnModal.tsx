@@ -10,6 +10,7 @@ interface StnModalProps {
   children: ReactNode;
   className?: string;
   overlayClassName?: string;
+  style?: React.CSSProperties;
 }
 
 export function StnModal({
@@ -19,13 +20,14 @@ export function StnModal({
   icon,
   children,
   className = "",
-  overlayClassName = ""
+  overlayClassName = "",
+  style
 }: StnModalProps) {
   if (!isOpen) return null;
 
   return createPortal(
     <div className={`stn-modal-overlay ${overlayClassName}`} onClick={onClose}>
-      <div className={`stn-modal ${className}`} onClick={(e) => e.stopPropagation()}>
+      <div className={`stn-modal ${className}`} style={style} onClick={(e) => e.stopPropagation()}>
         <div className="stn-modal-header">
           <h2>
             {icon && (

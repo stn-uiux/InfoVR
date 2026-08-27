@@ -223,16 +223,7 @@ export const DeviceRegistrationModal = () => {
     [nodes, addNode],
   ); // setNodeExpandedIds is stable from useState, so it doesn't strictly need to be in deps but good for clarity
 
-  const handleAddRootNode = useCallback(() => {
-    const siblings = nodes.filter((n) => n.parentId === null);
-    const newId = addNode({
-      parentId: null,
-      name: "New Root",
-      type: "root",
-      order: siblings.length,
-    });
-    setRenamingId(newId);
-  }, [nodes, addNode]);
+
 
 
 
@@ -621,22 +612,7 @@ export const DeviceRegistrationModal = () => {
                       </span>
                     </div>
 
-                    <div className="tree-node-group-row">
-                      <div className="tree-node-title-row" style={{ marginLeft: "auto" }}>
-                        {isEditMode && (
-                          <button
-                            className="comm-btn comm-btn-sm comm-btn-secondary"
-                            title="최상위 노드 추가"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleAddRootNode();
-                            }}
-                          >
-                            <Icon icon="material-symbols:add" className="icon" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
+
                   </div>
                   <div style={{ padding: "0 16px" }}>
                     <div className="drm-sidebar-search-wrap" style={{ margin: 0, width: "100%" }}>

@@ -35,7 +35,7 @@ export function StnTable<T>({
   onRowClick,
   emptyText = "데이터가 없습니다.",
   containerStyle,
-  defaultSortKey = null,
+  defaultSortKey = undefined,
   defaultSortDir = "asc",
   preSort,
   rowClassName,
@@ -43,7 +43,7 @@ export function StnTable<T>({
   const isMultiSelect = selectedRowKeys !== undefined && onSelectionChange !== undefined;
 
   // Sorting state
-  const [sortKey, setSortKey] = useState<string | null>(defaultSortKey);
+  const [sortKey, setSortKey] = useState<string | null>(defaultSortKey ?? null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">(defaultSortDir);
 
   const handleSort = (col: StnTableColumn<T>) => {

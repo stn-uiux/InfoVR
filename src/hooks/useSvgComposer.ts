@@ -42,6 +42,7 @@ import { moduleDefinitions } from '../utils/moduleAssets';
 import { useStore } from '../store/useStore';
 import { generatePortMap, buildPortStatusMapFromPortStates, applyPortStatuses } from '../utils/portUtils';
 import { getElementBBox, prefixSvgIds, filterPortElements, PORT_SELECTOR, resolvePortId } from '../utils/svgUtils';
+import { DEFAULT_CHASSIS_CARDS } from '../utils/defaultChassisCards';
 import { getColSpan, type EquipmentModel, type GeneratedPort, type InsertedCard, type InsertedModule } from '../types/equipment';
 import type { EquipmentViewSide } from '../types/equipment';
 import type { PortState } from '../types';
@@ -53,6 +54,18 @@ const PORT_STATUS_COLORS: Record<string, string> = {
   warning: ERROR_COLORS.warning,
   disabled: "#666666",
 };
+
+const staticThumbnailsModules = import.meta.glob<{ default: string }>(
+  "../utils/chassis-thumbnails/*.webp",
+  { eager: true }
+);
+
+const staticThumbnailMap = new Map<string, string>();
+for (const [path, mod] of Object.entries(staticThumbnailsModules)) {
+  const filename = path.split("/").pop() ?? "";
+  const baseName = filename.replace(/\.webp$/i, "").replace(/^\[\d+U\]\s*/, "").trim();
+  staticThumbnailMap.set(baseName, mod.default);
+}
 
 const CARD_ROW_HEIGHT = 46;
 type ComposerEquipmentModel = EquipmentModel & { 
@@ -337,13 +350,14 @@ export function useSvgComposer(
     return () => { isMounted = false; };
   }, [isModularDevice, cardsKey]);
 
+  const statusMap = useMemo(() => buildPortStatusMapFromPortStates(portStates), [portStates]);
+
   // ─── 포트 맵 ───
   const generatedPorts = useMemo<GeneratedPort[]>(() => {
     if (!isModularDevice || cardSvgMap.size === 0) return [];
     const ports = generatePortMap(insertedCards, cardSvgMap);
-    const statusMap = buildPortStatusMapFromPortStates(portStates);
     return applyPortStatuses(ports, statusMap);
-  }, [isModularDevice, insertedCards, cardSvgMap, portStates]);
+  }, [isModularDevice, insertedCards, cardSvgMap, statusMap]);
 
 
 
@@ -429,15 +443,35 @@ export function useSvgComposer(
           const portId = resolvePortId(el);
 
           let styleStr = "fill: transparent; stroke: none;";
+          let appliedStatus = "normal";
 
-          if (isModularDevice) {
-            if (portId) {
-              const gp = generatedPortMap.get(portId);
-              if (gp && gp.status !== "normal") {
-                const color = PORT_STATUS_COLORS[gp.status] || "transparent";
-                styleStr = `fill: ${color}33; stroke: ${color}; stroke-width: 1.5px;`;
+          if (portId) {
+            // 1. Check generatedPortMap (if it's a modular port)
+            const gp = generatedPortMap.get(portId);
+            if (gp && gp.status !== "normal") {
+              appliedStatus = gp.status;
+            } else {
+              // 2. Fallback: check statusMap directly for base SVG ports or non-modular devices
+              if (statusMap[portId] && statusMap[portId] !== "normal") {
+                appliedStatus = statusMap[portId];
+              } else {
+                const matchingKey = Object.keys(statusMap).find(k => 
+                  k === portId || 
+                  k.endsWith(`/${portId}`) || 
+                  k.endsWith(`-${portId}`) ||
+                  k === `port-${portId}` ||
+                  k.endsWith(`/port-${portId}`)
+                );
+                if (matchingKey && statusMap[matchingKey] !== "normal") {
+                  appliedStatus = statusMap[matchingKey];
+                }
               }
             }
+          }
+
+          if (appliedStatus !== "normal") {
+            const color = PORT_STATUS_COLORS[appliedStatus] || "transparent";
+            styleStr = `fill: ${color}33; stroke: ${color}; stroke-width: 1.5px;`;
           }
 
           styleStr += " pointer-events: all; cursor: pointer;";
@@ -493,6 +527,30 @@ export function useSvgComposer(
     if (cachedWebp) {
       setWebpUrl(cachedWebp);
       return;
+    }
+
+    if (modulesKey === "" && portsKey === "" && viewSide === "front") {
+      const staticThumb = staticThumbnailMap.get(modelName);
+      if (staticThumb) {
+        const defaultEquipModel = equipmentModels.find(m => m.modelName === modelName);
+        if (defaultEquipModel) {
+          const defaultLayoutKey = JSON.stringify({
+            cardArea: defaultEquipModel.cardArea,
+            rowHeights: defaultEquipModel._rowHeights,
+            rowGaps: defaultEquipModel._rowGaps,
+            rowColumns: defaultEquipModel._rowColumns,
+          });
+          
+          const defaultCards = DEFAULT_CHASSIS_CARDS[modelName] || [];
+          const defaultCardsKey = defaultCards.map((c: any) => `${c.slotNo}-${c.cardFileName}`).sort().join("|");
+
+          if (modelLayoutKey === defaultLayoutKey && (cardsKey === "" || cardsKey === defaultCardsKey)) {
+            _webpUrlCache.set(webpCacheKey, staticThumb);
+            setWebpUrl(staticThumb);
+            return;
+          }
+        }
+      }
     }
 
     let isMounted = true;
@@ -926,6 +984,8 @@ export async function generateComposedSvgAsync(
   if (!baseSvgEl.getAttribute('height')) baseSvgEl.setAttribute('height', '200');
   baseSvgEl.setAttribute("style", "max-width:100%; height:auto; display:block; margin: 0 auto;");
   
+  const statusMap = buildPortStatusMapFromPortStates([]);
+
   drawBlankSlots(baseSvgEl, baseDoc, equipModel);
   composeCards(baseSvgEl, baseDoc, parser, insertedCards, cardSvgMap, equipModel);
   composeModules(baseSvgEl, baseDoc, insertedModules);
@@ -949,12 +1009,18 @@ export async function preloadAllChassisThumbnails() {
     if (model.cardArea || model.slots || model.rows) {
       const modelLayoutKey = JSON.stringify({
         cardArea: model.cardArea,
-        rowHeights: undefined,
-        rowGaps: undefined,
-        rowColumns: undefined,
+        rowHeights: model._rowHeights,
+        rowGaps: model._rowGaps,
+        rowColumns: model._rowColumns,
       });
       const cacheKeyFront = `${model.modelName}::front::${modelLayoutKey}::::::`;
       const webpCacheKeyFront = `webp::${cacheKeyFront}`;
+
+      const staticThumb = staticThumbnailMap.get(model.modelName);
+      if (staticThumb) {
+        _webpUrlCache.set(webpCacheKeyFront, staticThumb);
+        continue;
+      }
       
       const savedFront = await idbStorage.getItem(webpCacheKeyFront);
       if (!savedFront) {

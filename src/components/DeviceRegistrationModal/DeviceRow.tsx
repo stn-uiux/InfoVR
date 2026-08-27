@@ -73,7 +73,7 @@ export const DeviceRow = React.memo(({
         <span className="drm-vendor-tag">{device.vendor}</span>
       </td>
       <td>
-        {statusInfo?.isInstalled === false ? (
+        {statusInfo?.placed === false ? (
           <StnBadge variant="secondary">
             미실장
           </StnBadge>
