@@ -78,10 +78,10 @@ const ALL_ROOM_IDS = getAllLeafIds(ROOM_TREE);
 
 // --- Default Groups (nested) ---
 const DEFAULT_GROUPS: AccountGroup[] = [
-  { id: "dev", name: "개발팀", parentId: null },
+  { id: "dev", name: "개발실", parentId: null },
   { id: "dev-front", name: "프론트엔드", parentId: "dev" },
   { id: "dev-back", name: "백엔드", parentId: "dev" },
-  { id: "ops", name: "운영팀", parentId: null },
+  { id: "ops", name: "운영실", parentId: null },
   { id: "ops-infra", name: "인프라", parentId: "ops" },
   { id: "ops-noc", name: "NOC", parentId: "ops" },
   { id: "sec", name: "보안팀", parentId: null },
@@ -108,6 +108,8 @@ DUMMY_ACCOUNTS[2] = { id: 3, name: "이담당", email: "viewer1@infovr.local", r
 DUMMY_ACCOUNTS[3] = { id: 4, name: "최엔지니어", email: "eng@infovr.local", role: "editor", status: "활성", allowedRooms: ALL_ROOM_IDS.slice(0, 5), groupId: "dev-front", createdAt: "2025-01-08" };
 DUMMY_ACCOUNTS[4] = { id: 5, name: "신입사원", email: "newbie@infovr.local", role: "pending", status: "활성", allowedRooms: [], groupId: "none", createdAt: "2026-08-20" };
 DUMMY_ACCOUNTS[5] = { id: 6, name: "외주작업자", email: "contractor@infovr.local", role: "pending", status: "활성", allowedRooms: [], groupId: "none", createdAt: "2026-08-25" };
+DUMMY_ACCOUNTS[6] = { id: 7, name: "개발실장", email: "dev_lead@infovr.local", role: "admin", status: "활성", allowedRooms: [...ALL_ROOM_IDS], groupId: "dev", createdAt: "2024-01-01" };
+DUMMY_ACCOUNTS[7] = { id: 8, name: "운영실장", email: "ops_lead@infovr.local", role: "admin", status: "활성", allowedRooms: [...ALL_ROOM_IDS], groupId: "ops", createdAt: "2024-01-01" };
 
 // ============================================================
 // Utility: get all descendant group IDs (inclusive)
@@ -304,25 +306,23 @@ const GroupTreeSidebar = ({
           onClick={() => onSelectGroup("all")}
           onContextMenu={(e) => handleCtx(e, "all")}
         >
-          <span className="group-tree-toggle-spacer" />
           <Icon icon="fluent:people-community-24-filled" style={{ fontSize: "15px", color: selectedGroupId === "all" ? "var(--theme-primary)" : "var(--text-tertiary)" }} />
           <span className="group-tree-name">전체</span>
           <span className="group-tree-count">{accountCounts["all"] || 0}</span>
         </div>
 
         {/* Tree */}
-        {rootGroups.map(g => renderGroup(g, 1))}
+        {rootGroups.map(g => renderGroup(g, 0))}
 
         {/* 미지정 */}
         <div
           className={`group-tree-item ${selectedGroupId === "none" ? "active" : ""} ${dragOverId === "none-drop" ? "drag-over" : ""}`}
-          style={{ paddingLeft: "12px", marginTop: "4px", borderTop: "1px solid var(--border-weak)", paddingTop: "8px" }}
+          style={{ paddingLeft: "36px", marginTop: "4px", borderTop: "1px solid var(--border-weak)", paddingTop: "8px" }}
           onClick={() => onSelectGroup("none")}
           onDragOver={(e) => { e.preventDefault(); setDragOverId("none-drop"); }}
           onDragLeave={handleDragLeave}
           onDrop={(e) => { e.preventDefault(); setDragOverId(null); /* accounts drop only - groups cant go to none */ }}
         >
-          <span className="group-tree-toggle-spacer" />
           <Icon icon="fluent:folder-open-24-regular" style={{ fontSize: "15px", opacity: 0.5 }} />
           <span className="group-tree-name">미지정</span>
           <span className="group-tree-count">{accountCounts["none"] || 0}</span>
@@ -376,8 +376,37 @@ export const AccountPermissionsModal = () => {
 
   const getGroupName = (gid: string) => {
     if (!gid || gid === "none") return "미지정";
-    return groups.find(g => g.id === gid)?.name || "미지정";
+    const group = groups.find(g => g.id === gid);
+    if (!group) return "미지정";
+    const buildPath = (g: AccountGroup): string => {
+      const parent = groups.find(p => p.id === g.parentId);
+      return parent ? `${buildPath(parent)} > ${g.name}` : g.name;
+    };
+    return buildPath(group);
   };
+
+  const getGroupDepth = useCallback((gid: string) => {
+    if (!gid || gid === "none") return 999;
+    let depth = 0;
+    let curr = groups.find(g => g.id === gid);
+    while (curr && curr.parentId) {
+      depth++;
+      curr = groups.find(g => g.id === curr!.parentId);
+    }
+    return depth;
+  }, [groups]);
+
+  const handlePreSort = useCallback((a: AccountData, b: AccountData) => {
+    if (selectedGroupId === "all") return 0;
+    return getGroupDepth(a.groupId) - getGroupDepth(b.groupId);
+  }, [getGroupDepth, selectedGroupId]);
+
+  const getRowClassName = useCallback((record: AccountData) => {
+    if (selectedGroupId === "all") {
+      return getGroupDepth(record.groupId) === 0 ? "highlight-row" : "";
+    }
+    return record.groupId === selectedGroupId ? "highlight-row" : "";
+  }, [selectedGroupId, getGroupDepth]);
 
   // --- Handlers ---
   const handleClose = () => setSettingsModalOpen(false);
@@ -487,8 +516,19 @@ export const AccountPermissionsModal = () => {
     { key: "name", title: "이름", sortable: true, sortValue: (u) => u.name, render: (u) => <div className="user-info-row"><div className={`user-avatar-sm role-${u.role}`}><Icon icon="fluent:person-24-filled" /></div><div className="user-name">{u.name}</div></div> },
     { key: "email", title: "아이디", sortable: true, sortValue: (u) => u.email, render: (u) => <div className="user-email">{u.email}</div> },
     { key: "group", title: "그룹", width: "120px", sortable: true, sortValue: (u) => getGroupName(u.groupId), render: (u) => <StnBadge variant="secondary">{getGroupName(u.groupId)}</StnBadge> },
-    { key: "roleSelect", title: "기본 권한", width: "200px", sortable: true, sortValue: (u) => u.role, render: (u) => <div style={{ width: "160px" }}><StnSelect size="sm" value={u.role} onChange={(v) => handleRoleChange(u.id, v as string)} options={[{ value: "admin", label: "관리자 (Admin)" }, { value: "editor", label: "편집자 (Editor)" }, { value: "viewer", label: "조회자 (Viewer)" }, { value: "pending", label: "승인대기 (Pending)" }]} /></div> },
-    { key: "roomAccess", title: "전산실 접근", width: "160px", render: (u) => { const c = u.allowedRooms.length, a = c === ALL_ROOM_IDS.length; return <button className="comm-btn comm-btn-sm comm-btn-ghost room-access-btn" onClick={(e) => { e.stopPropagation(); openRoomModal(u); }}><Icon icon="fluent:building-24-regular" className="icon" /><span>{a ? "전체" : `${c}개 전산실`}</span><Icon icon="material-symbols:chevron-right" style={{ fontSize: "14px", opacity: 0.5 }} /></button>; } }
+    { key: "roleSelect", title: "기본 권한", width: "200px", sortable: true, sortValue: (u) => u.role, render: (u) => <div style={{ width: "160px", margin: "0 auto" }}><StnSelect size="sm" value={u.role} onChange={(v) => handleRoleChange(u.id, v as string)} options={[{ value: "admin", label: "관리자 (Admin)" }, { value: "editor", label: "편집자 (Editor)" }, { value: "viewer", label: "조회자 (Viewer)" }, { value: "pending", label: "승인대기 (Pending)" }]} /></div> },
+    { key: "roomAccess", title: "전산실 접근", width: "160px", render: (u) => { 
+      const c = u.allowedRooms.length, a = c === ALL_ROOM_IDS.length; 
+      return (
+        <button className="room-access-btn" onClick={(e) => { e.stopPropagation(); openRoomModal(u); }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Icon icon="fluent:building-24-regular" style={{ fontSize: "16px", color: "var(--text-tertiary)" }} />
+            <span>{a ? "전체" : `${c}개`}</span>
+          </div>
+          <Icon icon="material-symbols:chevron-right" style={{ fontSize: "16px", color: "var(--text-tertiary)" }} />
+        </button>
+      ); 
+    } }
   ];
 
   if (!settingsModalOpen) return null;
@@ -530,7 +570,7 @@ export const AccountPermissionsModal = () => {
           <div className="modal-body-with-sidebar">
             <GroupTreeSidebar groups={groups} selectedGroupId={selectedGroupId} onSelectGroup={(id) => { setSelectedGroupId(id); setSelectedIds([]); }} accountCounts={accountCounts} onCreateGroup={handleCreateGroup} onRenameGroup={handleStartRename} onDeleteGroup={handleDeleteGroup} onMoveGroup={handleMoveGroup} />
             <div className="modal-body-main">
-              <StnTable columns={accountColumns} data={filteredAccounts} rowKey={(r) => r.id} selectedRowKeys={selectedIds} onSelectionChange={setSelectedIds} />
+              <StnTable columns={accountColumns} data={filteredAccounts} rowKey={(r) => r.id} selectedRowKeys={selectedIds} onSelectionChange={setSelectedIds} defaultSortKey="createdAt" defaultSortDir="desc" preSort={handlePreSort} rowClassName={getRowClassName} />
             </div>
           </div>
         </div>
@@ -565,7 +605,7 @@ export const AccountPermissionsModal = () => {
           <div className="modal-body-with-sidebar">
             <GroupTreeSidebar groups={groups} selectedGroupId={selectedGroupId} onSelectGroup={(id) => { setSelectedGroupId(id); setSelectedIds([]); }} accountCounts={accountCounts} onCreateGroup={handleCreateGroup} onRenameGroup={handleStartRename} onDeleteGroup={handleDeleteGroup} onMoveGroup={handleMoveGroup} />
             <div className="modal-body-main">
-              <StnTable columns={permissionColumns} data={filteredAccounts} rowKey={(r) => r.id} selectedRowKeys={selectedIds} onSelectionChange={setSelectedIds} />
+              <StnTable columns={permissionColumns} data={filteredAccounts} rowKey={(r) => r.id} selectedRowKeys={selectedIds} onSelectionChange={setSelectedIds} defaultSortKey="createdAt" defaultSortDir="desc" preSort={handlePreSort} rowClassName={getRowClassName} />
             </div>
           </div>
         </div>
@@ -636,9 +676,15 @@ export const AccountPermissionsModal = () => {
         .status-text.inactive { color: var(--text-secondary); }
         .date-text { font-size: 13px; color: var(--text-secondary); }
 
+        .highlight-row { background: rgba(var(--theme-primary-rgb), 0.03); }
+        .highlight-row:hover { background: rgba(var(--theme-primary-rgb), 0.06) !important; }
+
+        .room-access-btn { width: 100px; height: 32px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; border: 1px solid var(--border-weak); background: var(--panel-bg); border-radius: 6px; color: var(--text-primary); font-size: 13px; cursor: pointer; transition: all 0.2s; outline: none; }
+        .room-access-btn:hover { border-color: var(--theme-primary); background: rgba(var(--theme-primary-rgb), 0.02); }
+
         /* Group Tree Sidebar */
         .group-sidebar { width: 210px; flex-shrink: 0; display: flex; flex-direction: column; }
-        .group-sidebar-title { display: flex; align-items: center; gap: 6px; padding: 12px 14px; font-size: 14px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.5px; }
+        .group-sidebar-title { display: flex; align-items: center; gap: 6px; padding: 12px 14px 12px 0; font-size: 14px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.5px; }
         .group-sidebar-list { flex: 1; overflow-y: auto; padding: 4px 0; }
 
         .group-tree-item {

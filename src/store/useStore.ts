@@ -3035,9 +3035,27 @@ export const useStore = create<AppState>()(
           ? structuredClone(persistedState.customModels)
           : currentState.customModels;
 
+        // Fix race condition where IndexedDB loads after ThemeContext and overwrites the theme.
+        // We force the theme settings to match whatever currentState.csIsLightMode holds, 
+        // while allowing other persisted size configurations to be restored.
+        const themeConfig = currentState.csIsLightMode 
+          ? LIGHT_THEME_CYBER_SPACE_CONFIG 
+          : DEFAULT_CYBER_SPACE_CONFIG;
+
+        const sizeConfig = {
+          cyberSpaceEnabled: persistedState.cyberSpaceEnabled ?? currentState.cyberSpaceEnabled,
+          csCustomSpaceSize: persistedState.csCustomSpaceSize ?? currentState.csCustomSpaceSize,
+          csRoomWidthCm: persistedState.csRoomWidthCm ?? currentState.csRoomWidthCm,
+          csRoomLengthCm: persistedState.csRoomLengthCm ?? currentState.csRoomLengthCm,
+          csOffsetXCm: persistedState.csOffsetXCm ?? currentState.csOffsetXCm,
+          csOffsetZCm: persistedState.csOffsetZCm ?? currentState.csOffsetZCm,
+        };
+
         return {
           ...currentState,
           ...persistedState,
+          ...themeConfig,
+          ...sizeConfig,
           isEditMode: false,
           isCanvasReady: false,
           isSyncingPorts: false,

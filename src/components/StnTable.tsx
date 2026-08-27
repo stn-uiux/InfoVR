@@ -20,6 +20,10 @@ export interface StnTableProps<T> {
   onRowClick?: (record: T) => void;
   emptyText?: React.ReactNode;
   containerStyle?: React.CSSProperties;
+  defaultSortKey?: string;
+  defaultSortDir?: "asc" | "desc";
+  preSort?: (a: T, b: T) => number;
+  rowClassName?: (record: T) => string;
 }
 
 export function StnTable<T>({
@@ -31,12 +35,16 @@ export function StnTable<T>({
   onRowClick,
   emptyText = "데이터가 없습니다.",
   containerStyle,
+  defaultSortKey = null,
+  defaultSortDir = "asc",
+  preSort,
+  rowClassName,
 }: StnTableProps<T>) {
   const isMultiSelect = selectedRowKeys !== undefined && onSelectionChange !== undefined;
 
   // Sorting state
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [sortKey, setSortKey] = useState<string | null>(defaultSortKey);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">(defaultSortDir);
 
   const handleSort = (col: StnTableColumn<T>) => {
     if (!col.sortable) return;
@@ -54,19 +62,30 @@ export function StnTable<T>({
   };
 
   const sortedData = useMemo(() => {
-    if (!sortKey) return data;
-    const col = columns.find(c => c.key === sortKey);
-    if (!col || !col.sortValue) return data;
-    const extractor = col.sortValue;
-    return [...data].sort((a, b) => {
-      const va = extractor(a);
-      const vb = extractor(b);
-      let cmp = 0;
-      if (typeof va === "number" && typeof vb === "number") cmp = va - vb;
-      else cmp = String(va).localeCompare(String(vb), "ko");
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-  }, [data, sortKey, sortDir, columns]);
+    let sorted = [...data];
+    
+    if (sortKey) {
+      const col = columns.find(c => c.key === sortKey);
+      if (col && col.sortValue) {
+        const extractor = col.sortValue;
+        sorted.sort((a, b) => {
+          const va = extractor(a);
+          const vb = extractor(b);
+          let cmp = 0;
+          if (typeof va === "number" && typeof vb === "number") cmp = va - vb;
+          else cmp = String(va).localeCompare(String(vb), "ko");
+          return sortDir === "asc" ? cmp : -cmp;
+        });
+      }
+    }
+
+    if (preSort) {
+      // Stable sort for preSort (keeps column sort order within the preSort groups)
+      sorted.sort(preSort);
+    }
+    
+    return sorted;
+  }, [data, sortKey, sortDir, columns, preSort]);
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
@@ -151,7 +170,8 @@ export function StnTable<T>({
                   <tr
                     key={key}
                     onClick={() => onRowClick?.(record)}
-                    style={{ background: isSelected ? "rgba(91, 124, 247, 0.05)" : undefined }}
+                    className={rowClassName ? rowClassName(record) : undefined}
+                    style={{ background: isSelected ? "rgba(var(--theme-primary-rgb), 0.05)" : undefined }}
                   >
                     {isMultiSelect && (
                       <td className="col-check">
