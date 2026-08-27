@@ -5,6 +5,7 @@ import { useStore } from "../store/useStore";
 import { StnModal } from "./StnModal";
 import { StnSelect } from "./StnSelect";
 import { StnTable, StnTableColumn } from "./StnTable";
+import { CreateAccountModal } from "./CreateAccountModal";
 
 type AccountRole = "admin" | "editor" | "viewer" | "pending";
 type AccountStatus = "활성" | "정지";
@@ -352,6 +353,8 @@ export const AccountPermissionsModal = () => {
   const [renameGroup, setRenameGroup] = useState<AccountGroup | null>(null);
   const [renameValue, setRenameValue] = useState("");
 
+  const [isCreateAccountModalOpen, setIsCreateAccountModalOpen] = useState(false);
+
   // Computed
   const accountCounts = useMemo(() => {
     const counts: Record<string, number> = { all: accounts.length, none: 0 };
@@ -442,6 +445,22 @@ export const AccountPermissionsModal = () => {
       showToast(`${selectedIds.length}개 계정이 삭제되었습니다.`, "success");
       setSelectedIds([]);
     }
+  };
+
+  const handleCreateAccount = (data: { name: string; email: string; password: string; groupId: string; role: string }) => {
+    const newAccount: AccountData = {
+      id: Date.now(),
+      name: data.name,
+      email: data.email,
+      role: data.role as AccountRole,
+      status: "활성",
+      allowedRooms: [],
+      groupId: data.groupId,
+      createdAt: new Date().toISOString().split("T")[0],
+    };
+    setAccounts([newAccount, ...accounts]);
+    showToast(`계정 '${data.name}'이(가) 추가되었습니다.`, "success");
+    setIsCreateAccountModalOpen(false);
   };
 
   // Room
@@ -562,7 +581,7 @@ export const AccountPermissionsModal = () => {
                 </button>
               </div>
             ) : (
-              <button className="comm-btn comm-btn-primary" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <button className="comm-btn comm-btn-primary" style={{ display: "flex", alignItems: "center", gap: "6px" }} onClick={() => setIsCreateAccountModalOpen(true)}>
                 <Icon icon="fluent:person-add-24-filled" /> 새 계정 추가
               </button>
             )}
@@ -654,6 +673,16 @@ export const AccountPermissionsModal = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 새 계정 추가 모달 */}
+      {isCreateAccountModalOpen && (
+        <CreateAccountModal
+          open={isCreateAccountModalOpen}
+          onClose={() => setIsCreateAccountModalOpen(false)}
+          groups={groups}
+          onSave={handleCreateAccount}
+        />
       )}
 
       <style>{`

@@ -12,7 +12,6 @@ import { U_HEIGHT, GRID_SPACING, DEVICE_DEPTH } from "./constants";
 import { getHighestError } from "../utils/errorHelpers";
 import { resolveDeviceImage, isChassisModel } from "../utils/deviceAssets";
 import { DEFAULT_CHASSIS_CARDS } from "../utils/defaultChassisCards";
-import { useSvgComposer } from "../hooks/useSvgComposer";
 
 // ─── Phase 1-A: 모듈 레벨 공유 Geometry (모든 Rack이 재사용) ───
 const SHARED_GEO = {
@@ -863,44 +862,23 @@ const DeviceMesh = ({
     }
   });
 
-  // Always generate SVG if it's a chassis model (to override old big devicePngRaw), or if there are inserted cards AND no cached PNG is available
   const customModels = useStore((s) => s.customModels);
   
-  const stableInsertedCards = useMemo(() => {
-    return getEffectiveCards(device, customModels);
-  }, [device.insertedCards, device.modelName, customModels]);
-
-  const needsComposer = isChassisModel(device.modelName || "") || (!device.devicePngRaw && stableInsertedCards.length > 0);
-
-  const stableInsertedModules = device.insertedModules || EMPTY_ARRAY;
-  const stablePortStates = device.portStates || EMPTY_ARRAY;
-
-  const isChassis = isChassisModel(device.modelName || "");
-  const { composedHtml, blobUrl, webpUrl } = useSvgComposer(
-    needsComposer ? device.modelName : undefined,
-    needsComposer ? stableInsertedCards : EMPTY_ARRAY,
-    needsComposer ? stableInsertedModules : EMPTY_ARRAY,
-    needsComposer ? stablePortStates : EMPTY_ARRAY,
-    needsComposer ? (device.defaultViewSide || "front") : "front"
-  );
-
   const thumbUrl = useMemo(
     () => {
-      if (isChassis && webpUrl) {
-        return webpUrl;
-      }
+      // 1. Per-device override (if any)
       if (device.devicePngRaw) {
         return device.devicePngRaw;
       }
-      if (webpUrl) {
-        return webpUrl;
+      // 2. Custom variant thumbnail
+      const customModel = customModels.find(m => m.modelName === device.modelName);
+      if (customModel && customModel.modelPngRaw) {
+        return customModel.modelPngRaw;
       }
-      if (blobUrl) {
-        return blobUrl;
-      }
+      // 3. Fallback to default static image (which includes chassis-thumbnails)
       return resolveDeviceImage(device.modelName, device.defaultViewSide || "front");
     },
-    [device.defaultViewSide, device.modelName, webpUrl, blobUrl, device.devicePngRaw],
+    [device.defaultViewSide, device.modelName, device.devicePngRaw, customModels],
   );
 
   const resolvedUrl = useDeferredValue(thumbUrl);

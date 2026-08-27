@@ -5,10 +5,10 @@ import type { Device, PortState, RegisteredDevice } from "../types";
 import type { GeneratedPort } from "../types/equipment";
 import { getHighestError } from "../utils/errorHelpers";
 import { resolveDeviceImage, isChassisModel } from "../utils/deviceAssets";
+import { useDeviceImage } from "../hooks/useDeviceImage";
 import { getEffectiveCards } from "../utils/sampleUtils";
 import { DEFAULT_CHASSIS_CARDS } from "../utils/defaultChassisCards";
 import { generatePortMap } from "../utils/portUtils";
-import { useSvgComposer } from "../hooks/useSvgComposer";
 import { getNodeName } from "../utils/nodeUtils";
 
 /* ---------- Device Tile Image with loading / fallback ---------- */
@@ -74,15 +74,18 @@ export const DevicePanel = () => {
     insertedModules: any[];
   }) => {
     const customModels = useStore((s) => s.customModels);
-    const effectiveCards = getEffectiveCards({ modelName, insertedCards }, customModels);
     
-    const { webpUrl } = useSvgComposer(
-      isChassis ? modelName : undefined,
-      isChassis ? effectiveCards : [],
-      isChassis ? insertedModules : [],
-      [], viewSide as any
-    );
-    const finalSrc = isChassis && webpUrl ? webpUrl : staticImageSrc;
+    let finalSrc = staticImageSrc;
+    if (isChassis) {
+      const customModel = customModels.find(m => m.modelName === modelName);
+      if (customModel && customModel.modelPngRaw) {
+        finalSrc = customModel.modelPngRaw;
+      }
+    }
+    
+    const asyncSrc = useDeviceImage(modelName, viewSide as "front" | "rear");
+    finalSrc = finalSrc || asyncSrc;
+    
     if (!finalSrc) return null;
     return <img className="device-tile-image" src={finalSrc} alt={alt} />;
   };
@@ -828,25 +831,13 @@ export const DevicePanel = () => {
                       });
                       return sorted.map((rd) => {
                         const SvgComposerFallback = ({ device }: { device: any }) => {
-                          const isChassis = isChassisModel(device.modelName);
                           const customModels = useStore((s) => s.customModels);
-                          const stableInsertedCards = useMemo(() => {
-                            return getEffectiveCards(device, customModels);
-                          }, [device.insertedCards, device.modelName, customModels]);
-                          
-                          const needsComposer = isChassis || (!device.devicePngRaw && stableInsertedCards.length > 0);
-                          const { composedHtml, blobUrl, webpUrl } = useSvgComposer(
-                            needsComposer ? (device.modelName || "") : undefined,
-                            needsComposer ? stableInsertedCards : [],
-                            needsComposer ? (device.insertedModules || []) : [],
-                            [],
-                            needsComposer ? (device.defaultViewSide || "front") : "front"
-                          );
                           const thumbUrl = useMemo(() => {
-                            if (webpUrl) return webpUrl;
-                            if (blobUrl) return blobUrl;
+                            if (device.devicePngRaw) return device.devicePngRaw;
+                            const customModel = customModels.find(m => m.modelName === device.modelName);
+                            if (customModel && customModel.modelPngRaw) return customModel.modelPngRaw;
                             return resolveDeviceImage(device.modelName, device.defaultViewSide || "front");
-                          }, [device.defaultViewSide, device.modelName, webpUrl, blobUrl]);
+                          }, [device.defaultViewSide, device.modelName, device.devicePngRaw, customModels]);
                           return <img src={thumbUrl} alt={device.title || device.modelName} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />;
                         };
                         const thumb = resolveDeviceImage(rd.modelName, rd.defaultViewSide || "front");

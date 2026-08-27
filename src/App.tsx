@@ -46,6 +46,7 @@ import {
 } from "./utils/sampleData";
 import { createPortal } from "react-dom";
 import { PortErrorSynchronizer } from "./components/PortErrorSynchronizer";
+import { usePreloadThumbnails } from "./hooks/usePreloadThumbnails";
 
 /* ---------- Device Delete Confirmation Modal (top-level, z=99999) ---------- */
 const DeviceDeleteConfirmModal = () => {
@@ -214,6 +215,8 @@ function App() {
   const baselineNodes = useStore((s) => s.baselineNodes);
   const nodeEnvironments = useStore((s) => s.nodeEnvironments);
   const isSyncingPorts = useStore((s) => s.isSyncingPorts);
+
+  usePreloadThumbnails();
 
   const isDirty = useMemo(() => {
     // Keep these store slices as render triggers for getIsDirty().

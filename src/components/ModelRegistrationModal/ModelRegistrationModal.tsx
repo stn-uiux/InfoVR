@@ -20,7 +20,7 @@ import { cardDefinitions, equipmentModels, loadBaseEquipmentSvgRaw, getCardsForM
 import { DEVICE_TEMPLATES } from "../../utils/deviceTemplates";
 import { getDeviceViewSides, resolveDeviceImage, resolveDeviceSvgContent, isChassisModel } from "../../utils/deviceAssets";
 import { DEFAULT_CHASSIS_CARDS } from "../../utils/defaultChassisCards";
-import { useSvgComposer } from "../../hooks/useSvgComposer";
+import { useDeviceImage } from "../../hooks/useDeviceImage";
 
 const DynamicListThumb = ({
   modelName,
@@ -33,14 +33,12 @@ const DynamicListThumb = ({
   onHoverLeave,
   insertedCards,
 }: any) => {
-  const { webpUrl } = useSvgComposer(
-    isChassis ? modelName : undefined,
-    isChassis ? (insertedCards || []) : [], 
-    [], [], "front"
-  );
-
-  // 최종 이미지 URL: 섀시형은 webpUrl 최우선, 그 외는 staticImgUrl
-  const finalImgUrl = (isChassis && webpUrl) ? webpUrl : staticImgUrl;
+  // 섀시형 썸네일은 이제 useSvgComposer를 통해 동적 생성하지 않고 displayThumbPng 등을 통해 직접 받습니다.
+  // 이 컴포넌트는 ListThumb에서 이미 fallback 처리가 완료된 상태로 호출됩니다.
+  
+  // async하게 SVG를 로드하여 Data URL을 얻는 훅 사용
+  const asyncImgUrl = useDeviceImage(modelName, "front");
+  const finalImgUrl = staticImgUrl || asyncImgUrl;
 
   return (
     <div
@@ -57,13 +55,11 @@ const DynamicListThumb = ({
       onMouseMove={onHoverMove}
       onMouseLeave={onHoverLeave}
     >
-      {/* 1순위: 섀시형 WebP (공통 썸네일) */}
-      {isChassis && webpUrl ? (
-        <img src={webpUrl} alt={modelName} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-      ) : /* 2순위: PNG raw */ displayThumbPng ? (
+      {/* 1순위: PNG raw (미리 구운 썸네일) */}
+      {displayThumbPng ? (
         <img src={displayThumbPng} alt={modelName} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-      ) : /* 3순위: static 이미지 URL (고정형 모델용) */ staticImgUrl ? (
-        <img src={staticImgUrl} alt={modelName} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+      ) : /* 2순위: static 이미지 URL (혹은 SVG Data URL) */ finalImgUrl ? (
+        <img src={finalImgUrl} alt={modelName} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
       ) : /* 4순위: SVG fallback (거의 사용 안됨) */ displayThumb ? (
         <div dangerouslySetInnerHTML={{ __html: displayThumb }} style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }} />
       ) : (
@@ -74,6 +70,7 @@ const DynamicListThumb = ({
 };
 
 import { convertSvgToPngAsync } from "../../utils/imageUtils";
+import { generateComposedSvgAsync } from "../../hooks/useSvgComposer";
 
 const DELETE_ICON_STYLE: React.CSSProperties = {
   width: 14,
@@ -859,10 +856,68 @@ export const ModelRegistrationModal: React.FC = () => {
       }
     } else if (modelType === "card-based" && baseChassisRaw) {
       try {
-        // 섀시형 모델 fallback PNG - WebP는 useSvgComposer에서 동적 생성됨
-        finalModelPngRaw = await convertSvgToPngAsync(baseChassisRaw, dims.width || 860, dims.height || 200) || undefined;
+        const composerModel = {
+          modelId: "temp",
+          modelName: modelName.trim(),
+          rackUnit: `${unit}U`,
+          baseSvgUrl: "local",
+          baseEquipmentViewSvgRaw: baseChassisRaw || "",
+          equipmentSize: { width: dims.width, height: dims.height },
+          cardArea: { x: caX, y: caY, width: caWidth, height: caHeight, columns: effectiveMaxCols, columnWidth: effectiveColWidth },
+          _rowHeights: rowHeights.length > 0 ? rowHeights.map(r => parseFloat(r) || 0) : undefined,
+          _rowColumns: rowColumnsArr.length > 0 ? rowColumnsArr.map(c => parseInt(c) || 0) : undefined,
+          _rowGaps: rowGapsArr.length > 0 ? rowGapsArr.map(g => parseFloat(g) || 0) : undefined,
+          gridMerges,
+          gridColWidths,
+          gridRowHeights
+        };
+        const defaultCards = variants.find(v => v.variantName === "기본타입")?.insertedCards || [];
+        const composedSvg = await generateComposedSvgAsync(modelName.trim(), composerModel as any, defaultCards, [], "front");
+        if (composedSvg) {
+          finalModelPngRaw = await convertSvgToPngAsync(composedSvg, dims.width || 860, dims.height || 200) || undefined;
+        }
       } catch (err) {
         console.error("Failed to generate chassis PNG on submit", err);
+      }
+    }
+
+    // 각 variant의 variantPngRaw가 없으면 카드 합성 SVG → WebP로 생성
+    if (modelType === "card-based" && baseChassisRaw && variants.length > 0) {
+      const composerModelForVariants = {
+        modelId: "temp",
+        modelName: modelName.trim(),
+        rackUnit: `${unit}U`,
+        baseSvgUrl: "local",
+        baseEquipmentViewSvgRaw: baseChassisRaw || "",
+        equipmentSize: { width: dims.width, height: dims.height },
+        cardArea: { x: caX, y: caY, width: caWidth, height: caHeight, columns: effectiveMaxCols, columnWidth: effectiveColWidth },
+        _rowHeights: rowHeights.length > 0 ? rowHeights.map(r => parseFloat(r) || 0) : undefined,
+        _rowColumns: rowColumnsArr.length > 0 ? rowColumnsArr.map(c => parseInt(c) || 0) : undefined,
+        _rowGaps: rowGapsArr.length > 0 ? rowGapsArr.map(g => parseFloat(g) || 0) : undefined,
+        gridMerges,
+        gridColWidths,
+        gridRowHeights
+      };
+      for (let vi = 0; vi < variants.length; vi++) {
+        if (!variants[vi].variantPngRaw && variants[vi].insertedCards?.length) {
+          try {
+            const composedSvg = await generateComposedSvgAsync(
+              modelName.trim(),
+              composerModelForVariants as any,
+              variants[vi].insertedCards,
+              [],
+              "front"
+            );
+            if (composedSvg) {
+              variants[vi] = {
+                ...variants[vi],
+                variantPngRaw: await convertSvgToPngAsync(composedSvg, dims.width || 860, dims.height || 200) || undefined
+              };
+            }
+          } catch (err) {
+            console.error(`Failed to generate variant[${vi}] PNG on submit`, err);
+          }
+        }
       }
     }
 
@@ -2214,9 +2269,21 @@ export const ModelRegistrationModal: React.FC = () => {
                 gridColWidths,
                 gridRowHeights
               };
-              // 섀시형 variant PNG fallback - WebP는 useSvgComposer에서 동적 생성됨
+              // 섀시형 variant thumbnail: 카드가 합성된 SVG를 WebP로 변환 (serverRoom3D 방식)
               if (baseChassisRaw) {
-                newVariantPngRaw = await convertSvgToPngAsync(baseChassisRaw, dims.width || 860, dims.height || 200) || undefined;
+                const composedSvg = await generateComposedSvgAsync(
+                  modelName.trim(),
+                  composerModel as any,
+                  res.cards,
+                  [],
+                  "front"
+                );
+                if (composedSvg) {
+                  newVariantPngRaw = await convertSvgToPngAsync(composedSvg, dims.width || 860, dims.height || 200) || undefined;
+                } else {
+                  // fallback: 카드 합성 실패 시 빈 섀시라도 변환
+                  newVariantPngRaw = await convertSvgToPngAsync(baseChassisRaw, dims.width || 860, dims.height || 200) || undefined;
+                }
               }
             } catch (err) {
               console.error("Failed to generate variant PNG on save", err);
@@ -2244,10 +2311,27 @@ export const ModelRegistrationModal: React.FC = () => {
                 console.error("Failed to generate fallback PNG on variant save", err);
               }
             } else if (modelType === "card-based" && baseChassisRaw) {
-              // Auto-save 시 섀시 깡통 PNG 썸네일 생성
               try {
-                // 섀시형 모델 fallback PNG - WebP는 useSvgComposer에서 동적 생성됨
-                finalModelPngRaw = await convertSvgToPngAsync(baseChassisRaw, dims.width || 860, dims.height || 200) || undefined;
+                const composerModel = {
+                  modelId: "temp",
+                  modelName: modelName.trim(),
+                  rackUnit: `${unit}U`,
+                  baseSvgUrl: "local",
+                  baseEquipmentViewSvgRaw: baseChassisRaw || "",
+                  equipmentSize: { width: dims.width, height: dims.height },
+                  cardArea: { x: caX, y: caY, width: caWidth, height: caHeight, columns: effectiveMaxCols, columnWidth: effectiveColWidth },
+                  _rowHeights: rowHeights.length > 0 ? rowHeights.map(r => parseFloat(r) || 0) : undefined,
+                  _rowColumns: rowColumnsArr.length > 0 ? rowColumnsArr.map(c => parseInt(c) || 0) : undefined,
+                  _rowGaps: rowGapsArr.length > 0 ? rowGapsArr.map(g => parseFloat(g) || 0) : undefined,
+                  gridMerges,
+                  gridColWidths,
+                  gridRowHeights
+                };
+                const defaultCards = next.find(v => v.variantName === "기본타입")?.insertedCards || [];
+                const composedSvg = await generateComposedSvgAsync(modelName.trim(), composerModel as any, defaultCards, [], "front");
+                if (composedSvg) {
+                  finalModelPngRaw = await convertSvgToPngAsync(composedSvg, dims.width || 860, dims.height || 200) || undefined;
+                }
               } catch (err) {
                 console.error("Failed to generate chassis PNG on variant save", err);
               }

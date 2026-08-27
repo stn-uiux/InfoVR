@@ -55,18 +55,6 @@ const PORT_STATUS_COLORS: Record<string, string> = {
   disabled: "#666666",
 };
 
-const staticThumbnailsModules = import.meta.glob<{ default: string }>(
-  "../utils/chassis-thumbnails/*.webp",
-  { eager: true }
-);
-
-const staticThumbnailMap = new Map<string, string>();
-for (const [path, mod] of Object.entries(staticThumbnailsModules)) {
-  const filename = path.split("/").pop() ?? "";
-  const baseName = filename.replace(/\.webp$/i, "").replace(/^\[\d+U\]\s*/, "").trim();
-  staticThumbnailMap.set(baseName, mod.default);
-}
-
 const CARD_ROW_HEIGHT = 46;
 type ComposerEquipmentModel = EquipmentModel & { 
   _rowHeights?: number[]; 
@@ -182,12 +170,9 @@ const _blobUrlCache = new SimpleLRUCache<string, string>(CACHE_SIZE, (key, url) 
   // 캐시가 방출(Evict)될 때 메모리 해제
   URL.revokeObjectURL(url);
 });
-const _webpUrlCache = new SimpleLRUCache<string, string>(CACHE_SIZE);
-
 export interface SvgComposerResult {
   composedHtml: string;
   blobUrl?: string;
-  webpUrl?: string;
   isModularDevice: boolean;
   generatedPorts: GeneratedPort[];
   generatedPortMap: Map<string, GeneratedPort>;
@@ -285,17 +270,11 @@ export function useSvgComposer(
     _composedHtmlCache.get(_cacheKey) || ""
   );
 
-  const [webpUrl, setWebpUrl] = useState<string | undefined>(() =>
-    _webpUrlCache.get(`webp::${_cacheKey}`)
-  );
-
   // _cacheKey 변경 시 캐시 히트를 즉시 반영
   useEffect(() => {
     const cached = _composedHtmlCache.get(_cacheKey);
     if (cached) setComposedHtml(cached);
     else setComposedHtml("");
-
-    setWebpUrl(_webpUrlCache.get(`webp::${_cacheKey}`));
   }, [_cacheKey]);
 
   const isModularDevice = useMemo(() => {
@@ -517,79 +496,7 @@ export function useSvgComposer(
     return url;
   }, [composedHtml, _cacheKey]);
 
-  // ─── WebP 자동 생성 ───
-  useEffect(() => {
-    if (!equipModel || !modelName) return;
-    
-    const webpCacheKey = `webp::${_cacheKey}`;
-
-    const cachedWebp = _webpUrlCache.get(webpCacheKey);
-    if (cachedWebp) {
-      setWebpUrl(cachedWebp);
-      return;
-    }
-
-    if (modulesKey === "" && portsKey === "" && viewSide === "front") {
-      const staticThumb = staticThumbnailMap.get(modelName);
-      if (staticThumb) {
-        const defaultEquipModel = equipmentModels.find(m => m.modelName === modelName);
-        if (defaultEquipModel) {
-          const defaultLayoutKey = JSON.stringify({
-            cardArea: defaultEquipModel.cardArea,
-            rowHeights: defaultEquipModel._rowHeights,
-            rowGaps: defaultEquipModel._rowGaps,
-            rowColumns: defaultEquipModel._rowColumns,
-          });
-          
-          const defaultCards = DEFAULT_CHASSIS_CARDS[modelName] || [];
-          const defaultCardsKey = defaultCards.map((c: any) => `${c.slotNo}-${c.cardFileName}`).sort().join("|");
-
-          if (modelLayoutKey === defaultLayoutKey && (cardsKey === "" || cardsKey === defaultCardsKey)) {
-            _webpUrlCache.set(webpCacheKey, staticThumb);
-            setWebpUrl(staticThumb);
-            return;
-          }
-        }
-      }
-    }
-
-    let isMounted = true;
-    
-    withComposerTask(async () => {
-      const { idbStorage } = await import("../utils/indexedDBStorage");
-      const savedUrl = await idbStorage.getItem(webpCacheKey);
-      
-      if (!isMounted) return;
-      
-      if (savedUrl) {
-        _webpUrlCache.set(webpCacheKey, savedUrl);
-        setWebpUrl(savedUrl);
-      } else {
-        // 캐시에 없을 경우 새로 생성해야 함
-        const targetHtml = composedHtml;
-        const expectedHtml = _composedHtmlCache.get(_cacheKey);
-        if (!targetHtml || targetHtml !== expectedHtml) return;
-
-
-        // 캐시 오염을 방지하기 위해 WebP를 새로 생성하기 전에는 모든 카드의 SVG 데이터가 로드되었는지 확인합니다.
-        const isAllCardsLoaded = insertedCards.every((card) => cardSvgMap.has(card.cardFileName));
-        if (!isAllCardsLoaded) return;
-
-        const { convertSvgToPngAsync } = await import("../utils/imageUtils");
-        const url = await convertSvgToPngAsync(targetHtml, equipModel.equipmentSize?.width || 984, equipModel.equipmentSize?.height || 200);
-        
-        if (!isMounted) return;
-        
-        _webpUrlCache.set(webpCacheKey, url);
-        idbStorage.setItem(webpCacheKey, url).catch(console.error);
-        setWebpUrl(url);
-      }
-    }).catch(console.error);
-
-    return () => { isMounted = false; };
-  }, [composedHtml, baseHtmlForWebp, _cacheKey, equipModel, modelName, viewSide, insertedCards, cardSvgMap]);
-
-  return { composedHtml, blobUrl, webpUrl, isModularDevice, generatedPorts, generatedPortMap };
+  return { composedHtml, blobUrl, isModularDevice, generatedPorts, generatedPortMap };
 }
 
 // ─── 내부 합성 헬퍼 ───
@@ -1000,43 +907,4 @@ export async function generateComposedSvgAsync(
   return new XMLSerializer().serializeToString(baseDoc);
 }
 
-export async function preloadAllChassisThumbnails() {
-  const { equipmentModels } = await import("../utils/cardAssets");
-  const { idbStorage } = await import("../utils/indexedDBStorage");
-  const { convertSvgToPngAsync } = await import("../utils/imageUtils");
-  
-  for (const model of equipmentModels) {
-    if (model.cardArea || model.slots || model.rows) {
-      const modelLayoutKey = JSON.stringify({
-        cardArea: model.cardArea,
-        rowHeights: model._rowHeights,
-        rowGaps: model._rowGaps,
-        rowColumns: model._rowColumns,
-      });
-      const cacheKeyFront = `${model.modelName}::front::${modelLayoutKey}::::::`;
-      const webpCacheKeyFront = `webp::${cacheKeyFront}`;
 
-      const staticThumb = staticThumbnailMap.get(model.modelName);
-      if (staticThumb) {
-        _webpUrlCache.set(webpCacheKeyFront, staticThumb);
-        continue;
-      }
-      
-      const savedFront = await idbStorage.getItem(webpCacheKeyFront);
-      if (!savedFront) {
-        withComposerTask(async () => {
-          try {
-            const svgHtml = await generateComposedSvgAsync(model.modelName, model as any, [], [], "front");
-            if (svgHtml) {
-              const url = await convertSvgToPngAsync(svgHtml, model.equipmentSize?.width || 984, model.equipmentSize?.height || 200);
-              await idbStorage.setItem(webpCacheKeyFront, url);
-              _webpUrlCache.set(webpCacheKeyFront, url);
-            }
-          } catch (e) {
-            console.error("Failed to preload chassis thumbnail:", e);
-          }
-        });
-      }
-    }
-  }
-}

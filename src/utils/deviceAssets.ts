@@ -83,17 +83,6 @@ const assetModules = import.meta.glob<{ default: string }>(["../assets/*.png", "
   eager: true,
 });
 
-// Lazy import all SVG files from src/assets/ as raw text
-// Using ?raw avoids fetch() and URL-encoding issues with special char filenames.
-// By NOT specifying eager: true, these huge strings are put in separate chunks and loaded on demand.
-const svgRawModules = import.meta.glob<{ default: string }>(
-  ["../assets/*.svg", "../assets/gwacheon/*.svg", "../assets/card/*.svg"],
-  {
-    query: "?raw",
-  }
-);
-
-// ── PNG: modelName → resolved URL ──────────────────────────────────────────
 const deviceImageMap = new Map<string, string>();
 const deviceImageSideMap = new Map<string, string>();
 
@@ -109,6 +98,16 @@ for (const [path, mod] of Object.entries(assetModules)) {
     }
   }
 }
+
+// Lazy import all SVG files from src/assets/ as raw text
+// Using ?raw avoids fetch() and URL-encoding issues with special char filenames.
+// By NOT specifying eager: true, these huge strings are put in separate chunks and loaded on demand.
+const svgRawModules = import.meta.glob<{ default: string }>(
+  ["../assets/*.svg", "../assets/gwacheon/*.svg", "../assets/card/*.svg"],
+  {
+    query: "?raw",
+  }
+);
 
 // ── SVG: modelName → Promise resolving to raw SVG text ─────────────────────
 const deviceSvgPromiseMap = new Map<string, () => Promise<{ default: string }>>();
@@ -151,23 +150,50 @@ export const resolveDeviceImage = (
     }
   }
 
-  // 3. Fallback: 사용자 등록 모델 SVG → data URL
+  // 2. Fallback: custom 모델 PNG -> SVG data URL
   const custom = findCustomModelByName(modelName);
-  const svgRaw = side === "rear" ? custom?.rearSvgRaw : (custom?.modelSvgRaw || custom?.baseEquipmentViewSvgRaw);
-  if (svgRaw) {
-    const cacheKey = `${modelName.toLowerCase()}::${side}`;
-    let cached = customSvgDataUrlCache.get(cacheKey);
-    if (!cached) {
-      cached = svgRawToDataUrl(svgRaw);
-      customSvgDataUrlCache.set(cacheKey, cached);
+  const isChassis = isChassisModel(modelName);
+  
+  if (custom && custom.modelPngRaw) {
+    return custom.modelPngRaw;
+  }
+  
+  // chassis 템플릿의 경우 정적 PNG가 없으면 빈 섀시 SVG를 Data URL로 변환하여 즉시 반환
+  if (isChassis) {
+    const svgRaw = side === "rear" ? custom?.rearSvgRaw : (custom?.modelSvgRaw || custom?.baseEquipmentViewSvgRaw);
+    if (svgRaw) {
+      const cacheKey = `${modelName.toLowerCase()}::${side}`;
+      let cached = customSvgDataUrlCache.get(cacheKey);
+      if (!cached) {
+        cached = svgRawToDataUrl(svgRaw);
+        customSvgDataUrlCache.set(cacheKey, cached);
+      }
+      return cached;
+    } else {
+      // Base template (SVG promise map)
+      const lookupName = getLookupNames(modelName)[0];
+      const importFn = side === "front" 
+        ? (deviceSvgPromiseMap.get(lookupName) ?? deviceSvgPromiseMap.get(lookupName.toLowerCase()))
+        : deviceSvgSidePromiseMap.get(getAssetKey(lookupName, side));
+      if (importFn) {
+         // 동기적으로 반환할 수 없으므로(import가 비동기), 초기 렌더링 시에는 undefined 반환 후
+         // 외부에서 resolveDeviceSvgContent를 통해 처리해야 하나, SVG 캐시에 로드된 경우 동기 반환 가능
+         const cacheKey = `${modelName.toLowerCase()}::${side}`;
+         const cachedRaw = svgContentCache.get(cacheKey);
+         if (cachedRaw) {
+           let cachedDataUrl = customSvgDataUrlCache.get(cacheKey);
+           if (!cachedDataUrl) {
+             cachedDataUrl = svgRawToDataUrl(cachedRaw);
+             customSvgDataUrlCache.set(cacheKey, cachedDataUrl);
+           }
+           return cachedDataUrl;
+         }
+      }
     }
-    return cached;
   }
 
   return undefined;
 };
-
-
 
 /**
  * Resolve a device SVG raw text content from modelName.

@@ -24,12 +24,7 @@ export const InitialLoader = () => {
       if (cd.svgUrl) preloadThumbnail(cd.svgUrl);
     });
     
-    // 섀시형 모델 썸네일(WebP) 백그라운드 사전 생성 및 로컬 캐싱
-    import("../hooks/useSvgComposer").then((mod) => {
-      if (mod.preloadAllChassisThumbnails) {
-        mod.preloadAllChassisThumbnails();
-      }
-    });
+
   }, []);
 
   useEffect(() => {
