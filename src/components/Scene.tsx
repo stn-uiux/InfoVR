@@ -109,7 +109,7 @@ const SceneReadyMonitor = ({ isReadyToMonitor }: { isReadyToMonitor: boolean }) 
     };
   }, []);
 
-  useFrame(() => {
+  useFrame((state) => {
     // 이미 한 번 ready가 된 적이 있으면, 후속 로딩에서는 false로 되돌리지 않음
     if (hasBeenReadyOnce.current) return;
 
@@ -124,6 +124,7 @@ const SceneReadyMonitor = ({ isReadyToMonitor }: { isReadyToMonitor: boolean }) 
     
     if (frameCount.current < 5) {
       frameCount.current++;
+      state.invalidate();
       if (frameCount.current === 5 && !useStore.getState().isCanvasReady) {
         setCanvasReady(true);
         hasBeenReadyOnce.current = true;
@@ -349,6 +350,7 @@ export const Scene = () => {
 
   return (
     <Canvas
+      frameloop="demand"
       shadows
       camera={{ position: [10, 10, 10], fov: 50 }}
       style={{ width: "100%", height: "100vh", background: backgroundColor }}

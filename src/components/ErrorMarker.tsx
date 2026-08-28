@@ -22,6 +22,7 @@ export const ErrorMarker = ({ rack }: ErrorMarkerProps) => {
   useFrame((state, delta) => {
     if (meshRef.current) {
       meshRef.current.rotation.y += delta * 1.0; // Rotate slowly around Y axis
+      state.invalidate();
     }
   });
 

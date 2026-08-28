@@ -96,7 +96,7 @@ export const sampleNodes: HierarchyNode[] = getDefaultNodes();
 // 기존: 강남 120개, 기타 60~80개 → 총 ~700 장비
 // 변경: 전산실당 장비 대수 200~500대로 대폭 증가
 const ROOM_CONFIG: Record<string, { deviceCount: number; rackCount: number; cols: number }> = {
-  [GANGNAM_ROOM_1_NODE_ID]: { deviceCount: 500, rackCount: 40, cols: 10 },
+  [GANGNAM_ROOM_1_NODE_ID]: { deviceCount: 800, rackCount: 60, cols: 15 },
   [GANGNAM_ROOM_2_NODE_ID]: { deviceCount: 350, rackCount: 30, cols: 10 },
   [GANGNAM_ROOM_3_NODE_ID]: { deviceCount: 200, rackCount: 16, cols: 8 },
   [GANGBUK_ROOM_1_NODE_ID]: { deviceCount: 300, rackCount: 24, cols: 8 },

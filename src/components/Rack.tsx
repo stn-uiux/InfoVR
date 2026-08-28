@@ -501,6 +501,7 @@ export const Rack = memo(({
           onClick={isObstructing ? undefined : (e) => {
             if (e.delta > 15) return; // Ignore drag
             (e as any).stoppedByRack = true;
+            
             const hitGizmoHelper = e.intersections.some((hit) => {
               let obj: Object3D | null = hit.object;
               while (obj) {
@@ -511,48 +512,27 @@ export const Rack = memo(({
             });
             if (hitGizmoHelper) return;
 
-            // Find the FIRST interactBox hit by the ray
+            // Prevent clicks from passing through if this rack is behind another
             const firstRackHit = e.intersections.find(
               (hit) => (hit.object as Mesh).geometry === SHARED_GEO.interactBox
             );
-            
-            // If the first interactBox hit is NOT this rack's interactBox, 
-            // it means this rack is behind another rack. Ignore the click!
             if (firstRackHit && firstRackHit.object !== e.eventObject) {
               return;
             }
 
-            let hitModel = false;
-            for (const hit of e.intersections) {
-              let isModel = false;
-              let obj: Object3D | null = hit.object;
-              while (obj) {
-                if (obj.userData && obj.userData.isModelContainer) {
-                  isModel = true;
-                  break;
-                }
-                obj = obj.parent;
-              }
-              if (isModel) {
-                hitModel = true;
-                break;
-              }
-              if ((hit.object as Mesh).geometry !== SHARED_GEO.interactBox) {
-                break;
-              }
-            }
-            if (hitModel) return;
-
-            // Note: NOT stopping propagation so that devices inside the rack can still receive onClick!
-            // We only want to prevent racks behind from being selected. But since this is onClick,
-            // if we don't stop propagation, both rack and device might process it, which is fine, 
-            // device ignores first click.
             const state = useStore.getState();
-            if (state.selectedRackId !== rackId || state.focusedRackId !== rackId) {
+            const isAlreadySelected = state.selectedRackId === rackId;
+
+            if (!isAlreadySelected) {
+              // FIRST CLICK: Select the rack and completely stop the click from falling through!
+              e.stopPropagation();
               state.selectRack(rackId);
               if (!state.isEditMode) {
                 state.focusRack(rackId);
               }
+            } else {
+              // ALREADY SELECTED: Allow click to pass through to devices inside the rack.
+              // The background sphere will still ignore it because stoppedByRack is true.
             }
           }}
           onPointerOver={isObstructing ? undefined : (e) => {
@@ -820,8 +800,10 @@ const DeviceMesh = ({
   }, [needsAnimation, blackColor]);
 
   // Phase 1-C: early return 패턴으로 빈 함수 호출 오버헤드 제거
-  useFrame(({ clock }) => {
+  useFrame((state) => {
     if (!needsAnimation) return;
+    state.invalidate();
+    const clock = state.clock;
 
     const bodyMat = meshRef.current?.material;
     const faceMat = faceplateRef.current?.material;

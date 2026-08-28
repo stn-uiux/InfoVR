@@ -298,7 +298,7 @@ export function CyberSpaceEnvironment() {
               blur={[400, 400]}
               resolution={1024}
               mixBlur={csIsLightMode ? 1.0 : 3.0}
-              mixStrength={csIsLightMode ? 1.5 : 12}
+              mixStrength={csIsLightMode ? 0.8 : 4.0}
               roughness={csFloorRoughness}
               depthScale={1.2}
               minDepthThreshold={0.4}

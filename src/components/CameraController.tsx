@@ -44,12 +44,12 @@ export const CameraController = () => {
     const handleLocalZoomOut = (prevRackId: string | null) => {
       const currentRacks = useStore.getState().racks;
       const prevRack = currentRacks.find((r) => r.rackId === prevRackId);
-      
+
       if (prevRack) {
         const rackX = prevRack.position[0] * GRID_SPACING;
         const rackZ = prevRack.position[1] * GRID_SPACING;
         const rackHeight = prevRack.rackSize * U_HEIGHT + 0.1;
-        
+
         const orientation = prevRack.orientation ?? 180;
         const orientationRad = ((180 - orientation) * Math.PI) / 180;
         const camDirX = Math.sin(orientationRad);
@@ -82,7 +82,7 @@ export const CameraController = () => {
         lastProcessedRackId.current = null;
         lastWasFocused.current = false;
         setPreFocusCameraState(null);
-        
+
         handleLocalZoomOut(prevRackId);
         return;
       }
@@ -142,7 +142,7 @@ export const CameraController = () => {
 
     const distHeight = rackHeight / 2 / Math.tan(vFovRad / 2);
     const distWidth = rackWidth / 2 / Math.tan(hFovRad / 2);
-    
+
     // 낮은 랙일수록 하단 UI(캐러셀 등)에 가려지는 것을 방지하기 위해 줌 배율을 한 단계 늘립니다.
     const distanceMultiplier = rack.rackSize <= 32 ? 1.8 : 1.55;
     const baseDistance = Math.max(distHeight, distWidth) * distanceMultiplier;
@@ -162,7 +162,7 @@ export const CameraController = () => {
 
     // 정면에 가까운 뷰를 위해 카메라 기준 높이를 랙 중앙보다 살짝 위로 맞춥니다.
     // (OrbitControls의 maxPolarAngle 제한에 걸려 화면이 떨리는 현상 방지)
-    const cameraHeight = rackHeight * 0.5 + 0.3; 
+    const cameraHeight = rackHeight * 0.5 + 0.3;
 
     // 시선 중심점(LookAt) 역시 랙 중앙으로 둡니다.
     vTargetLookAt.current.set(rackX, rackHeight * 0.5, rackZ);
@@ -181,7 +181,7 @@ export const CameraController = () => {
 
     isAnimating.current = true;
     // 리액트가 랙을 숨길(unmount/invisible) 수 있도록 카메라 이동을 2프레임 지연시킵니다.
-    animationDelayFrames.current = 2; 
+    animationDelayFrames.current = 2;
   }, [camera, controls, setPreFocusCameraState]);
 
   // Detect user interaction to stop fighting controls
@@ -370,7 +370,7 @@ export const CameraController = () => {
   useFrame((state, delta) => {
     const storeState = useStore.getState();
     const targetId = storeState.focusedRackId || storeState.selectedRackId;
-    
+
     // React의 useEffect(setupFocus)가 아직 실행되지 않아 스토어 상태와 렌더링 상태가 불일치할 경우 
     // 잘못된 위치 기준으로 장애물을 판별하는 것을 막기 위해 프레임 업데이트를 스킵합니다.
     if (targetId !== lastProcessedRackId.current) {
@@ -415,7 +415,7 @@ export const CameraController = () => {
       if (storeState.focusedRackId) {
 
         const targetRack = storeState.racks.find(r => r.rackId === storeState.focusedRackId);
-        
+
         if (targetRack) {
           // 목표 랙의 중심점
           const rackX = targetRack.position[0] * GRID_SPACING;
@@ -457,7 +457,7 @@ export const CameraController = () => {
               const distToTargetXZ = dirXZ.length();
               if (distToTargetXZ === 0) continue;
               dirXZ.normalize();
-              
+
               const otherXZ = new Vector2(otherX, otherZ);
               const vecToOtherXZ = new Vector2().subVectors(otherXZ, camXZ);
               const projSightXZ = vecToOtherXZ.dot(dirXZ);
@@ -474,9 +474,9 @@ export const CameraController = () => {
                   // 카메라가 목표 랙을 내려다보는 시선이 맞은편 랙 위쪽 허공을 지나가는지 검사
                   const ratio = projSightXZ / distToTargetXZ;
                   const sightYAtRack = camPosToUse.y + ratio * (targetCenterY - camPosToUse.y);
-                  
+
                   const otherHeight = other.rackSize * U_HEIGHT + 0.1;
-                  
+
                   // 시선 높이가 맞은편 랙의 실제 높이보다 낮거나, 카메라 자체가 랙 높이보다 낮다면 (화면 하단을 가림) 숨김 처리
                   if (sightYAtRack < otherHeight + 0.5 || camPosToUse.y < otherHeight + 0.5) {
                     obstructingIds.push(other.rackId);
@@ -491,7 +491,7 @@ export const CameraController = () => {
           if (isAnimating.current) {
             nextIds = Array.from(new Set([...storeState.obstructingRackIds, ...obstructingIds]));
           }
-          
+
           // 배열 동등성 비교 (순서 무관)
           const currentSorted = [...storeState.obstructingRackIds].sort();
           const nextSorted = nextIds.sort();
@@ -507,6 +507,7 @@ export const CameraController = () => {
     }
 
     if (!isAnimating.current || !controls || isInteracting.current) return;
+    state.invalidate();
 
     // 리액트가 상태를 감지하여 랙을 숨길 수 있도록 딜레이 적용
     if (animationDelayFrames.current > 0) {
@@ -515,7 +516,7 @@ export const CameraController = () => {
     }
 
     const orbitControls = controls as unknown as OrbitControls;
-    const alpha = 1 - Math.exp(-4 * delta); // 타겟팅 속도 조정 (3 -> 4)
+    const alpha = 1 - Math.exp(-5 * delta); // 타겟팅 속도 조정 
 
     camera.position.lerp(vTargetPos.current, alpha);
     orbitControls.target.lerp(vTargetLookAt.current, alpha);

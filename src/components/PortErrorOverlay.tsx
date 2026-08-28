@@ -152,7 +152,8 @@ export const PortErrorOverlay = ({
   portRectsRef.current = portRects;
 
   // 매 프레임 캔버스 다시 그리기 → 반짝임
-  useFrame(({ clock }) => {
+  useFrame((state) => {
+    const clock = state.clock;
     if (!texture || portRectsRef.current.length === 0) return;
     const { canvas, tex } = texture;
     const ctx = canvas.getContext("2d");
@@ -162,6 +163,7 @@ export const PortErrorOverlay = ({
     const H = canvas.height;
     const t = clock.getElapsedTime();
     const blink = 0.5 + Math.sin(t * Math.PI * 1.8) * 0.5; // 0~1
+    state.invalidate();
 
     ctx.clearRect(0, 0, W, H);
 
