@@ -10,7 +10,7 @@ import {
   Edges,
   PivotControls,
 } from "@react-three/drei";
-import { Matrix4, Vector3, Plane, BufferGeometry, Float32BufferAttribute } from "three";
+import { Matrix4, Vector3, Plane, BufferGeometry, Float32BufferAttribute, BackSide } from "three";
 import { useStore } from "../store/useStore";
 import { Rack } from "./Rack";
 import { ImportedModelMesh } from "./ImportedModelMesh";
@@ -352,29 +352,8 @@ export const Scene = () => {
       shadows
       camera={{ position: [10, 10, 10], fov: 50 }}
       style={{ width: "100%", height: "100vh", background: backgroundColor }}
-      onPointerDown={(e) => {
-        if (useStore.getState().isGizmoHovered) return;
-        pointerDownPos.current = { x: e.clientX, y: e.clientY };
-      }}
       onPointerLeave={() => {
         useStore.getState().setHoveredDevice(null);
-      }}
-      onPointerMissed={(e) => {
-        if (useStore.getState().isGizmoHovered) return;
-        if (e.button !== 0) return; // Only process left click for deselection
-
-        // Only clear focus on a "click" (minimal movement between down and up)
-        if (pointerDownPos.current) {
-          const dx = e.clientX - pointerDownPos.current.x;
-          const dy = e.clientY - pointerDownPos.current.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 5) {
-            useStore.getState().selectRack(null);
-            useStore.getState().selectModel(null);
-            setIsRoomSelected(false);
-          }
-        }
-        pointerDownPos.current = null;
       }}
     >
       {/* Only use default basic lights in Edit Mode */}
@@ -400,6 +379,28 @@ export const Scene = () => {
 
       {/* Global Focus Lights to avoid Shader recompilation freezes on selection */}
       <GlobalFocusLights />
+
+      {/* Robust Background Click Catcher */}
+      <mesh
+        scale={10000}
+        onClick={(e) => {
+          if (useStore.getState().isGizmoHovered) return;
+          if (e.button !== 0) return;
+          if (e.delta > 15) return; // ignore drags
+
+          // Only trigger if this background click wasn't already processed by a Rack or Model
+          if ((e as any).stoppedByRack || (e as any).stoppedByModel) {
+            return;
+          }
+
+          useStore.getState().selectRack(null);
+          useStore.getState().selectModel(null);
+          setIsRoomSelected(false);
+        }}
+      >
+        <sphereGeometry args={[1, 16, 16]} />
+        <meshBasicMaterial side={BackSide} transparent opacity={0} depthWrite={false} />
+      </mesh>
 
       {!selectedRackId && (
         <GizmoHelper alignment="top-right" margin={[gizmoMarginX, 140]} renderPriority={isEditMode ? undefined : 2}>
@@ -491,7 +492,7 @@ export const Scene = () => {
                       position={[0, -2.005, 0]}
                       onClick={(e) => {
                         if (e.button !== 0) return; // Only left-click
-                        if (e.delta > 5) return; // Ignore drags
+                        if (e.delta > 15) return; // Ignore drags
 
                         // Only select the floor if it was the front-most object clicked
                         // (prevents selecting floor when clicking a Rack that doesn't stop propagation)

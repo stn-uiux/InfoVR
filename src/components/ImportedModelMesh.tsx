@@ -330,7 +330,8 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
     if (e.button !== 0) return; // Only allow left-click
-    if (e.delta > 5) return; // Ignore if user dragged
+    if (e.delta > 15) return; // Ignore if user dragged
+    (e as any).stoppedByModel = true;
 
     if (useStore.getState().isGizmoHovered) return;
 

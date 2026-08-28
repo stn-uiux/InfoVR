@@ -499,7 +499,8 @@ export const Rack = memo(({
           scale={[width, height, depth]}
           onPointerDown={isObstructing ? undefined : handlePointerDown}
           onClick={isObstructing ? undefined : (e) => {
-            if (e.delta > 5) return; // Ignore drag
+            if (e.delta > 15) return; // Ignore drag
+            (e as any).stoppedByRack = true;
             const hitGizmoHelper = e.intersections.some((hit) => {
               let obj: Object3D | null = hit.object;
               while (obj) {
