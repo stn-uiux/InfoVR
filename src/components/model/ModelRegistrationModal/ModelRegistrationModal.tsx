@@ -35,7 +35,7 @@ const DynamicListThumb = ({
 }: any) => {
   // 섀시형 썸네일은 이제 useSvgComposer를 통해 동적 생성하지 않고 displayThumbPng 등을 통해 직접 받습니다.
   // 이 컴포넌트는 ListThumb에서 이미 fallback 처리가 완료된 상태로 호출됩니다.
-  
+
   // async하게 SVG를 로드하여 Data URL을 얻는 훅 사용
   const asyncImgUrl = useDeviceImage(modelName, "front");
   const finalImgUrl = staticImgUrl || asyncImgUrl;
@@ -44,9 +44,9 @@ const DynamicListThumb = ({
     <div
       className="model-thumb"
       onMouseEnter={(e) => {
-        onHover({ 
-          pngRaw: displayThumbPng, 
-          svgRaw: null, 
+        onHover({
+          pngRaw: displayThumbPng,
+          svgRaw: null,
           imgUrl: finalImgUrl || null,
           name: modelName,
         });
@@ -577,7 +577,7 @@ export const ModelRegistrationModal: React.FC = () => {
     setErrors({});
     setEditingModelId(null);
     setInitialFormStateStr(null);
-    
+
     if (chassisOriginalFileRef) chassisOriginalFileRef.current = null;
     if (modelFileRef.current) modelFileRef.current.value = "";
     if (rearFileRef.current) rearFileRef.current.value = "";
@@ -588,10 +588,10 @@ export const ModelRegistrationModal: React.FC = () => {
   const loadModelForEdit = useCallback(async (modelId: string) => {
     const model = customModels.find((m) => m.modelId === modelId);
     if (!model) return;
-    
+
     setIsFormLoading(true);
     resetForm();
-    
+
     setEditingModelId(modelId);
     setModelName(model.modelName);
     setVendor(model.vendor || "Nokia");
@@ -1126,15 +1126,15 @@ export const ModelRegistrationModal: React.FC = () => {
               {/* Model SVG Upload */}
               {modelType !== "card-based" && (
                 <div className="mrm-section">
-                  <div className="mrm-section-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
+                  <div className="mrm-section-title">
+                    <div className="mrm-title-left">
                       모델 파일 업로드
                       <span className="badge">SVG</span>
                     </div>
                     {modelSvgRaw && !useDualView && (
-                      <div style={{ display: "flex", gap: "8px" }}>
-                        <button type="button" onClick={() => modelFileRef.current?.click()} style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "4px", background: "var(--bg-tertiary)", border: "1px solid var(--border-medium)", color: "var(--text-secondary)", cursor: "pointer" }}>변경</button>
-                        <button type="button" onClick={() => { setModelSvgRaw(null); setModelSvgFileName(""); }} style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "4px", background: "var(--severity-critical)", border: "none", color: "#fff", cursor: "pointer" }}>삭제</button>
+                      <div className="mrm-title-actions">
+                        <button type="button" className="comm-btn comm-btn-secondary comm-btn-sm" onClick={() => modelFileRef.current?.click()}>변경</button>
+                        <button type="button" className="comm-btn comm-btn-destructive comm-btn-sm" onClick={() => { setModelSvgRaw(null); setModelSvgFileName(""); }}>삭제</button>
                       </div>
                     )}
                   </div>
@@ -1210,12 +1210,12 @@ export const ModelRegistrationModal: React.FC = () => {
                   ) : (
                     <div className="mrm-dual-upload-grid">
                       <div className={`mrm-side-panel ${defaultViewSide === "front" ? "is-default" : ""}`}>
-                        <div className="mrm-side-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div className="mrm-side-title">
                           <div style={{ fontWeight: 600 }}>앞면</div>
                           {modelSvgRaw && (
-                            <div style={{ display: "flex", gap: "8px" }}>
-                              <button type="button" onClick={() => modelFileRef.current?.click()} style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "4px", background: "var(--bg-tertiary)", border: "1px solid var(--border-medium)", color: "var(--text-secondary)", cursor: "pointer" }}>변경</button>
-                              <button type="button" onClick={() => { setModelSvgRaw(null); setModelSvgFileName(""); }} style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "4px", background: "var(--severity-critical)", border: "none", color: "#fff", cursor: "pointer" }}>삭제</button>
+                            <div className="mrm-title-actions">
+                              <button type="button" className="comm-btn comm-btn-secondary comm-btn-sm" onClick={() => modelFileRef.current?.click()}>변경</button>
+                              <button type="button" className="comm-btn comm-btn-destructive comm-btn-sm" onClick={() => { setModelSvgRaw(null); setModelSvgFileName(""); }}>삭제</button>
                             </div>
                           )}
                         </div>
@@ -1246,12 +1246,12 @@ export const ModelRegistrationModal: React.FC = () => {
                       </div>
 
                       <div className={`mrm-side-panel ${defaultViewSide === "rear" ? "is-default" : ""}`}>
-                        <div className="mrm-side-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div className="mrm-side-title">
                           <div style={{ fontWeight: 600 }}>뒷면</div>
                           {rearSvgRaw && (
-                            <div style={{ display: "flex", gap: "8px" }}>
-                              <button type="button" onClick={() => rearFileRef.current?.click()} style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "4px", background: "var(--bg-tertiary)", border: "1px solid var(--border-medium)", color: "var(--text-secondary)", cursor: "pointer" }}>변경</button>
-                              <button type="button" onClick={() => { setRearSvgRaw(null); setRearSvgFileName(""); }} style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "4px", background: "var(--severity-critical)", border: "none", color: "#fff", cursor: "pointer" }}>삭제</button>
+                            <div className="mrm-title-actions">
+                              <button type="button" className="comm-btn comm-btn-secondary comm-btn-sm" onClick={() => rearFileRef.current?.click()}>변경</button>
+                              <button type="button" className="comm-btn comm-btn-destructive comm-btn-sm" onClick={() => { setRearSvgRaw(null); setRearSvgFileName(""); }}>삭제</button>
                             </div>
                           )}
                         </div>
@@ -1290,14 +1290,14 @@ export const ModelRegistrationModal: React.FC = () => {
                 <>
                   {/* Base Chassis SVG */}
                   <div className="mrm-section">
-                    <div className="mrm-section-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div>
+                    <div className="mrm-section-title">
+                      <div className="mrm-title-left">
                         기본 섀시 (Base Equipment View)
                         <span className="badge">카드 기반</span>
                       </div>
                       {baseChassisRaw && (
-                        <div style={{ display: "flex", gap: "8px" }}>
-                          <button type="button" onClick={() => chassisFileRef.current?.click()} style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "4px", background: "var(--bg-tertiary)", border: "1px solid var(--border-medium)", color: "var(--text-secondary)", cursor: "pointer" }}>변경</button>
+                        <div className="mrm-title-actions">
+                          <button type="button" className="comm-btn comm-btn-secondary comm-btn-sm" onClick={() => chassisFileRef.current?.click()}>변경</button>
                           <button
                             type="button"
                             onClick={() => {
@@ -1729,7 +1729,7 @@ export const ModelRegistrationModal: React.FC = () => {
                     const eqModel = equipmentModels.find((m) => m.modelName === tmpl.modelName);
                     const isCardBased = !!overrideModel || !!eqModel;
                     const displayUnit = overrideModel ? overrideModel.unit : tmpl.uSize;
-                    
+
                     // 섀시형: displayThumb(SVG)를 넘기지 않음 → DynamicListThumb 내부에서 webpUrl 사용
                     // 고정형: PNG → staticImgUrl → SVG fallback 순서
                     let displayThumbPng: string | null = null;
@@ -1748,8 +1748,8 @@ export const ModelRegistrationModal: React.FC = () => {
                     // 고정형만 SVG fallback 허용 (섀시형은 webpUrl 사용)
                     if (!isCardBased && !displayThumbPng && overrideModel) {
                       const om = overrideModel as any;
-                      displayThumb = om.defaultViewSide === "rear" && om.rearSvgRaw 
-                        ? om.rearSvgRaw 
+                      displayThumb = om.defaultViewSide === "rear" && om.rearSvgRaw
+                        ? om.rearSvgRaw
                         : (om.modelSvgRaw || null);
                     }
 

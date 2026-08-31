@@ -3412,6 +3412,17 @@ input:checked+.slider:before {
   margin-bottom: 16px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+}
+
+.mrm-title-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mrm-title-actions {
+  display: flex;
   gap: 8px;
 }
 
