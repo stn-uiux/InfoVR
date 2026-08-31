@@ -59,7 +59,7 @@
 | **3D 엔진** | Three.js 0.182 · React Three Fiber · Drei |
 | **상태관리** | Zustand 5 |
 | **빌드 도구** | Vite 7 |
-| **스타일링** | Vanilla CSS (Grafana-inspired 디자인 시스템) |
+| **스타일링** | Pure Vanilla CSS (CSS Variables 기반) |
 | **데이터 처리** | SheetJS (xlsx) · IndexedDB |
 | **애니메이션** | React Spring · @use-gesture/react |
 
@@ -69,6 +69,7 @@
 
 ```
 InfoVR/
+├── arcVRoom/            # arcVRoom 별도 앱/페이지 디렉토리
 ├── public/
 │   ├── assets/          # 3D 모델 에셋 (GLB)
 │   └── font/            # 커스텀 폰트
@@ -112,8 +113,9 @@ InfoVR/
 │   │   ├── cardAssets.ts          # 모듈러 카드 에셋
 │   │   ├── moduleAssets.ts        # 모듈 에셋
 │   │   └── sampleData.ts          # 샘플 데이터
-│   └── styles/
-│       └── grafana-theme.css      # Grafana 스타일 디자인 시스템
+│   ├── css/                 # 순수 CSS 모음 (theme, layout, components 등)
+│   ├── pages/               # 로그인, 회원가입 등 페이지 컴포넌트
+│   └── port-wizard/         # 포트맵핑 마법사 관련 기능
 ├── index.html
 ├── vite.config.ts
 ├── tsconfig.json
@@ -177,12 +179,12 @@ npm run preview
 
 ## 🎨 디자인 시스템
 
-Grafana에서 영감을 받은 커스텀 CSS 디자인 시스템을 사용합니다.
+순수 CSS(Vanilla CSS)를 기반으로 한 커스텀 디자인 시스템을 사용합니다.
 
-- CSS Custom Properties 기반 테마 토큰
+- CSS Custom Properties(Variables)를 활용한 테마 토큰
 - 라이트 / 다크 모드 완전 지원
-- 일관된 색상·타이포그래피·간격 체계
-- 글래스모피즘 & 마이크로 애니메이션 적용
+- 모듈화된 CSS 구조 (theme, layout, components, features 등 분리)
+- 일관된 색상·타이포그래피·간격 체계 및 글래스모피즘, 마이크로 애니메이션 적용
 
 ---
 
