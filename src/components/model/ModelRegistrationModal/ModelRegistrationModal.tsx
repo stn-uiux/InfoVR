@@ -921,7 +921,7 @@ export const ModelRegistrationModal: React.FC = () => {
       }
     }
 
-    const payload: Omit<import("../../types/equipment").CustomEquipmentModel, "modelId"> = {
+    const payload: Omit<import("../../../types/equipment").CustomEquipmentModel, "modelId"> = {
       modelName: modelName.trim(),
       vendor: vendor,
       unit,
@@ -2337,7 +2337,7 @@ export const ModelRegistrationModal: React.FC = () => {
               }
             }
 
-            const payload: Omit<import("../../types/equipment").CustomEquipmentModel, "modelId"> = {
+            const payload: Omit<import("../../../types/equipment").CustomEquipmentModel, "modelId"> = {
               modelName: modelName.trim(),
               vendor: vendor,
               unit,
