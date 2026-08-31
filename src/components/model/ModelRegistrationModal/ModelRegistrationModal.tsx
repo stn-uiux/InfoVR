@@ -1049,8 +1049,10 @@ export const ModelRegistrationModal: React.FC = () => {
               {/* Basic Info */}
               <div className="mrm-section">
                 <div className="mrm-section-title">
-                  기본 정보
-                  <span className="badge">필수</span>
+                  <div className="mrm-title-left">
+                    기본 정보
+                    <span className="badge">필수</span>
+                  </div>
                 </div>
 
                 <div className="mrm-form-grid" style={{ gridTemplateColumns: "1.2fr 0.8fr 1fr 1.5fr" }}>
@@ -1409,8 +1411,10 @@ export const ModelRegistrationModal: React.FC = () => {
                   {/* Type/Variant Configuration */}
                   <div className="mrm-section">
                     <div className="mrm-section-title">
-                      타입 관리
-                      <span className="badge">미리 구성된 모델 옵션</span>
+                      <div className="mrm-title-left">
+                        타입 관리
+                        <span className="badge">미리 구성된 모델 옵션</span>
+                      </div>
                     </div>
                     <div style={{ padding: "16px", border: "1px solid var(--border-weak)", borderRadius: "10px", background: "var(--bg-secondary)" }}>
                       <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "12px", lineHeight: 1.5 }}>
@@ -1504,7 +1508,11 @@ export const ModelRegistrationModal: React.FC = () => {
 
                   {/* Card Assignment */}
                   <div className="mrm-section">
-                    <div className="mrm-section-title">카드 할당</div>
+                    <div className="mrm-section-title">
+                      <div className="mrm-title-left">
+                        카드 할당
+                      </div>
+                    </div>
 
                     <div className="mrm-card-config">
                       {/* Assigned cards */}
