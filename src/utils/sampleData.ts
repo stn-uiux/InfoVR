@@ -15,7 +15,7 @@ import {
 import {
   RACK_WIDTH_STANDARD,
   GRID_SPACING,
-} from "../components/constants";
+} from "../components/layout/constants";
 import sampleCardsRaw from "./sampleCards.json";
 
 const sampleCards = sampleCardsRaw as Record<string, any[]>;

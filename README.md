@@ -71,51 +71,87 @@
 InfoVR/
 ├── arcVRoom/            # arcVRoom 별도 앱/페이지 디렉토리
 ├── public/
-│   ├── assets/          # 3D 모델 에셋 (GLB)
-│   └── font/            # 커스텀 폰트
+│   ├── models/          # 3D 모델 에셋 (GLB)
+│   ├── assets/          # 팝업 및 기타 정적 이미지 에셋
+│   ├── font/            # 커스텀 폰트
+│   └── materials/       # 커스텀 재질/큐브맵 에셋 등
 ├── src/
-│   ├── assets/          # 장비 SVG · 모듈 SVG · 카드 SVG
+│   ├── assets/          # 장비/모듈 SVG 및 관련 에셋
 │   │   ├── card/        # 모듈러 카드 에셋
-│   │   └── 3D/          # 3D 모델 에셋
+│   │   └── gwacheon/    # 특정 벤더/사이트 관련 에셋
 │   ├── components/
-│   │   ├── Scene.tsx              # 3D 씬 루트
-│   │   ├── Rack.tsx               # 3D 랙 렌더링
-│   │   ├── CameraController.tsx   # 카메라 제어
-│   │   ├── DevicePanel.tsx        # 장비 사이드 패널
-│   │   ├── DeviceModal.tsx        # 장비 상세 모달
-│   │   ├── DeviceSvgPreview.tsx   # SVG 장비 프리뷰
-│   │   ├── DeviceRegistrationModal.tsx  # 장비 등록 CRUD
-│   │   ├── EquipmentAssemblyModal.tsx   # 장비 조립 모달
-│   │   ├── ImportExportModal.tsx  # Excel 임포트/익스포트
-│   │   ├── ModelImporter.tsx      # 3D 모델 임포터
-│   │   ├── HierarchyTree.tsx      # 계층 트리 네비게이션
-│   │   ├── DashboardWidgets.tsx   # 대시보드 위젯
-│   │   ├── ModulePopover.tsx      # 모듈 삽입 팝오버
-│   │   ├── PortErrorOverlay.tsx   # 포트 에러 오버레이
-│   │   └── ...
+│   │   ├── 3d/                  # 3D 씬 및 Three.js 렌더링
+│   │   │   ├── CameraController.tsx         # 카메라의 시점 이동 및 줌 제어
+│   │   │   ├── CyberSpaceEnvironment.tsx    # 사이버 스페이스 환경(바닥, 조명 등) 구성
+│   │   │   ├── ErrorMarker.tsx              # 장비 에러 발생 시 3D 공간 상에 경고 마커 표시
+│   │   │   ├── GlobalFocusLights.tsx        # 장비를 포커스할 때 활성화되는 조명 효과
+│   │   │   ├── GltfErrorBoundary.tsx        # 모델 로딩 실패 시 앱 크래시 방지용 에러 바운더리
+│   │   │   ├── ImportedModelMesh.tsx        # GLTF 파싱 및 커스텀 재질(Material) 적용
+│   │   │   ├── ModelImporter.tsx            # 외부 GLB/GLTF 모델 동적 임포트 래퍼
+│   │   │   ├── Rack.tsx                     # 서버 랙 3D 렌더링 및 내부 장비 슬롯 배치
+│   │   │   ├── Scene.tsx                    # Canvas 기반의 전체 3D 씬 루트 컴포넌트
+│   │   │   └── SpotLightWithTarget.tsx      # 특정 위치를 비추는 스포트라이트 조명
+│   │   ├── account/             # 계정 및 권한 관리
+│   │   │   ├── AccountPermissionsModal.tsx  # 사용자별 시스템/장비 접근 권한 설정 모달
+│   │   │   ├── CreateAccountModal.tsx       # 신규 관리자 및 일반 사용자 계정 생성 모달
+│   │   │   └── MyPageModal.tsx              # 로그인된 사용자의 내 정보(비밀번호 등) 수정 모달
+│   │   ├── device/              # 장비 관련 UI 및 관리
+│   │   │   ├── CardThumbnail.tsx            # 모듈/카드의 SVG 에셋을 썸네일 형태로 렌더링
+│   │   │   ├── DeviceModal.tsx              # 장비 상세 정보(스펙, 이력 등) 조회 메인 모달
+│   │   │   ├── DevicePanel.tsx              # 장비 클릭 시 노출되는 상태 및 포트 상세 패널(2D)
+│   │   │   ├── DeviceRegistrationModal.tsx  # 신규 장비 단건/대량 등록 및 위치 할당 모달
+│   │   │   ├── DeviceRegistrationModal/     # 대량 등록을 위한 NodePicker 등 하위 컴포넌트 폴더
+│   │   │   ├── DeviceSvgPreview.tsx         # 2D 기반 장비 전/후면 실시간 미리보기
+│   │   │   ├── DeviceTooltip.tsx            # 3D 공간에서 장비 마우스 오버 시 나타나는 플로팅 툴팁
+│   │   │   ├── ModulePopover.tsx            # 장비 내 슬롯 카드를 클릭했을 때 뜨는 모듈 상태 팝업
+│   │   │   ├── PortErrorOverlay.tsx         # 물리 포트에 알람/장애 발생 시 렌더링되는 시각적 오버레이
+│   │   │   └── PortErrorSynchronizer.tsx    # 서버의 장애 상태를 3D 포트 에셋에 동기화하는 로직
+│   │   ├── layout/              # 대시보드 및 화면 프레임 레이아웃
+│   │   │   ├── CyberSpaceControlPanel.tsx   # 3D 환경 뷰어 컨트롤(리셋, 테마 변경 등) 도구 패널
+│   │   │   ├── CyberSpaceToggle.tsx         # 사이버 스페이스(3D)와 일반 모드 뷰 전환 스위치
+│   │   │   ├── DashboardWidgets.tsx         # 메인 우측 상단의 장비 통계, 알람 발생 등 요약 위젯
+│   │   │   ├── DigitalClock.tsx             # 대시보드에 표기되는 실시간 디지털 시계
+│   │   │   ├── FocusCarousel.tsx            # 장애 장비나 포커스된 장비를 순회하며 볼 수 있는 하단 슬라이더
+│   │   │   ├── HierarchyTree.tsx            # 사이트 > 룸 > 랙 형태의 물리적 계층형 네비게이션 트리
+│   │   │   ├── InitialLoader.tsx            # 최초 접속 시 3D 모델과 SVG를 로딩하는 프로그레스 바 화면
+│   │   │   ├── SettingsDropdown.tsx         # 시스템 환경설정 및 로그아웃 메뉴 드롭다운
+│   │   │   └── SharedTreeNodeItem.tsx       # 계층 트리의 각 노드(폴더/단말) 렌더링 아이템
+│   │   ├── model/               # 3D 모델 및 커스텀 템플릿 정의
+│   │   │   ├── EquipmentAssemblyModal.tsx   # 섀시형 장비에 모듈식 카드를 조립하여 새로운 변형을 굽는 모달
+│   │   │   └── ModelRegistrationModal/      # 물리적 포트 위치 지정(InteractiveGridEditor) 및 신규 모델 타입 등록 폼
+│   │   ├── system/              # 시스템 공통/유틸리티 알림
+│   │   │   ├── ImportExportModal.tsx        # 엑셀(CSV) 기반 시스템 데이터 일괄 Import / Export 기능
+│   │   │   └── UnsavedChangesDialog.tsx     # 편집 도중 닫기 시도 시 "저장되지 않은 정보가 있습니다" 경고 다이얼로그
+│   │   └── ui/                  # 프로젝트 전역 재사용 UI (Vanilla CSS 기반 Design System)
+│   │       ├── BaseModal.tsx                # 기존 구형 팝업 모달 래퍼 (StnModal로 전환 진행 중)
+│   │       ├── Breadcrumb.tsx               # 상단 현재 위치 탐색기 (예: GWA > ROOM_01 > RACK_A)
+│   │       ├── StnBadge.tsx                 # 장애(Red) / 정상(Green) 등을 표시하는 배지 라벨
+│   │       ├── StnFormField.tsx             # 폼 입력 시 필수 여부 표기 및 유효성 에러 라벨 래퍼
+│   │       ├── StnInput.tsx                 # 디자인 시스템이 적용된 공통 텍스트 인풋박스
+│   │       ├── StnModal.tsx                 # 모던 디자인 시스템이 적용된 커스텀 최상위 팝업 컨테이너
+│   │       ├── StnSelect.tsx                # 검색 기능을 지원하는 공통 드롭다운 셀렉트 폼
+│   │       ├── StnTable.tsx                 # 목록 조회 및 페이지네이션을 지원하는 데이터 그리드 표
+│   │       └── ThemeToggle.tsx              # 라이트 모드 ↔ 다크 모드 전환 스위치
+│   ├── css/                 # 순수 CSS 모음 (theme, layout, components 등)
 │   ├── hooks/
 │   │   ├── usePortInteraction.ts  # 포트 호버/클릭 인터랙션
 │   │   ├── useSvgComposer.ts      # SVG 동적 합성
-│   │   └── useClickOutside.ts     # 외부 클릭 감지
+│   │   └── ...
+│   ├── pages/               # 로그인, 회원가입 등 페이지 컴포넌트
+│   ├── port-wizard/         # 포트맵핑 마법사 관련 기능
 │   ├── store/
 │   │   └── useStore.ts            # Zustand 글로벌 스토어
 │   ├── contexts/
-│   │   └── ThemeContext.tsx        # 라이트/다크 테마
+│   │   └── ThemeContext.tsx       # 라이트/다크 테마 컨텍스트
 │   ├── types/
 │   │   ├── index.ts               # 공통 타입 정의
 │   │   └── equipment.ts           # 장비·모듈 타입
 │   ├── utils/
 │   │   ├── storage.ts             # 데이터 영속화 (Excel ↔ Store)
-│   │   ├── svgUtils.ts            # SVG 유틸리티
-│   │   ├── portUtils.ts           # 포트 처리 유틸리티
-│   │   ├── nodeUtils.ts           # 트리 노드 유틸리티
 │   │   ├── deviceAssets.ts        # 장비 에셋 매핑
 │   │   ├── cardAssets.ts          # 모듈러 카드 에셋
-│   │   ├── moduleAssets.ts        # 모듈 에셋
-│   │   └── sampleData.ts          # 샘플 데이터
-│   ├── css/                 # 순수 CSS 모음 (theme, layout, components 등)
-│   ├── pages/               # 로그인, 회원가입 등 페이지 컴포넌트
-│   └── port-wizard/         # 포트맵핑 마법사 관련 기능
+│   │   └── ...
+│   └── main.tsx             # 앱 엔트리 포인트
 ├── index.html
 ├── vite.config.ts
 ├── tsconfig.json

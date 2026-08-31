@@ -1,0 +1,2421 @@
+import { Icon } from "@iconify/react";
+import InteractiveGridEditor, { type GridMerge } from "./InteractiveGridEditor";
+import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
+import { useStore } from "../../../store/useStore";
+import { StnFormField } from "../../ui/StnFormField";
+import { StnInput } from "../../ui/StnInput";
+import { StnSelect } from "../../ui/StnSelect";
+import type {
+  CustomModelType,
+  CardWidthType,
+  EquipmentViewSide,
+  EquipmentVariant,
+} from "../../../types/equipment";
+import { CardRegistrationForm } from "./CardRegistrationForm";
+import { EquipmentAssemblyModal } from "../EquipmentAssemblyModal";
+import { CardThumbnail } from "../../device/CardThumbnail";
+import { StnModal } from "../../ui/StnModal";
+import { cardDefinitions, equipmentModels, loadBaseEquipmentSvgRaw, getCardsForModel } from "../../../utils/cardAssets";
+import { DEVICE_TEMPLATES } from "../../../utils/deviceTemplates";
+import { getDeviceViewSides, resolveDeviceImage, resolveDeviceSvgContent, isChassisModel } from "../../../utils/deviceAssets";
+import { DEFAULT_CHASSIS_CARDS } from "../../../utils/defaultChassisCards";
+import { useDeviceImage } from "../../../hooks/useDeviceImage";
+
+const DynamicListThumb = ({
+  modelName,
+  isChassis,
+  displayThumbPng,
+  displayThumb,
+  staticImgUrl,
+  onHover,
+  onHoverMove,
+  onHoverLeave,
+  insertedCards,
+}: any) => {
+  // 섀시형 썸네일은 이제 useSvgComposer를 통해 동적 생성하지 않고 displayThumbPng 등을 통해 직접 받습니다.
+  // 이 컴포넌트는 ListThumb에서 이미 fallback 처리가 완료된 상태로 호출됩니다.
+  
+  // async하게 SVG를 로드하여 Data URL을 얻는 훅 사용
+  const asyncImgUrl = useDeviceImage(modelName, "front");
+  const finalImgUrl = staticImgUrl || asyncImgUrl;
+
+  return (
+    <div
+      className="model-thumb"
+      onMouseEnter={(e) => {
+        onHover({ 
+          pngRaw: displayThumbPng, 
+          svgRaw: null, 
+          imgUrl: finalImgUrl || null,
+          name: modelName,
+        });
+        onHoverMove(e);
+      }}
+      onMouseMove={onHoverMove}
+      onMouseLeave={onHoverLeave}
+    >
+      {/* 1순위: PNG raw (미리 구운 썸네일) */}
+      {displayThumbPng ? (
+        <img src={displayThumbPng} alt={modelName} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+      ) : /* 2순위: static 이미지 URL (혹은 SVG Data URL) */ finalImgUrl ? (
+        <img src={finalImgUrl} alt={modelName} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+      ) : /* 4순위: SVG fallback (거의 사용 안됨) */ displayThumb ? (
+        <div dangerouslySetInnerHTML={{ __html: displayThumb }} style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }} />
+      ) : (
+        <span style={{ fontSize: 18, color: "var(--text-tertiary)" }}>🖥️</span>
+      )}
+    </div>
+  );
+};
+
+import { convertSvgToPngAsync } from "../../../utils/imageUtils";
+import { generateComposedSvgAsync } from "../../../hooks/useSvgComposer";
+
+const DELETE_ICON_STYLE: React.CSSProperties = {
+  width: 14,
+  height: 14,
+};
+
+/** SVG raw text에서 width/height 추출 */
+function parseSvgDimensions(svgRaw: string): { width: number; height: number } {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(svgRaw, "image/svg+xml");
+  const svg = doc.querySelector("svg");
+  if (!svg) return { width: 800, height: 200 };
+
+  const vb = svg.getAttribute("viewBox");
+  if (vb) {
+    const parts = vb.split(/[\s,]+/).map(Number);
+    if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+      return { width: parts[2], height: parts[3] };
+    }
+  }
+  const w = parseFloat(svg.getAttribute("width") || "0");
+  const h = parseFloat(svg.getAttribute("height") || "0");
+  if (w > 0 && h > 0) return { width: w, height: h };
+  return { width: 800, height: 200 };
+}
+
+/** SVG raw text를 안전하게 축소 렌더링 */
+function SvgPreview({ svgRaw, maxHeight = 500 }: { svgRaw: string; maxHeight?: number }) {
+  const sanitized = useMemo(() => {
+    // width/height를 100%로 치환하여 반응형 렌더링
+    return svgRaw
+      .replace(/width="[^"]*"/, 'width="100%"')
+      .replace(/height="[^"]*"/, `height="${maxHeight}px"`)
+      .replace(/<svg/, '<svg style="max-width:984px;max-height:' + maxHeight + 'px"');
+  }, [svgRaw, maxHeight]);
+
+  return (
+    <div
+      className="mrm-svg-preview"
+      dangerouslySetInnerHTML={{ __html: sanitized }}
+    />
+  );
+}
+
+/** 기본 섀시 SVG 위에 카드 영역 좌표를 오버레이로 표시하는 미리보기 */
+function ChassisPreviewWithOverlay({
+  svgRaw,
+  cardArea,
+  colWidths,
+  rowHeights: rowHeightsNum,
+  rowGaps,
+  merges,
+  onDrawEnd,
+  onGridChange,
+  onSave
+}: {
+  svgRaw: string;
+  cardArea: { x: number; y: number; width: number; height: number; columns: number; columnWidth: number };
+  colWidths: number[];
+  rowHeights: number[];
+  rowGaps?: number[];
+  merges: GridMerge[];
+  onDrawEnd?: (rect: { x: number; y: number; width: number; height: number }) => void;
+  onGridChange?: (data: { colWidths: number[]; rowHeights: number[]; rowGaps?: number[]; merges: GridMerge[]; baseX?: number; baseY?: number }) => void;
+  onSave?: () => void;
+}) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [startPt, setStartPt] = useState({ x: 0, y: 0 });
+  const [currentPt, setCurrentPt] = useState({ x: 0, y: 0 });
+
+  const svgInfo = useMemo(() => {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svgRaw, "image/svg+xml");
+    const svg = doc.querySelector("svg");
+    if (!svg) return { viewBox: "0 0 800 200" };
+    let vb = svg.getAttribute("viewBox");
+    if (!vb) {
+      const w = parseFloat(svg.getAttribute("width") || "800") || 800;
+      const h = parseFloat(svg.getAttribute("height") || "200") || 200;
+      vb = `0 0 ${w} ${h}`;
+    }
+    return { viewBox: vb };
+  }, [svgRaw]);
+
+  const displaySvg = useMemo(() => {
+    let modified = svgRaw
+      .replace(/width="[^"]*"/, '')
+      .replace(/\sheight="[^"]*"/, '');
+
+    const svgMatch = modified.match(/<svg[^>]*>/);
+    if (svgMatch) {
+      let svgTag = svgMatch[0];
+      svgTag = svgTag.replace(/preserveAspectRatio="[^"]*"/, '');
+      if (!svgTag.includes('viewBox=')) {
+        svgTag = svgTag.replace(/<svg/, `<svg viewBox="${svgInfo.viewBox}"`);
+      }
+      svgTag = svgTag.replace(/<svg/, `<svg preserveAspectRatio="xMidYMid meet" style="width:100%; max-width:984px; height:auto; max-height:580px; display:block; margin:0 auto;"`);
+      modified = modified.replace(svgMatch[0], svgTag);
+    }
+    return modified;
+  }, [svgRaw, svgInfo.viewBox]);
+
+  const getSvgPoint = (e: React.PointerEvent) => {
+    const svg = svgRef.current;
+    if (!svg) return { x: 0, y: 0 };
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const transformed = pt.matrixTransform(svg.getScreenCTM()?.inverse());
+    return { x: transformed.x, y: transformed.y };
+  };
+
+  const [toolbarNode, setToolbarNode] = useState<HTMLElement | null>(null);
+
+  const hasGrid = colWidths.length > 0 && rowHeightsNum.length > 0 && cardArea.width > 0 && cardArea.height > 0;
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    // Don't draw if clicking on grid editor elements
+    if (hasGrid) return;
+    const pt = getSvgPoint(e);
+    const svg = svgRef.current;
+    if (svg) {
+      const vb = svg.viewBox.baseVal;
+      const maxW = vb && vb.width > 0 ? vb.width : 800;
+      const maxH = vb && vb.height > 0 ? vb.height : 200;
+      pt.x = Math.max(0, Math.min(pt.x, maxW));
+      pt.y = Math.max(0, Math.min(pt.y, maxH));
+    }
+    setIsDrawing(true);
+    setStartPt(pt);
+    setCurrentPt(pt);
+    (e.target as Element).setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDrawing) return;
+    const pt = getSvgPoint(e);
+    const svg = svgRef.current;
+    if (svg) {
+      const vb = svg.viewBox.baseVal;
+      const maxW = vb && vb.width > 0 ? vb.width : 800;
+      const maxH = vb && vb.height > 0 ? vb.height : 200;
+      pt.x = Math.max(0, Math.min(pt.x, maxW));
+      pt.y = Math.max(0, Math.min(pt.y, maxH));
+    }
+    setCurrentPt(pt);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (!isDrawing) return;
+    setIsDrawing(false);
+    (e.target as Element).releasePointerCapture(e.pointerId);
+
+    const x = Math.min(startPt.x, currentPt.x);
+    const y = Math.min(startPt.y, currentPt.y);
+    const width = Math.abs(currentPt.x - startPt.x);
+    const height = Math.abs(currentPt.y - startPt.y);
+
+    if (width > 5 && height > 5 && onDrawEnd) {
+      onDrawEnd({ x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) });
+    }
+  };
+
+  const drawRect = isDrawing ? {
+    x: Math.min(startPt.x, currentPt.x),
+    y: Math.min(startPt.y, currentPt.y),
+    width: Math.abs(currentPt.x - startPt.x),
+    height: Math.abs(currentPt.y - startPt.y)
+  } : null;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      <div className="mrm-svg-preview mrm-svg-preview--chassis" style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', position: 'relative' }}>
+        <div style={{ position: 'relative', width: '100%', maxWidth: '984px', display: 'flex', justifyContent: 'center' }}>
+          <div dangerouslySetInnerHTML={{ __html: displaySvg }} style={{ width: '100%' }} />
+          <svg
+            ref={svgRef}
+            viewBox={svgInfo.viewBox}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              overflow: 'visible',
+              pointerEvents: 'auto',
+              cursor: hasGrid ? 'default' : 'crosshair',
+              zIndex: 10
+            }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerLeave={handlePointerUp}
+          >
+            {/* Drawing mode rect */}
+            {isDrawing && drawRect && (
+              <rect
+                x={drawRect.x}
+                y={drawRect.y}
+                width={drawRect.width}
+                height={drawRect.height}
+                fill="rgba(0,200,255,0.2)"
+                stroke="rgba(0,200,255,1)"
+                strokeWidth="2"
+                strokeDasharray="4 4"
+                vectorEffect="non-scaling-stroke"
+              />
+            )}
+
+            {hasGrid && onGridChange && (
+              <InteractiveGridEditor
+                key={`grid-editor-${svgInfo.viewBox}`}
+                svgRef={svgRef}
+                baseX={cardArea.x}
+                baseY={cardArea.y}
+                colWidths={colWidths}
+                rowHeights={rowHeightsNum}
+                rowGaps={rowGaps}
+                merges={merges}
+                toolbarContainer={toolbarNode}
+                onGridChange={onGridChange}
+                onSave={onSave}
+              />
+            )}
+          </svg>
+        </div>
+
+        {/* Guidance Message */}
+        {!hasGrid && !isDrawing && (
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: 'rgba(0,0,0,0.65)',
+            color: '#fff',
+            padding: '12px 24px',
+            borderRadius: '8px',
+            pointerEvents: 'none',
+            fontSize: '14px',
+            fontWeight: '600',
+            backdropFilter: 'blur(4px)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+          }}>
+            이미지에 드래그하여 섀시 영역을 그려주세요
+          </div>
+        )}
+      </div>
+      <div ref={setToolbarNode} className="interactive-grid-toolbar-container" style={{ padding: "4px 0" }} />
+    </div>
+  );
+}
+
+
+export const ModelRegistrationModal: React.FC = () => {
+  const isOpen = useStore((s) => s.modelRegistrationModalOpen);
+  const setOpen = useStore((s) => s.setModelRegistrationModalOpen);
+  const customModels = useStore((s) => s.customModels);
+  const customCards = useStore((s) => s.customCards);
+  const addCustomModel = useStore((s) => s.addCustomModel);
+  const updateCustomModel = useStore((s) => s.updateCustomModel);
+  const removeCustomModel = useStore((s) => s.removeCustomModel);
+  const addCustomCard = useStore((s) => s.addCustomCard);
+  const deletedDefaultTemplates = useStore((s) => s.deletedDefaultTemplates);
+  const removeDefaultTemplate = useStore((s) => s.removeDefaultTemplate);
+  const restoreDefaultTemplate = useStore((s) => s.restoreDefaultTemplate);
+  const layouts = useStore((s) => s.layouts);
+  const registeredDevices = useStore((s) => s.registeredDevices);
+
+  // Tabs: "register" | "list"
+  const [activeTab, setActiveTab] = useState<"register" | "list">("list");
+
+  interface AvailableCard {
+    id: string;
+    name: string;
+    svgUrl?: string;
+    svgRaw?: string;
+    widthType: CardWidthType;
+    svgWidth: number;
+    svgHeight: number;
+    isBuiltIn: boolean;
+  }
+
+  const allAvailableCards = useMemo<AvailableCard[]>(() => {
+    const builtInMapped: AvailableCard[] = cardDefinitions.map((c) => ({
+      id: c.cardFileName,
+      name: c.cardType,
+      svgUrl: c.svgUrl,
+      widthType: c.widthType,
+      svgWidth: c.svgWidth,
+      svgHeight: c.svgHeight,
+      isBuiltIn: true,
+    }));
+    const customMapped: AvailableCard[] = customCards.map((c) => ({
+      id: c.cardId,
+      name: c.cardName,
+      svgRaw: c.cardSvgRaw,
+      widthType: c.widthType,
+      svgWidth: c.svgWidth,
+      svgHeight: c.svgHeight,
+      isBuiltIn: false,
+    }));
+    return [...builtInMapped, ...customMapped];
+  }, [customCards]);
+
+  // Form state
+  const [modelName, setModelName] = useState("");
+  const [vendor, setVendor] = useState("Cisco");
+  const [unit, setUnit] = useState<number>(1);
+  const [modelType, setModelType] = useState<CustomModelType>("normal");
+  const [modelSvgRaw, setModelSvgRaw] = useState<string | null>(null);
+  const [modelSvgFileName, setModelSvgFileName] = useState("");
+  const [useDualView, setUseDualView] = useState(false);
+  const [rearSvgRaw, setRearSvgRaw] = useState<string | null>(null);
+  const [rearSvgFileName, setRearSvgFileName] = useState("");
+  const [defaultViewSide, setDefaultViewSide] = useState<EquipmentViewSide>("front");
+  const [baseChassisRaw, setBaseChassisRaw] = useState<string | null>(null);
+  const [baseChassisFileName, setBaseChassisFileName] = useState("");
+  const chassisOriginalFileRef = useRef<File | null>(null);
+  const [variants, setVariants] = useState<EquipmentVariant[]>([]);
+  const [isAssemblyOpen, setIsAssemblyOpen] = useState(false);
+  const [editingVariantIndex, setEditingVariantIndex] = useState<number | null>(null);
+
+  // List Thumb Tooltip
+  const [hoveredListThumb, setHoveredListThumb] = useState<{ pngRaw?: string | null, svgRaw?: string | null, imgUrl?: string | null, name: string } | null>(null);
+  const [hoveredListThumbPos, setHoveredListThumbPos] = useState({ x: 0, y: 0 });
+  // Card area config (card-based models) — string 기반으로 자유로운 편집 지원
+  const [caXStr, setCaXStr] = useState("0");
+  const [caYStr, setCaYStr] = useState("0");
+  const [caWidthStr, setCaWidthStr] = useState("860");
+  const [caHeightStr, setCaHeightStr] = useState("200");
+  const [caColumnsStr, setCaColumnsStr] = useState("2");
+  const [caColWidthStr, setCaColWidthStr] = useState("430");
+  const [caRowCountStr, setCaRowCountStr] = useState("4");
+
+  // Row heights (card-based models)
+  const [rowHeights, setRowHeights] = useState<string[]>([]);
+  const [uniformRowHeight, setUniformRowHeight] = useState("46");
+
+  // Row columns (행별 열 수)
+  const [rowColumnsArr, setRowColumnsArr] = useState<string[]>([]);
+  const [uniformRowColumns, setUniformRowColumns] = useState("2");
+
+  // Row gaps (행 간 간격 - margin)
+  const [rowGapsArr, setRowGapsArr] = useState<string[]>([]);
+  const [uniformRowGap, setUniformRowGap] = useState("0");
+
+  // Interactive grid state
+  const [gridColWidths, setGridColWidths] = useState<number[]>([]);
+  const [gridRowHeights, setGridRowHeights] = useState<number[]>([]);
+  const [gridMerges, setGridMerges] = useState<GridMerge[]>([]);
+
+  // Editing mode
+  const [editingModelId, setEditingModelId] = useState<string | null>(null);
+
+
+  // Assigned cards
+  const [assignedCardIds, setAssignedCardIds] = useState<string[]>([]);
+
+  // Computed numeric values (safe parsing)
+  const caX = parseFloat(caXStr) || 0;
+  const caY = parseFloat(caYStr) || 0;
+  const caWidth = parseFloat(caWidthStr) || 0;
+  const caHeight = parseFloat(caHeightStr) || 0;
+  const caColumns = parseInt(caColumnsStr) || 1;
+  const caColWidth = parseFloat(caColWidthStr) || 0;
+  const caRowCount = parseInt(caRowCountStr) || 0;
+
+  // 행별 열 수에서 최대 열 수 계산
+  const maxColumns = useMemo(() => {
+    if (rowColumnsArr.length === 0) return caColumns;
+    const vals = rowColumnsArr.map((c) => parseInt(c) || caColumns);
+    return Math.max(...vals, 1);
+  }, [rowColumnsArr, caColumns]);
+
+  // 행 수 (사용자 설정 우선)
+  const defaultRowHeight = 46;
+
+
+
+  const computedRowCount = caRowCount;
+  const isChassisDrawn = gridColWidths.length > 0 && gridRowHeights.length > 0 && caWidth > 0 && caHeight > 0;
+
+  // rowHeights & rowColumns 자동 초기화: 행 수 변경 시 배열 크기 동기화
+  const syncRowHeights = useCallback((newRowCount: number) => {
+    setRowHeights((prev) => {
+      if (prev.length === newRowCount) return prev;
+      const result: string[] = [];
+      for (let i = 0; i < newRowCount; i++) {
+        result.push(prev[i] ?? String(defaultRowHeight));
+      }
+      return result;
+    });
+    setRowColumnsArr((prev) => {
+      if (prev.length === newRowCount) return prev;
+      const result: string[] = [];
+      for (let i = 0; i < newRowCount; i++) {
+        result.push(prev[i] ?? caColumnsStr);
+      }
+      return result;
+    });
+    // 간격은 행 수 - 1 만큼 (마지막 행 아래에는 간격 불필요)
+    const gapCount = Math.max(0, newRowCount - 1);
+    setRowGapsArr((prev) => {
+      if (prev.length === gapCount) return prev;
+      const result: string[] = [];
+      for (let i = 0; i < gapCount; i++) {
+        result.push(prev[i] ?? "0");
+      }
+      return result;
+    });
+  }, [caColumnsStr]);
+
+  // Sub-modal state
+  const [isCardRegOpen, setIsCardRegOpen] = useState(false);
+  const [showExistingPicker, setShowExistingPicker] = useState(false);
+
+  // Errors & Toast
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+  // 툴팁(호버) 상태
+  const [hoveredTooltipCard, setHoveredTooltipCard] = useState<AvailableCard | null>(null);
+  const [hoveredTooltipPos, setHoveredTooltipPos] = useState({ x: 0, y: 0 });
+
+  const handleCardMouseMove = (e: React.MouseEvent, card: AvailableCard) => {
+    setHoveredTooltipCard(card);
+    setHoveredTooltipPos({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleCardMouseLeave = () => {
+    setHoveredTooltipCard(null);
+  };
+
+  // Dirty state tracking
+  const [isFormLoading, setIsFormLoading] = useState(false);
+  const [initialFormStateStr, setInitialFormStateStr] = useState<string | null>(null);
+
+  const currentFormStateStr = useMemo(() => {
+    return JSON.stringify({
+      modelName, vendor, unit, modelType, modelSvgFileName, useDualView, rearSvgFileName, defaultViewSide,
+      baseChassisFileName, caXStr, caYStr, caWidthStr, caHeightStr, caColumnsStr, caColWidthStr, caRowCountStr,
+      rowHeights, uniformRowHeight, rowColumnsArr, uniformRowColumns, rowGapsArr, uniformRowGap,
+      gridColWidths, gridRowHeights, gridMerges, assignedCardIds, variants
+    });
+  }, [
+    modelName, vendor, unit, modelType, modelSvgFileName, useDualView, rearSvgFileName, defaultViewSide,
+    baseChassisFileName, caXStr, caYStr, caWidthStr, caHeightStr, caColumnsStr, caColWidthStr, caRowCountStr,
+    rowHeights, uniformRowHeight, rowColumnsArr, uniformRowColumns, rowGapsArr, uniformRowGap,
+    gridColWidths, gridRowHeights, gridMerges, assignedCardIds, variants
+  ]);
+
+  useEffect(() => {
+    if (!isFormLoading && activeTab === "register" && initialFormStateStr === null) {
+      setInitialFormStateStr(currentFormStateStr);
+    }
+  }, [isFormLoading, activeTab, currentFormStateStr, initialFormStateStr]);
+
+  const isDirty = initialFormStateStr !== null && currentFormStateStr !== initialFormStateStr;
+
+  const modelFileRef = useRef<HTMLInputElement>(null);
+  const rearFileRef = useRef<HTMLInputElement>(null);
+  const chassisFileRef = useRef<HTMLInputElement>(null);
+
+  // Display name preview
+  const displayName = useMemo(() => {
+    if (!modelName.trim()) return "";
+    return `[${unit}U] ${modelName.trim()}`;
+  }, [modelName, unit]);
+
+  // Reset form
+  const resetForm = useCallback(() => {
+    setModelName("");
+    setVendor("Nokia");
+    setUnit(1);
+    setModelType("normal");
+    setModelSvgRaw(null);
+    setModelSvgFileName("");
+    setUseDualView(false);
+    setRearSvgRaw(null);
+    setRearSvgFileName("");
+    setDefaultViewSide("front");
+    setBaseChassisRaw(null);
+    setBaseChassisFileName("");
+    setCaXStr("0");
+    setCaYStr("0");
+    setCaWidthStr("860");
+    setCaHeightStr("200");
+    setCaColumnsStr("2");
+    setCaColWidthStr("430");
+    setCaRowCountStr("4");
+    setRowHeights([]);
+    setUniformRowHeight("46");
+    setRowColumnsArr([]);
+    setUniformRowColumns("2");
+    setRowGapsArr([]);
+    setUniformRowGap("0");
+    setGridColWidths([]);
+    setGridRowHeights([]);
+    setGridMerges([]);
+    setAssignedCardIds([]);
+    setVariants([]);
+    setErrors({});
+    setEditingModelId(null);
+    setInitialFormStateStr(null);
+    
+    if (chassisOriginalFileRef) chassisOriginalFileRef.current = null;
+    if (modelFileRef.current) modelFileRef.current.value = "";
+    if (rearFileRef.current) rearFileRef.current.value = "";
+    if (chassisFileRef.current) chassisFileRef.current.value = "";
+  }, []);
+
+  // Load model into form for editing
+  const loadModelForEdit = useCallback(async (modelId: string) => {
+    const model = customModels.find((m) => m.modelId === modelId);
+    if (!model) return;
+    
+    setIsFormLoading(true);
+    resetForm();
+    
+    setEditingModelId(modelId);
+    setModelName(model.modelName);
+    setVendor(model.vendor || "Nokia");
+    setUnit(model.unit);
+    setModelType(model.modelType);
+    setModelSvgRaw(model.modelSvgRaw);
+    setModelSvgFileName("(기존 파일)");
+    setUseDualView(!!model.rearSvgRaw);
+    setRearSvgRaw(model.rearSvgRaw || null);
+    setRearSvgFileName(model.rearSvgRaw ? "(기존 파일)" : "");
+    setDefaultViewSide(model.defaultViewSide || "front");
+
+    let baseRaw = model.baseEquipmentViewSvgRaw || null;
+    let baseFileName = baseRaw ? "(기존 파일)" : "";
+    if (!baseRaw && model.modelType === "card-based") {
+      const eqModel = equipmentModels.find(m => m.modelName === model.modelName);
+      if (eqModel && eqModel.baseSvgUrl) {
+        const raw = await loadBaseEquipmentSvgRaw(eqModel.baseSvgUrl);
+        if (raw) {
+          baseRaw = raw;
+          baseFileName = eqModel.baseSvgUrl;
+        }
+      }
+    }
+
+    setBaseChassisRaw(baseRaw);
+    setBaseChassisFileName(baseFileName);
+    if (model.cardArea) {
+      setCaXStr(String(model.cardArea.x));
+      setCaYStr(String(model.cardArea.y));
+      setCaWidthStr(String(model.cardArea.width));
+      setCaHeightStr(String(model.cardArea.height));
+      setCaColumnsStr(String(model.cardArea.columns));
+      setCaColWidthStr(String(model.cardArea.columnWidth));
+    }
+    if (model.rowHeights && model.rowHeights.length > 0) {
+      setCaRowCountStr(String(model.rowHeights.length));
+      setRowHeights(model.rowHeights.map(String));
+    } else if (model.cardArea) {
+      const count = Math.floor(model.cardArea.height / defaultRowHeight);
+      setCaRowCountStr(String(count));
+      setRowHeights(Array.from({ length: count }, () => String(defaultRowHeight)));
+    }
+    // 행별 열 수 로드
+    if (model.rowColumns && model.rowColumns.length > 0) {
+      setRowColumnsArr(model.rowColumns.map(String));
+    } else if (model.cardArea) {
+      const count = model.rowHeights?.length || Math.floor(model.cardArea.height / defaultRowHeight);
+      setRowColumnsArr(Array.from({ length: count }, () => String(model.cardArea!.columns)));
+    }
+    // 행 간 간격 로드
+    if (model.rowGaps && model.rowGaps.length > 0) {
+      setRowGapsArr(model.rowGaps.map(String));
+    } else {
+      const rCount = model.rowHeights?.length || (model.cardArea ? Math.floor(model.cardArea.height / defaultRowHeight) : 0);
+      setRowGapsArr(Array.from({ length: Math.max(0, rCount - 1) }, () => "0"));
+    }
+    // Initialize grid state from model data
+    if (model.cardArea) {
+      const rh = model.rowHeights || [];
+      const rc = model.rowColumns || [];
+      const maxCols = rc.length > 0 ? Math.max(...rc, 1) : model.cardArea.columns;
+      const colW = model.cardArea.width / maxCols;
+      setGridColWidths(model.gridColWidths && model.gridColWidths.length > 0 ? [...model.gridColWidths] : Array.from({ length: maxCols }, () => colW));
+      setGridRowHeights(model.gridRowHeights && model.gridRowHeights.length > 0 ? [...model.gridRowHeights] : (rh.length > 0 ? [...rh] : [model.cardArea.height]));
+      setGridMerges(model.gridMerges || []);
+    } else {
+      setGridColWidths([]);
+      setGridRowHeights([]);
+      setGridMerges([]);
+    }
+    setAssignedCardIds(model.assignedCardIds || []);
+    setVariants(model.variants || []);
+    setErrors({});
+    setActiveTab("register");
+    setIsFormLoading(false);
+  }, [customModels]);
+
+  const showToastMsg = useCallback(
+    (message: string, type: "success" | "error") => {
+      setToast({ message, type });
+      setTimeout(() => setToast(null), 3000);
+    },
+    [],
+  );
+
+  const processImageFile = useCallback((file: File, setRaw: (val: string) => void, setFileName: (val: string) => void, setError: (err: string | undefined) => void, forceW?: number, forceH?: number) => {
+    const name = file.name.toLowerCase();
+    if (name.endsWith(".svg")) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        let svgRaw = reader.result as string;
+        if (forceW && forceH) {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(svgRaw, "image/svg+xml");
+          const svg = doc.querySelector("svg");
+          if (svg) {
+            svg.setAttribute("width", String(forceW));
+            svg.setAttribute("height", String(forceH));
+            if (!svg.hasAttribute("viewBox")) {
+              svg.setAttribute("viewBox", `0 0 ${forceW} ${forceH}`);
+            }
+            svg.setAttribute("preserveAspectRatio", "none");
+            svgRaw = new XMLSerializer().serializeToString(doc);
+          }
+        }
+        setRaw(svgRaw);
+        setFileName(file.name);
+        setError(undefined);
+      };
+      reader.readAsText(file);
+    } else if (name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".webp")) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        const img = new Image();
+        img.onload = () => {
+          const w = forceW || img.width || 800;
+          const h = forceH || img.height || 200;
+          const svgRaw = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><image href="${dataUrl}" width="${w}" height="${h}" preserveAspectRatio="none" /></svg>`;
+          setRaw(svgRaw);
+          setFileName(file.name);
+          setError(undefined);
+        };
+        img.src = dataUrl;
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setError("SVG, PNG, JPG 파일만 지원합니다.");
+    }
+  }, []);
+
+  // File handlers
+  const processModelFile = useCallback((file?: File) => {
+    if (!file) return;
+    processImageFile(file, setModelSvgRaw, setModelSvgFileName, (err) => setErrors((p) => { const n = { ...p }; if (err) n.modelFile = err; else delete n.modelFile; return n; }));
+  }, [processImageFile]);
+
+  const handleModelFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      processModelFile(e.target.files?.[0]);
+    },
+    [processModelFile]
+  );
+
+  const processChassisFile = useCallback((file?: File) => {
+    if (!file) return;
+    chassisOriginalFileRef.current = file;
+    // Reset grid variables when a new image is uploaded
+    setCaXStr("0");
+    setCaYStr("0");
+    setCaWidthStr("0");
+    setCaHeightStr("0");
+    setGridColWidths([]);
+    setGridRowHeights([]);
+    setGridMerges([]);
+    setRowHeights([]);
+    setRowColumnsArr([]);
+    setRowGapsArr([]);
+
+    processImageFile(
+      file,
+      setBaseChassisRaw,
+      setBaseChassisFileName,
+      (err) => setErrors((p) => { const n = { ...p }; if (err) n.chassisFile = err; else delete n.chassisFile; return n; }),
+      984,
+      unit * 96
+    );
+  }, [processImageFile, unit]);
+
+  // Re-process chassis image when unit changes
+  useEffect(() => {
+    const file = chassisOriginalFileRef.current;
+    if (!file || !baseChassisRaw) return;
+    processImageFile(
+      file,
+      setBaseChassisRaw,
+      setBaseChassisFileName,
+      () => { },
+      984,
+      unit * 96
+    );
+  }, [unit]);
+
+  const handleChassisFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      processChassisFile(e.target.files?.[0]);
+    },
+    [processChassisFile]
+  );
+
+  const processRearFile = useCallback((file?: File) => {
+    if (!file) return;
+    processImageFile(file, setRearSvgRaw, setRearSvgFileName, (err) => setErrors((p) => { const n = { ...p }; if (err) n.rearFile = err; else delete n.rearFile; return n; }));
+  }, [processImageFile]);
+
+  const handleRearFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      processRearFile(e.target.files?.[0]);
+    },
+    [processRearFile]
+  );
+
+  // Card management
+  const handleAddNewCard = useCallback(
+    (card: {
+      cardName: string;
+      cardSvgRaw: string;
+      svgWidth: number;
+      svgHeight: number;
+      widthType: CardWidthType;
+    }) => {
+      const cardId = addCustomCard({
+        ...card,
+        createdAt: new Date().toISOString(),
+      });
+      setAssignedCardIds((prev) => [...prev, cardId]);
+      showToastMsg(`카드 "${card.cardName}" 등록 완료`, "success");
+    },
+    [addCustomCard, showToastMsg],
+  );
+
+  const handleSelectExistingCard = useCallback((cardId: string) => {
+    setAssignedCardIds((prev) => {
+      if (prev.includes(cardId)) return prev.filter((id) => id !== cardId);
+      return [...prev, cardId];
+    });
+  }, []);
+
+  const handleRemoveAssignedCard = useCallback((cardId: string) => {
+    setAssignedCardIds((prev) => prev.filter((id) => id !== cardId));
+  }, []);
+
+
+
+  // Submit
+  const handleSubmit = useCallback(async () => {
+    const newErrors: Record<string, string> = {};
+    if (!modelName.trim()) newErrors.modelName = "모델명을 입력하세요.";
+    if (unit < 1 || unit > 48) newErrors.unit = "1~48 사이의 값을 입력하세요.";
+    if (modelType !== "card-based" && !modelSvgRaw) newErrors.modelFile = "모델 이미지 파일을 업로드하세요.";
+    if (modelType !== "card-based" && useDualView && !rearSvgRaw) newErrors.rearFile = "뒷면 이미지 파일을 업로드하세요.";
+    if (modelType === "card-based" && !baseChassisRaw) {
+      newErrors.chassisFile = "기본 섀시 이미지 파일을 업로드하세요.";
+    }
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
+
+    const dims = parseSvgDimensions(modelSvgRaw || baseChassisRaw || "");
+    const parsedRowColumns = rowColumnsArr.map((c) => parseInt(c) || caColumns);
+    const effectiveMaxCols = parsedRowColumns.length > 0 ? Math.max(...parsedRowColumns, 1) : caColumns;
+    const effectiveColWidth = caWidth / effectiveMaxCols;
+
+    const finalModelSvgRaw = modelType === "card-based" ? "" : (modelSvgRaw || "");
+    let finalModelPngRaw: string | undefined = undefined;
+
+    if (modelType !== "card-based" && !finalModelPngRaw && finalModelSvgRaw) {
+      try {
+        finalModelPngRaw = await convertSvgToPngAsync(finalModelSvgRaw, dims.width || 860, dims.height || 200);
+      } catch (err) {
+        console.error("Failed to generate fallback PNG on submit", err);
+      }
+    } else if (modelType === "card-based" && baseChassisRaw) {
+      try {
+        const composerModel = {
+          modelId: "temp",
+          modelName: modelName.trim(),
+          rackUnit: `${unit}U`,
+          baseSvgUrl: "local",
+          baseEquipmentViewSvgRaw: baseChassisRaw || "",
+          equipmentSize: { width: dims.width, height: dims.height },
+          cardArea: { x: caX, y: caY, width: caWidth, height: caHeight, columns: effectiveMaxCols, columnWidth: effectiveColWidth },
+          _rowHeights: rowHeights.length > 0 ? rowHeights.map(r => parseFloat(r) || 0) : undefined,
+          _rowColumns: rowColumnsArr.length > 0 ? rowColumnsArr.map(c => parseInt(c) || 0) : undefined,
+          _rowGaps: rowGapsArr.length > 0 ? rowGapsArr.map(g => parseFloat(g) || 0) : undefined,
+          gridMerges,
+          gridColWidths,
+          gridRowHeights
+        };
+        const defaultCards = variants.find(v => v.variantName === "기본타입")?.insertedCards || [];
+        const composedSvg = await generateComposedSvgAsync(modelName.trim(), composerModel as any, defaultCards, [], "front");
+        if (composedSvg) {
+          finalModelPngRaw = await convertSvgToPngAsync(composedSvg, dims.width || 860, dims.height || 200) || undefined;
+        }
+      } catch (err) {
+        console.error("Failed to generate chassis PNG on submit", err);
+      }
+    }
+
+    // 각 variant의 variantPngRaw가 없으면 카드 합성 SVG → WebP로 생성
+    if (modelType === "card-based" && baseChassisRaw && variants.length > 0) {
+      const composerModelForVariants = {
+        modelId: "temp",
+        modelName: modelName.trim(),
+        rackUnit: `${unit}U`,
+        baseSvgUrl: "local",
+        baseEquipmentViewSvgRaw: baseChassisRaw || "",
+        equipmentSize: { width: dims.width, height: dims.height },
+        cardArea: { x: caX, y: caY, width: caWidth, height: caHeight, columns: effectiveMaxCols, columnWidth: effectiveColWidth },
+        _rowHeights: rowHeights.length > 0 ? rowHeights.map(r => parseFloat(r) || 0) : undefined,
+        _rowColumns: rowColumnsArr.length > 0 ? rowColumnsArr.map(c => parseInt(c) || 0) : undefined,
+        _rowGaps: rowGapsArr.length > 0 ? rowGapsArr.map(g => parseFloat(g) || 0) : undefined,
+        gridMerges,
+        gridColWidths,
+        gridRowHeights
+      };
+      for (let vi = 0; vi < variants.length; vi++) {
+        if (!variants[vi].variantPngRaw && variants[vi].insertedCards?.length) {
+          try {
+            const composedSvg = await generateComposedSvgAsync(
+              modelName.trim(),
+              composerModelForVariants as any,
+              variants[vi].insertedCards,
+              [],
+              "front"
+            );
+            if (composedSvg) {
+              variants[vi] = {
+                ...variants[vi],
+                variantPngRaw: await convertSvgToPngAsync(composedSvg, dims.width || 860, dims.height || 200) || undefined
+              };
+            }
+          } catch (err) {
+            console.error(`Failed to generate variant[${vi}] PNG on submit`, err);
+          }
+        }
+      }
+    }
+
+    const payload: Omit<import("../../types/equipment").CustomEquipmentModel, "modelId"> = {
+      modelName: modelName.trim(),
+      vendor: vendor,
+      unit,
+      displayName: `[${unit}U] ${modelName.trim()}`,
+      modelSvgRaw: finalModelSvgRaw,
+      modelPngRaw: finalModelPngRaw,
+      rearSvgRaw: useDualView ? rearSvgRaw || undefined : undefined,
+      defaultViewSide: useDualView ? defaultViewSide : "front",
+      modelType,
+      baseEquipmentViewSvgRaw: modelType === "card-based" ? baseChassisRaw || undefined : undefined,
+      cardArea:
+        modelType === "card-based"
+          ? {
+            x: caX,
+            y: caY,
+            width: caWidth,
+            height: caHeight,
+            columns: effectiveMaxCols,
+            columnWidth: effectiveColWidth,
+          }
+          : undefined,
+      rowHeights: modelType === "card-based" && rowHeights.length > 0 ? rowHeights.map(r => parseFloat(r) || 0) : undefined,
+      rowColumns: modelType === "card-based" && rowColumnsArr.length > 0 ? rowColumnsArr.map(c => parseInt(c) || 0) : undefined,
+      rowGaps: modelType === "card-based" && rowGapsArr.length > 0 ? rowGapsArr.map(g => parseFloat(g) || 0) : undefined,
+      gridMerges: modelType === "card-based" && gridMerges.length > 0 ? gridMerges : undefined,
+      gridColWidths: modelType === "card-based" && gridColWidths.length > 0 ? gridColWidths : undefined,
+      gridRowHeights: modelType === "card-based" && gridRowHeights.length > 0 ? gridRowHeights : undefined,
+      equipmentSize: { width: dims.width, height: dims.height },
+      assignedCardIds: modelType === "card-based" ? assignedCardIds : [],
+      variants: modelType === "card-based" ? variants : undefined,
+      createdAt: editingModelId ? customModels.find((m) => m.modelId === editingModelId)?.createdAt || new Date().toISOString() : new Date().toISOString(),
+    };
+
+    if (editingModelId) {
+      updateCustomModel(editingModelId, payload);
+      showToastMsg(`모델 "${displayName}" 수정 완료!`, "success");
+    } else {
+      addCustomModel(payload);
+      showToastMsg(`모델 "${displayName}" 등록 완료!`, "success");
+    }
+    resetForm();
+    setActiveTab("list");
+  }, [
+    modelName,
+    vendor,
+    unit,
+    modelSvgRaw,
+    useDualView,
+    rearSvgRaw,
+    defaultViewSide,
+    modelType,
+    baseChassisRaw,
+    caX, caY, caWidth, caHeight, caColumns,
+    rowColumnsArr,
+    gridMerges,
+    gridColWidths,
+    gridRowHeights,
+    assignedCardIds,
+    editingModelId,
+    customModels,
+    addCustomModel,
+    updateCustomModel,
+    displayName,
+    showToastMsg,
+    resetForm,
+    variants,
+  ]);
+
+  // Delete model
+  const handleDeleteModel = useCallback(
+    (modelId: string) => {
+      removeCustomModel(modelId);
+      showToastMsg("모델이 삭제되었습니다.", "success");
+    },
+    [removeCustomModel, showToastMsg],
+  );
+
+  // Assigned card details
+  const assignedCardDetails = useMemo(() => {
+    return assignedCardIds
+      .map((id) => allAvailableCards.find((c) => c.id === id))
+      .filter((c): c is AvailableCard => c !== undefined);
+  }, [assignedCardIds, allAvailableCards]);
+
+  // Available existing cards (not yet assigned)
+  const availableCards = useMemo(() => {
+    return allAvailableCards;
+  }, [allAvailableCards]);
+
+  if (!isOpen) return null;
+
+  return (
+    <>
+      <StnModal
+        isOpen={isOpen}
+        onClose={() => setOpen(false)}
+        title="장비 모델 관리"
+        icon="material-symbols:build-circle"
+      >
+
+        {/* Navigation for Register View */}
+        {activeTab === "register" && (
+          <div style={{ padding: "16px 28px 0" }}>
+            <button
+              className="comm-btn comm-btn-secondary comm-btn-sm"
+              onClick={() => {
+                if (isDirty) {
+                  if (!window.confirm("저장되지 않은 변경사항이 모두 사라집니다. 목록으로 돌아가시겠습니까?")) return;
+                }
+                setActiveTab("list");
+                setEditingModelId(null);
+              }}
+              style={{ gap: 6, display: "inline-flex", alignItems: "center" }}
+            >
+              <Icon icon="material-symbols:arrow-back" style={{ width: 16, height: 16 }} />
+              목록으로 돌아가기
+            </button>
+          </div>
+        )}
+
+        {activeTab === "register" ? (
+          <>
+            {/* Body: Registration Form */}
+            <div className="mrm-body">
+              {/* Basic Info */}
+              <div className="mrm-section">
+                <div className="mrm-section-title">
+                  기본 정보
+                  <span className="badge">필수</span>
+                </div>
+
+                <div className="mrm-form-grid" style={{ gridTemplateColumns: "1.2fr 0.8fr 1fr 1.5fr" }}>
+                  <StnFormField label="모델명" required error={errors.modelName}>
+                    <StnInput
+                      type="text"
+                      value={modelName}
+                      onChange={(e) => setModelName(e.target.value)}
+                      placeholder="예: 7250 IXR-6"
+                    />
+                  </StnFormField>
+
+                  <StnFormField label="Rack Unit (U)" required error={errors.unit}>
+                    <StnInput
+                      type="number"
+                      min={1}
+                      max={48}
+                      value={unit}
+                      onChange={(e) => setUnit(parseInt(e.target.value) || 1)}
+                    />
+                  </StnFormField>
+
+                  <StnFormField label="제조사" required>
+                    <StnSelect
+                      value={vendor}
+                      onChange={(val) => setVendor(val.toString())}
+                      options={[
+                        { label: "AXGATE", value: "AXGATE" },
+                        { label: "Cisco", value: "Cisco" },
+                        { label: "Ciena", value: "Ciena" },
+                        { label: "Coweaver", value: "Coweaver" },
+                        { label: "Dasan", value: "Dasan" },
+                        { label: "Dell", value: "Dell" },
+                        { label: "Edgecore", value: "Edgecore" },
+                        { label: "Juniper", value: "Juniper" },
+                        { label: "Nokia", value: "Nokia" },
+                        { label: "Rebellions", value: "Rebellions" },
+                        { label: "Supermicro", value: "Supermicro" },
+                        { label: "Ubiquoss", value: "Ubiquoss" },
+                        { label: "Woorinet", value: "Woorinet" }
+                      ]}
+                      placeholder="제조사를 선택하세요"
+                    />
+                  </StnFormField>
+
+                  <StnFormField label="폼 팩터" required>
+                    <div className="mrm-type-selector compact">
+                      <div
+                        className={`mrm-type-card compact ${modelType === "normal" ? "active" : ""}`}
+                        onClick={() => setModelType("normal")}
+                      >
+                        <div className="type-icon"><Icon icon="humbleicons:server" /></div>
+                        <div className="type-info">
+                          <div className="type-name">고정형</div>
+                          <div className="type-desc">단일 바디 장비</div>
+                        </div>
+                      </div>
+                      <div
+                        className={`mrm-type-card compact ${modelType === "card-based" ? "active" : ""}`}
+                        onClick={() => setModelType("card-based")}
+                      >
+                        <div className="type-icon"><Icon icon="humbleicons:servers" /></div>
+                        <div className="type-info">
+                          <div className="type-name">섀시형</div>
+                          <div className="type-desc">장비(섀시+카드)</div>
+                        </div>
+                      </div>
+                    </div>
+                  </StnFormField>
+                </div>
+              </div>
+
+              {/* Model SVG Upload */}
+              {modelType !== "card-based" && (
+                <div className="mrm-section">
+                  <div className="mrm-section-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      모델 파일 업로드
+                      <span className="badge">SVG</span>
+                    </div>
+                    {modelSvgRaw && !useDualView && (
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <button type="button" onClick={() => modelFileRef.current?.click()} style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "4px", background: "var(--bg-tertiary)", border: "1px solid var(--border-medium)", color: "var(--text-secondary)", cursor: "pointer" }}>변경</button>
+                        <button type="button" onClick={() => { setModelSvgRaw(null); setModelSvgFileName(""); }} style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "4px", background: "var(--severity-critical)", border: "none", color: "#fff", cursor: "pointer" }}>삭제</button>
+                      </div>
+                    )}
+                  </div>
+
+                  <input
+                    type="file"
+                    accept=".svg,.png,.jpg,.jpeg,.webp"
+                    ref={modelFileRef}
+                    style={{ display: "none" }}
+                    onChange={handleModelFileChange}
+                  />
+                  <input
+                    type="file"
+                    accept=".svg,.png,.jpg,.jpeg,.webp"
+                    ref={rearFileRef}
+                    style={{ display: "none" }}
+                    onChange={handleRearFileChange}
+                  />
+
+                  <div className="mrm-upload-mode-row">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={useDualView}
+                        onChange={(e) => {
+                          setUseDualView(e.target.checked);
+                          if (!e.target.checked) {
+                            setDefaultViewSide("front");
+                            setErrors((p) => {
+                              const next = { ...p };
+                              delete next.rearFile;
+                              return next;
+                            });
+                          }
+                        }}
+                      />
+                      앞면/뒷면 이미지 사용
+                    </label>
+                    <span>
+                      서버처럼 후면 포트 확인이 필요한 모델은 뒷면 SVG를 함께 등록하세요.
+                    </span>
+                  </div>
+
+                  {!useDualView ? (
+                    <>
+                      {!modelSvgRaw && (
+                        <div
+                          className="mrm-file-upload"
+                          onClick={() => modelFileRef.current?.click()}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            processModelFile(e.dataTransfer.files?.[0]);
+                          }}
+                        >
+                          <div className="upload-icon">📁</div>
+                          <div className="upload-text">
+                            장비 모델 이미지 파일을 업로드하세요
+                          </div>
+                          <div className="upload-hint">
+                            클릭하거나 파일을 선택하세요
+                          </div>
+                        </div>
+                      )}
+                      {errors.modelFile && (
+                        <span className="error-hint" style={{ marginTop: 4, display: "block" }}>
+                          {errors.modelFile}
+                        </span>
+                      )}
+
+                      {modelSvgRaw && <SvgPreview svgRaw={modelSvgRaw} />}
+                    </>
+                  ) : (
+                    <div className="mrm-dual-upload-grid">
+                      <div className={`mrm-side-panel ${defaultViewSide === "front" ? "is-default" : ""}`}>
+                        <div className="mrm-side-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div style={{ fontWeight: 600 }}>앞면</div>
+                          {modelSvgRaw && (
+                            <div style={{ display: "flex", gap: "8px" }}>
+                              <button type="button" onClick={() => modelFileRef.current?.click()} style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "4px", background: "var(--bg-tertiary)", border: "1px solid var(--border-medium)", color: "var(--text-secondary)", cursor: "pointer" }}>변경</button>
+                              <button type="button" onClick={() => { setModelSvgRaw(null); setModelSvgFileName(""); }} style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "4px", background: "var(--severity-critical)", border: "none", color: "#fff", cursor: "pointer" }}>삭제</button>
+                            </div>
+                          )}
+                        </div>
+                        {!modelSvgRaw && (
+                          <div
+                            className="mrm-file-upload mrm-file-upload--compact"
+                            onClick={() => modelFileRef.current?.click()}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              processModelFile(e.dataTransfer.files?.[0]);
+                            }}
+                          >
+                            <div className="upload-text">앞면 SVG 업로드</div>
+                            <div className="upload-hint">장비 전면 이미지</div>
+                          </div>
+                        )}
+                        {errors.modelFile && (
+                          <span className="error-hint" style={{ marginTop: 4, display: "block" }}>
+                            {errors.modelFile}
+                          </span>
+                        )}
+                        {modelSvgRaw && (
+                          <div className="mrm-side-preview">
+                            <SvgPreview svgRaw={modelSvgRaw} maxHeight={220} />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className={`mrm-side-panel ${defaultViewSide === "rear" ? "is-default" : ""}`}>
+                        <div className="mrm-side-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div style={{ fontWeight: 600 }}>뒷면</div>
+                          {rearSvgRaw && (
+                            <div style={{ display: "flex", gap: "8px" }}>
+                              <button type="button" onClick={() => rearFileRef.current?.click()} style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "4px", background: "var(--bg-tertiary)", border: "1px solid var(--border-medium)", color: "var(--text-secondary)", cursor: "pointer" }}>변경</button>
+                              <button type="button" onClick={() => { setRearSvgRaw(null); setRearSvgFileName(""); }} style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "4px", background: "var(--severity-critical)", border: "none", color: "#fff", cursor: "pointer" }}>삭제</button>
+                            </div>
+                          )}
+                        </div>
+                        {!rearSvgRaw && (
+                          <div
+                            className="mrm-file-upload mrm-file-upload--compact"
+                            onClick={() => rearFileRef.current?.click()}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              processRearFile(e.dataTransfer.files?.[0]);
+                            }}
+                          >
+                            <div className="upload-text">뒷면 SVG 업로드</div>
+                            <div className="upload-hint">장비 후면 이미지</div>
+                          </div>
+                        )}
+                        {errors.rearFile && (
+                          <span className="error-hint" style={{ marginTop: 4, display: "block" }}>
+                            {errors.rearFile}
+                          </span>
+                        )}
+                        {rearSvgRaw && (
+                          <div className="mrm-side-preview">
+                            <SvgPreview svgRaw={rearSvgRaw} maxHeight={220} />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Card-based Configuration */}
+              {modelType === "card-based" && (
+                <>
+                  {/* Base Chassis SVG */}
+                  <div className="mrm-section">
+                    <div className="mrm-section-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        기본 섀시 (Base Equipment View)
+                        <span className="badge">카드 기반</span>
+                      </div>
+                      {baseChassisRaw && (
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          <button type="button" onClick={() => chassisFileRef.current?.click()} style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "4px", background: "var(--bg-tertiary)", border: "1px solid var(--border-medium)", color: "var(--text-secondary)", cursor: "pointer" }}>변경</button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBaseChassisRaw(null);
+                              setBaseChassisFileName("");
+                              setCaXStr("0");
+                              setCaYStr("0");
+                              setCaWidthStr("0");
+                              setCaHeightStr("0");
+                              setCaColumnsStr("1");
+                              setCaColWidthStr("0");
+                              setCaRowCountStr("1");
+                              setRowHeights([]);
+                              setUniformRowHeight("46");
+                              setRowColumnsArr([]);
+                              setUniformRowColumns("1");
+                              setRowGapsArr([]);
+                              setUniformRowGap("0");
+                              setGridColWidths([]);
+                              setGridRowHeights([]);
+                              setGridMerges([]);
+                            }}
+                            style={{ padding: "4px 10px", fontSize: "12px", borderRadius: "4px", background: "var(--severity-critical)", border: "none", color: "#fff", cursor: "pointer" }}
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <input
+                      type="file"
+                      accept=".svg,.png,.jpg,.jpeg,.webp"
+                      ref={chassisFileRef}
+                      style={{ display: "none" }}
+                      onChange={handleChassisFileChange}
+                    />
+                    {!baseChassisRaw && (
+                      <div
+                        className="mrm-file-upload"
+                        onClick={() => chassisFileRef.current?.click()}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          processChassisFile(e.dataTransfer.files?.[0]);
+                        }}
+                      >
+                        <div className="upload-icon">🖼️</div>
+                        <div className="upload-text">
+                          기본 섀시 이미지 파일을 업로드하세요
+                        </div>
+                        <div className="upload-hint">
+                          카드가 삽입되는 빈 장비 바디
+                        </div>
+                      </div>
+                    )}
+                    {errors.chassisFile && (
+                      <span className="error-hint" style={{ marginTop: 4, display: "block" }}>
+                        {errors.chassisFile}
+                      </span>
+                    )}
+
+                    {baseChassisRaw && (
+                      <ChassisPreviewWithOverlay
+                        svgRaw={baseChassisRaw}
+                        cardArea={{ x: caX, y: caY, width: caWidth, height: caHeight, columns: caColumns, columnWidth: caColWidth }}
+                        colWidths={gridColWidths}
+                        rowHeights={gridRowHeights}
+                        rowGaps={rowGapsArr.map(Number)}
+                        merges={gridMerges}
+                        onDrawEnd={(rect) => {
+                          setCaXStr(String(rect.x));
+                          setCaYStr(String(rect.y));
+                          setCaWidthStr(String(rect.width));
+                          setCaHeightStr(String(rect.height));
+                          // Initialize grid with default 2 cols × 4 rows
+                          const cols = 2;
+                          const rows = 4;
+                          setGridColWidths(Array.from({ length: cols }, () => Math.round(rect.width / cols)));
+                          setGridRowHeights(Array.from({ length: rows }, () => Math.round(rect.height / rows)));
+                          setGridMerges([]);
+                          setCaColumnsStr(String(cols));
+                          setCaRowCountStr(String(rows));
+                        }}
+                        onGridChange={(data) => {
+                          setGridColWidths(data.colWidths);
+                          setGridRowHeights(data.rowHeights);
+                          setGridMerges(data.merges);
+                          if (data.rowGaps) setRowGapsArr(data.rowGaps.map(String));
+                          if (data.baseX !== undefined) setCaXStr(String(Math.round(data.baseX)));
+                          if (data.baseY !== undefined) setCaYStr(String(Math.round(data.baseY)));
+                          // Sync back to legacy state
+                          setCaColumnsStr(String(data.colWidths.length));
+                          setCaRowCountStr(String(data.rowHeights.length));
+                          setCaWidthStr(String(Math.round(data.colWidths.reduce((a, b) => a + b, 0))));
+                          setCaHeightStr(String(Math.round(data.rowHeights.reduce((a, b) => a + b, 0))));
+                          setRowHeights(data.rowHeights.map(String));
+                          setRowColumnsArr(data.rowHeights.map(() => String(data.colWidths.length)));
+                        }}
+                        onSave={() => {
+                          showToastMsg("카드 영역 및 기본 섀시 정보가 임시 저장되었습니다.", "success");
+                        }}
+                      />
+                    )}
+                  </div>
+
+                  {/* Legacy Card Area Configuration (Coordinates) removed as requested */}
+
+                  {/* Type/Variant Configuration */}
+                  <div className="mrm-section">
+                    <div className="mrm-section-title">
+                      타입 관리
+                      <span className="badge">미리 구성된 모델 옵션</span>
+                    </div>
+                    <div style={{ padding: "16px", border: "1px solid var(--border-weak)", borderRadius: "10px", background: "var(--bg-secondary)" }}>
+                      <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "12px", lineHeight: 1.5 }}>
+                        이 섀시 모델을 선택했을 때 자동으로 할당될 카드 구성을 미리 정의합니다.
+                        기본타입 외에 A타입, B타입 등을 추가할 수 있으며, 등록 후 '새 장비 등록' 메뉴에서 개별 모델로 선택할 수 있습니다.
+                      </p>
+
+                      <div className="mrm-models-list" style={{ marginBottom: "16px", marginTop: "4px" }}>
+                        {variants.map((v, i) => (
+                          <div key={v.variantId || i} className="mrm-model-row">
+                            <span className="model-type-tag card-based">
+                              {v.isDefault ? "기본" : "추가"}
+                            </span>
+                            <DynamicListThumb
+                              modelName={modelName}
+                              isChassis={modelType === "card-based"}
+                              displayThumbPng={v.variantPngRaw || null}
+                              displayThumb={(() => {
+                                // 섀시형은 SVG를 넘기지 않음 → webpUrl 사용
+                                if (modelType === "card-based") return null;
+                                const isRear = defaultViewSide === "rear";
+                                if (isRear && rearSvgRaw) return rearSvgRaw;
+                                return modelSvgRaw || null;
+                              })()}
+                              staticImgUrl={null}
+                              insertedCards={v.insertedCards || []}
+                              onHover={setHoveredListThumb}
+                              onHoverMove={(e: any) => setHoveredListThumbPos({ x: e.clientX, y: e.clientY })}
+                              onHoverLeave={() => setHoveredListThumb(null)}
+                            />
+                            <div className="model-info-wrapper">
+                              <div className="model-info-header">
+                                <div className="model-info">
+                                  <div className="model-display-name">
+                                    {v.variantName}
+                                  </div>
+                                  <div className="model-meta">
+                                    <span>{v.insertedCards?.length || 0}개 카드 장착됨</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="model-actions">
+                                <button
+                                  type="button"
+                                  className="action-icon-btn edit-btn"
+                                  onClick={() => { setEditingVariantIndex(i); setIsAssemblyOpen(true); }}
+                                  title="타입 수정"
+                                  aria-label="타입 수정"
+                                >
+                                  <Icon icon="material-symbols:edit" style={{ width: 16, height: 16 }} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="action-icon-btn delete-btn"
+                                  onClick={() => setVariants(prev => prev.filter((_, idx) => idx !== i))}
+                                  title="타입 삭제"
+                                  aria-label="타입 삭제"
+                                >
+                                  <Icon icon="material-symbols:delete" style={{ width: 16, height: 16 }} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {variants.length === 0 && (
+                        <div style={{ padding: "20px", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px", background: "var(--bg-primary)", borderRadius: "6px", border: "1px dashed var(--border-medium)", marginBottom: "16px" }}>
+                          구성된 타입이 없습니다. 새 타입을 추가해주세요.
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        disabled={!baseChassisRaw || !isChassisDrawn}
+                        onClick={() => {
+                          setEditingVariantIndex(null);
+                          setIsAssemblyOpen(true);
+                        }}
+                        style={{
+                          width: "100%", padding: "10px", borderRadius: "6px",
+                          background: "var(--theme-primary)", color: "#fff", fontWeight: 600, border: "none",
+                          opacity: (!baseChassisRaw || !isChassisDrawn) ? 0.5 : 1,
+                          cursor: (!baseChassisRaw || !isChassisDrawn) ? "not-allowed" : "pointer"
+                        }}
+                      >
+                        + 새 타입 추가
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Card Assignment */}
+                  <div className="mrm-section">
+                    <div className="mrm-section-title">카드 할당</div>
+
+                    <div className="mrm-card-config">
+                      {/* Assigned cards */}
+                      <div className="mrm-card-list">
+                        {assignedCardDetails.length > 0 ? (
+                          assignedCardDetails.map((card) => (
+                            <div
+                              key={card.id}
+                              className="mrm-card-item"
+                              onMouseMove={(e) => handleCardMouseMove(e, card)}
+                              onMouseLeave={handleCardMouseLeave}
+                            >
+                              <div className="card-preview" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <CardThumbnail
+                                  svgUrl={card.isBuiltIn ? card.svgUrl : undefined}
+                                  svgRaw={!card.isBuiltIn ? card.svgRaw : undefined}
+                                  alt={card.name}
+                                  style={{ width: "100%", height: "48px", objectFit: "contain" }}
+                                />
+                              </div>
+                              <div className="card-info">
+                                <div className="card-name">{card.name}</div>
+                                <div className="card-meta">
+                                  {card.widthType.toUpperCase()} · {card.svgWidth}×{card.svgHeight}px
+                                </div>
+                              </div>
+                              <button
+                                className="card-remove"
+                                onClick={() => handleRemoveAssignedCard(card.id)}
+                                title="할당 해제"
+                                aria-label="할당 해제"
+                              >
+                                <Icon icon="material-symbols:close-rounded" className="icon" style={DELETE_ICON_STYLE} />
+                              </button>
+                            </div>
+                          ))
+                        ) : (
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              height: "100%",
+                              color: "var(--text-tertiary)",
+                              fontSize: "12px",
+                            }}
+                          >
+                            할당된 카드가 없습니다.<br /> 아래 버튼으로 카드를 추가하세요.
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Actions */}
+                      <div className="mrm-sub-actions">
+                        <button
+                          className="mrm-btn-sm"
+                          onClick={() => setIsCardRegOpen(true)}
+                        >
+                          + 새 카드 등록
+                        </button>
+                        {availableCards.length > 0 && (
+                          <button
+                            className="mrm-btn-sm"
+                            onClick={() => setShowExistingPicker(!showExistingPicker)}
+                          >
+                            {showExistingPicker ? "목록 닫기" : "기존 카드에서 선택"}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Existing Card Picker */}
+                      {showExistingPicker && availableCards.length > 0 && (
+                        <div className="mrm-existing-cards">
+                          {availableCards.map((card) => {
+                            const isSelected = assignedCardIds.includes(card.id);
+                            return (
+                              <div
+                                key={card.id}
+                                className={`mrm-existing-card ${isSelected ? "selected" : ""}`}
+                                onClick={() => handleSelectExistingCard(card.id)}
+                                onMouseMove={(e) => handleCardMouseMove(e, card)}
+                                onMouseLeave={handleCardMouseLeave}
+                              >
+                                <div
+                                  style={{
+                                    height: 48,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    overflow: "hidden",
+                                    borderRadius: 4,
+                                    background: "var(--bg-tertiary)",
+                                  }}
+                                >
+                                  <CardThumbnail
+                                    svgUrl={card.isBuiltIn ? card.svgUrl : undefined}
+                                    svgRaw={!card.isBuiltIn ? card.svgRaw : undefined}
+                                    alt={card.name}
+                                    style={{ width: "100%", height: "48px", objectFit: "contain" }}
+                                  />
+                                </div>
+                                <div className="ec-name">{card.name}</div>
+                                <div className="ec-meta">
+                                  {card.widthType.toUpperCase()} · {card.svgWidth}×{card.svgHeight}
+                                </div>
+                                {isSelected && (
+                                  <div
+                                    style={{
+                                      fontSize: 10,
+                                      color: "#22c55e",
+                                      fontWeight: 700,
+                                      marginTop: 2,
+                                    }}
+                                  >
+                                    ✓ 선택됨
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="mrm-actions">
+              {editingModelId && (
+                <button
+                  className="mrm-btn danger"
+                  style={{ marginRight: 'auto', backgroundColor: '#e74c3c', color: 'white' }}
+                  onClick={() => {
+                    let isUsed = false;
+                    if (registeredDevices.some((d) => d.modelName === modelName)) {
+                      isUsed = true;
+                    } else {
+                      const allLayouts = Object.values(layouts);
+                      for (const layout of allLayouts) {
+                        if (layout.racks.some((r) => r.devices.some((d) => d.modelName === modelName))) {
+                          isUsed = true;
+                          break;
+                        }
+                      }
+                    }
+
+                    if (isUsed) {
+                      alert("모델이 사용중이라 삭제가 불가합니다.");
+                      return;
+                    }
+
+                    if (window.confirm("해당 모델 데이터가 사라집니다. 목록으로 돌아가시겠습니까?")) {
+                      removeCustomModel(editingModelId);
+                      showToastMsg(`모델 "${modelName}" 삭제 완료!`, "success");
+                      resetForm();
+                      setActiveTab("list");
+                    }
+                  }}
+                >
+                  삭제
+                </button>
+              )}
+              <button className="mrm-btn secondary" onClick={() => {
+                if (isDirty) {
+                  if (!window.confirm("작성 중인 내용이 모두 사라집니다. 취소하시겠습니까?")) return;
+                }
+                resetForm();
+                setActiveTab("list");
+              }}>
+                취소
+              </button>
+              <button
+                className="mrm-btn primary"
+                disabled={
+                  !isDirty ||
+                  !modelName.trim() ||
+                  (modelType !== "card-based" && !modelSvgRaw) ||
+                  (modelType !== "card-based" && useDualView && !rearSvgRaw) ||
+                  (modelType === "card-based" && !baseChassisRaw)
+                }
+                onClick={handleSubmit}
+              >
+                저장
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Body: Registered Models List */}
+            <div className="mrm-body">
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <div style={{
+                  fontSize: 12, fontWeight: 700, color: "var(--text-tertiary)",
+                  textTransform: "uppercase", letterSpacing: "0.05em",
+                  padding: "8px 0 6px",
+                }}>
+                  기본 장비 모델 ({DEVICE_TEMPLATES.filter((t) => !deletedDefaultTemplates.includes(t.modelName)).length})
+                </div>
+                <button
+                  className="comm-btn comm-btn-primary comm-btn-md"
+                  onClick={() => {
+                    setIsFormLoading(true);
+                    resetForm();
+                    setActiveTab("register");
+                    setIsFormLoading(false);
+                  }}
+                  style={{ gap: 6, display: "inline-flex", alignItems: "center" }}
+                >
+                  <Icon icon="material-symbols:add" style={{ width: 16, height: 16 }} />
+                  새 모델 등록
+                </button>
+              </div>
+              {/* Default (Built-in) Models */}
+              <div style={{ marginBottom: 8 }}>
+                <div className="mrm-models-list">
+                  {DEVICE_TEMPLATES.filter((t) => !deletedDefaultTemplates.includes(t.modelName)).map((tmpl) => {
+                    const overrideModel = customModels.find((m) => m.modelName === tmpl.modelName);
+                    const eqModel = equipmentModels.find((m) => m.modelName === tmpl.modelName);
+                    const isCardBased = !!overrideModel || !!eqModel;
+                    const displayUnit = overrideModel ? overrideModel.unit : tmpl.uSize;
+                    
+                    // 섀시형: displayThumb(SVG)를 넘기지 않음 → DynamicListThumb 내부에서 webpUrl 사용
+                    // 고정형: PNG → staticImgUrl → SVG fallback 순서
+                    let displayThumbPng: string | null = null;
+                    let displayThumb: string | null = null;
+
+                    if (overrideModel && overrideModel.variants) {
+                      const defaultVariant = overrideModel.variants.find(v => v.variantName === "기본타입");
+                      if (defaultVariant && defaultVariant.variantPngRaw) {
+                        displayThumbPng = defaultVariant.variantPngRaw;
+                      }
+                    }
+                    if (!displayThumbPng && overrideModel) {
+                      displayThumbPng = overrideModel.modelPngRaw || null;
+                    }
+
+                    // 고정형만 SVG fallback 허용 (섀시형은 webpUrl 사용)
+                    if (!isCardBased && !displayThumbPng && overrideModel) {
+                      const om = overrideModel as any;
+                      displayThumb = om.defaultViewSide === "rear" && om.rearSvgRaw 
+                        ? om.rearSvgRaw 
+                        : (om.modelSvgRaw || null);
+                    }
+
+                    const imgUrl = resolveDeviceImage(tmpl.modelName);
+                    const variantCount = overrideModel?.variants?.length || 0;
+                    return (
+                      <div key={`default-${tmpl.modelName}`} className="mrm-model-row">
+                        <span className={`model-type-tag ${isCardBased ? "card-based" : "normal"}`}>
+                          {isCardBased ? "섀시형" : "고정형"}
+                        </span>
+                        <DynamicListThumb
+                          modelName={tmpl.modelName}
+                          isChassis={isCardBased}
+                          displayThumbPng={displayThumbPng}
+                          displayThumb={displayThumb}
+                          staticImgUrl={imgUrl}
+                          insertedCards={(() => {
+                            if (overrideModel?.variants?.length) {
+                              const defaultVariant = overrideModel.variants.find((v: any) => v.variantName === "기본타입");
+                              if (defaultVariant?.insertedCards) return defaultVariant.insertedCards;
+                              // 첫번째 variant의 cards라도 반환
+                              if (overrideModel.variants[0]?.insertedCards) return overrideModel.variants[0].insertedCards;
+                            }
+                            return DEFAULT_CHASSIS_CARDS[tmpl.modelName] || [];
+                          })()}
+                          onHover={setHoveredListThumb}
+                          onHoverMove={(e: any) => setHoveredListThumbPos({ x: e.clientX, y: e.clientY })}
+                          onHoverLeave={() => setHoveredListThumb(null)}
+                        />
+                        <div className="model-info-wrapper">
+                          <div className="model-info-header">
+                            <div className="model-info">
+                              <div className="model-display-name">
+                                [{displayUnit}U] {tmpl.modelName}
+                              </div>
+                              <div className="model-meta">
+                                <span>{displayUnit}U</span>
+                                <span>·</span>
+                                <span>{tmpl.vendor}</span>
+                                <span>·</span>
+                                <span>{tmpl.type}</span>
+                                {isCardBased && overrideModel && (
+                                  <>
+                                    <span>·</span>
+                                    <span>타입 {variantCount}개</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="model-actions">
+                            <button
+                              className="action-icon-btn edit-btn"
+                              onClick={async () => {
+                                if (overrideModel) {
+                                  // Load the overridden model for editing
+                                  loadModelForEdit(overrideModel.modelId);
+                                  return;
+                                }
+
+                                // 기본 장비를 편집 폼에 로드 (SVG 이미지 + 카드 영역 설정 포함)
+                                setIsFormLoading(true);
+                                resetForm();
+                                setModelName(tmpl.modelName);
+                                setVendor(tmpl.vendor || "Nokia");
+                                setUnit(tmpl.uSize);
+                                setErrors({});
+                                setEditingModelId(null);
+                                setUseDualView(false);
+                                setRearSvgRaw(null);
+                                setRearSvgFileName("");
+                                setDefaultViewSide("front");
+                                setActiveTab("register");
+
+                                // 카드 기반 모델 여부 확인
+                                const eqModel = equipmentModels.find(
+                                  (m) => m.modelName === tmpl.modelName
+                                );
+                                if (eqModel) {
+                                  setModelType("card-based");
+
+                                  if (eqModel.rows && eqModel.rows.length > 0) {
+                                    // ── rows 기반 모델 (IXR-6, IXR-10): rows에서 카드 영역 역산 ──
+                                    const firstRow = eqModel.rows[0];
+                                    const lastRow = eqModel.rows[eqModel.rows.length - 1];
+                                    const computedX = firstRow.x;
+                                    const computedY = firstRow.y;
+                                    const computedW = firstRow.width;
+                                    const computedH = (lastRow.y + lastRow.height) - firstRow.y;
+                                    const computedCols = firstRow.columns;
+                                    const computedColW = Math.round(computedW / computedCols);
+
+                                    setCaXStr(String(computedX));
+                                    setCaYStr(String(computedY));
+                                    setCaWidthStr(String(computedW));
+                                    setCaHeightStr(String(computedH));
+                                    setCaColumnsStr(String(computedCols));
+                                    setCaColWidthStr(String(computedColW));
+
+                                    // 행 수 & 행 높이 & 행별 열 수 & 행 간 간격
+                                    const rCount = eqModel.rows.length;
+                                    setCaRowCountStr(String(rCount));
+                                    setRowHeights(eqModel.rows.map((r) => String(r.height)));
+                                    setRowColumnsArr(eqModel.rows.map((r) => String(r.columns)));
+                                    // rows Y좌표 차이로 간격 계산
+                                    const gaps: string[] = [];
+                                    for (let ri = 0; ri < rCount - 1; ri++) {
+                                      const currentEnd = eqModel.rows[ri].y + eqModel.rows[ri].height;
+                                      const nextStart = eqModel.rows[ri + 1].y;
+                                      gaps.push(String(Math.max(0, nextStart - currentEnd)));
+                                    }
+                                    setRowGapsArr(gaps);
+                                  } else if (eqModel.cardArea) {
+                                    // ── cardArea 기반 모델 (R4, R6, R6d, R6dl) ──
+                                    setCaXStr(String(eqModel.cardArea.x));
+                                    setCaYStr(String(eqModel.cardArea.y));
+                                    setCaWidthStr(String(eqModel.cardArea.width));
+                                    setCaHeightStr(String(eqModel.cardArea.height));
+                                    setCaColumnsStr(String(eqModel.cardArea.columns));
+                                    setCaColWidthStr(String(eqModel.cardArea.columnWidth));
+
+                                    // slots에서 고유 행 높이 추출, 없으면 기본값으로 계산
+                                    if (eqModel.slots && eqModel.slots.length > 0) {
+                                      const rowMap = new Map<number, number>();
+                                      for (const s of eqModel.slots) {
+                                        if (!rowMap.has(s.row) || s.height > (rowMap.get(s.row) || 0)) {
+                                          rowMap.set(s.row, s.height);
+                                        }
+                                      }
+                                      const sortedRows = [...rowMap.entries()].sort((a, b) => a[0] - b[0]);
+                                      setCaRowCountStr(String(sortedRows.length));
+                                      setRowHeights(sortedRows.map(([, h]) => String(h)));
+                                      setRowColumnsArr(Array.from({ length: sortedRows.length }, () => String(eqModel.cardArea!.columns)));
+                                      // slots 기반: 행 간 Y좌표 차이로 간격 계산
+                                      const slotGaps: string[] = [];
+                                      const sortedRowKeys = sortedRows.map(([k]) => k);
+                                      for (let ri = 0; ri < sortedRowKeys.length - 1; ri++) {
+                                        const curRow = eqModel.slots!.filter((s) => s.row === sortedRowKeys[ri]);
+                                        const nextRow = eqModel.slots!.filter((s) => s.row === sortedRowKeys[ri + 1]);
+                                        if (curRow.length > 0 && nextRow.length > 0) {
+                                          const curEnd = Math.max(...curRow.map((s) => s.y + s.height));
+                                          const nextStart = Math.min(...nextRow.map((s) => s.y));
+                                          slotGaps.push(String(Math.max(0, nextStart - curEnd)));
+                                        } else {
+                                          slotGaps.push("0");
+                                        }
+                                      }
+                                      setRowGapsArr(slotGaps);
+                                    } else {
+                                      const rCount = Math.max(1, Math.floor(eqModel.cardArea.height / 46));
+                                      setCaRowCountStr(String(rCount));
+                                      setRowHeights(Array.from({ length: rCount }, () => "46"));
+                                      setRowColumnsArr(Array.from({ length: rCount }, () => String(eqModel.cardArea!.columns)));
+                                      setRowGapsArr(Array.from({ length: Math.max(0, rCount - 1) }, () => "0"));
+                                    }
+                                  }
+
+                                  // 섀시 SVG 로드
+                                  if (eqModel.baseSvgUrl) {
+                                    const chassisSvg = await loadBaseEquipmentSvgRaw(eqModel.baseSvgUrl);
+                                    if (chassisSvg) {
+                                      setBaseChassisRaw(chassisSvg);
+                                      setBaseChassisFileName(eqModel.baseSvgUrl);
+                                    }
+                                  }
+                                } else {
+                                  setModelType("normal");
+                                  setBaseChassisRaw(null);
+                                  setBaseChassisFileName("");
+                                  setCaRowCountStr("0");
+                                  setRowHeights([]);
+                                  setRowColumnsArr([]);
+                                  setRowGapsArr([]);
+                                }
+
+                                // 카드 할당: 카드 기반 모델이면 호환 카드를 자동 할당
+                                if (eqModel) {
+                                  const compatibleCards = getCardsForModel(eqModel);
+                                  setAssignedCardIds(compatibleCards.map((c) => c.cardFileName));
+                                } else {
+                                  setAssignedCardIds([]);
+                                }
+
+                                // 모델 SVG 로드
+                                const svgContent = await resolveDeviceSvgContent(tmpl.modelName);
+                                if (svgContent) {
+                                  setModelSvgRaw(svgContent);
+                                  setModelSvgFileName(`[${tmpl.uSize}U] ${tmpl.modelName}.svg`);
+                                } else {
+                                  setModelSvgRaw(null);
+                                  setModelSvgFileName("");
+                                }
+
+                                const sides = getDeviceViewSides(tmpl.modelName);
+                                if (sides.includes("rear")) {
+                                  const rearSvgContent = await resolveDeviceSvgContent(tmpl.modelName, "rear");
+                                  setUseDualView(!!rearSvgContent);
+                                  setRearSvgRaw(rearSvgContent || null);
+                                  setRearSvgFileName(rearSvgContent ? `[${tmpl.uSize}U] ${tmpl.modelName} back.svg` : "");
+                                }
+                                setIsFormLoading(false);
+                              }}
+                              title="모델 수정"
+                              aria-label="모델 수정"
+                            >
+                              <Icon icon="material-symbols:edit" style={{ width: 16, height: 16 }} />
+                            </button>
+                            <button
+                              className="action-icon-btn delete-btn"
+                              onClick={() => {
+                                removeDefaultTemplate(tmpl.modelName);
+                                showToastMsg(`기본 모델 "[${tmpl.uSize}U] ${tmpl.modelName}" 숨김 처리됨`, "success");
+                              }}
+                              title="기본 모델 숨기기"
+                              aria-label="기본 모델 숨기기"
+                            >
+                              <Icon icon="material-symbols:visibility-off" style={{ width: 16, height: 16 }} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Hidden Default Models */}
+              {deletedDefaultTemplates.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{
+                    fontSize: 12, fontWeight: 700, color: "var(--text-tertiary)",
+                    textTransform: "uppercase", letterSpacing: "0.05em",
+                    padding: "8px 0 6px",
+                  }}>
+                    숨김 처리된 기본 모델 ({deletedDefaultTemplates.length})
+                  </div>
+                  <div className="mrm-models-list" style={{ opacity: 0.6 }}>
+                    {DEVICE_TEMPLATES.filter((t) => deletedDefaultTemplates.includes(t.modelName)).map((tmpl) => {
+                      const overrideModel = customModels.find((m) => m.modelName === tmpl.modelName);
+                      const eqModel = equipmentModels.find((m) => m.modelName === tmpl.modelName);
+                      const isCardBased = !!overrideModel || !!eqModel;
+                      const imgUrl = resolveDeviceImage(tmpl.modelName);
+                      return (
+                        <div key={`hidden-${tmpl.modelName}`} className="mrm-model-row" style={{ background: "var(--bg-secondary)" }}>
+                          <span className={`model-type-tag ${isCardBased ? "card-based" : "normal"}`}>
+                            {isCardBased ? "섀시형" : "고정형"}
+                          </span>
+                          <DynamicListThumb
+                            modelName={tmpl.modelName}
+                            isChassis={isCardBased}
+                            displayThumbPng={null}
+                            displayThumb={null}
+                            staticImgUrl={imgUrl}
+                            insertedCards={(() => {
+                              if (overrideModel?.variants?.length) {
+                                const defaultVariant = overrideModel.variants.find((v: any) => v.variantName === "기본타입");
+                                if (defaultVariant?.insertedCards) return defaultVariant.insertedCards;
+                                if (overrideModel.variants[0]?.insertedCards) return overrideModel.variants[0].insertedCards;
+                              }
+                              return DEFAULT_CHASSIS_CARDS[tmpl.modelName] || [];
+                            })()}
+                            onHover={setHoveredListThumb}
+                            onHoverMove={(e: any) => setHoveredListThumbPos({ x: e.clientX, y: e.clientY })}
+                            onHoverLeave={() => setHoveredListThumb(null)}
+                          />
+                          <div className="model-info-wrapper">
+                            <div className="model-info-header">
+                              <div className="model-info">
+                                <div className="model-display-name">
+                                  [{tmpl.uSize}U] {tmpl.modelName}
+                                </div>
+                                <div className="model-meta">
+                                  <span>{tmpl.uSize}U</span>
+                                  <span>·</span>
+                                  <span>{tmpl.vendor}</span>
+                                  <span>·</span>
+                                  <span>{tmpl.type}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="model-actions">
+                              <button
+                                className="action-icon-btn edit-btn"
+                                onClick={() => {
+                                  restoreDefaultTemplate(tmpl.modelName);
+                                  showToastMsg(`기본 모델 "[${tmpl.uSize}U] ${tmpl.modelName}" 복구됨`, "success");
+                                }}
+                                title="숨김 해제 (복구)"
+                                aria-label="숨김 해제"
+                              >
+                                <Icon icon="material-symbols:visibility" style={{ width: 16, height: 16 }} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Custom Models */}
+              <div>
+                <div style={{
+                  fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)",
+                  textTransform: "uppercase", letterSpacing: "0.05em",
+                  padding: "8px 0 6px", borderBottom: "1px solid var(--border-weak)",
+                  marginBottom: 8,
+                }}>
+                  커스텀 모델 ({customModels.filter(m => !DEVICE_TEMPLATES.some(t => t.modelName === m.modelName)).length})
+                </div>
+                {customModels.filter(m => !DEVICE_TEMPLATES.some(t => t.modelName === m.modelName)).length > 0 ? (
+                  <div className="mrm-models-list">
+                    {customModels.filter(m => !DEVICE_TEMPLATES.some(t => t.modelName === m.modelName)).map((model) => (
+                      <div key={model.modelId} className="mrm-model-row">
+                        <span className={`model-type-tag ${model.modelType}`}>
+                          {model.modelType === "normal" ? "고정형" : "섀시형"}
+                        </span>
+                        <DynamicListThumb
+                          modelName={model.modelName}
+                          isChassis={model.modelType === "card-based"}
+                          displayThumbPng={(() => {
+                            if (model.variants) {
+                              const defaultVariant = model.variants.find(v => v.variantName === "기본타입");
+                              if (defaultVariant && defaultVariant.variantPngRaw) {
+                                return defaultVariant.variantPngRaw;
+                              }
+                            }
+                            return model.modelPngRaw || null;
+                          })()}
+                          displayThumb={(() => {
+                            // 섀시형은 SVG를 넘기지 않음 → webpUrl 사용
+                            if (model.modelType === "card-based") return null;
+                            const isRear = model.defaultViewSide === "rear";
+                            if (isRear && model.rearSvgRaw) return model.rearSvgRaw;
+                            return model.modelSvgRaw || null;
+                          })()}
+                          staticImgUrl={null}
+                          insertedCards={(() => {
+                            if (model.variants) {
+                              const defaultVariant = model.variants.find(v => v.variantName === "기본타입");
+                              if (defaultVariant && defaultVariant.insertedCards) {
+                                return defaultVariant.insertedCards;
+                              }
+                            }
+                            return (model as any).insertedCards || [];
+                          })()}
+                          onHover={setHoveredListThumb}
+                          onHoverMove={(e: any) => setHoveredListThumbPos({ x: e.clientX, y: e.clientY })}
+                          onHoverLeave={() => setHoveredListThumb(null)}
+                        />
+                        <div className="model-info-wrapper">
+                          <div className="model-info-header">
+                            <div className="model-info">
+                              <div className="model-display-name">
+                                {model.displayName}
+                              </div>
+                              <div className="model-meta">
+                                <span>{model.unit}U</span>
+                                <span>·</span>
+                                <span>
+                                  {model.equipmentSize
+                                    ? `${model.equipmentSize.width}×${model.equipmentSize.height}px`
+                                    : ""}
+                                </span>
+                                {model.modelType === "card-based" && (
+                                  <>
+                                    <span>·</span>
+                                    <span>타입 {model.variants?.length || 0}개</span>
+                                  </>
+                                )}
+                                {model.rearSvgRaw && (
+                                  <>
+                                    <span>·</span>
+                                    <span>양면/{model.defaultViewSide === "rear" ? "뒷면 기본" : "앞면 기본"}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="model-actions">
+                            <button
+                              className="action-icon-btn edit-btn"
+                              onClick={() => loadModelForEdit(model.modelId)}
+                              title="모델 수정"
+                              aria-label="모델 수정"
+                            >
+                              <Icon icon="material-symbols:edit" style={{ width: 16, height: 16 }} />
+                            </button>
+                            <button
+                              className="action-icon-btn delete-btn"
+                              onClick={() => handleDeleteModel(model.modelId)}
+                              title="커스텀 모델 삭제"
+                              aria-label="커스텀 모델 삭제"
+                            >
+                              <Icon icon="material-symbols:delete" style={{ width: 16, height: 16 }} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      textAlign: "center",
+                      padding: "30px 0",
+                      color: "var(--text-tertiary)",
+                    }}
+                  >
+                    <div style={{ fontSize: 12, opacity: 0.7 }}>
+                      등록된 커스텀 모델이 없습니다. "새 모델 등록" 탭에서 추가하세요.
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+
+        {hoveredTooltipCard && (
+          <div
+            style={{
+              position: "fixed",
+              left: hoveredTooltipPos.x + 15,
+              top: hoveredTooltipPos.y + 15,
+              zIndex: 100000,
+              background: "var(--bg-secondary)",
+              padding: "8px",
+              borderRadius: "8px",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.6)",
+              pointerEvents: "none",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: hoveredTooltipCard.widthType === "full" ? "800px" : "400px",
+              maxWidth: "80vw"
+            }}
+          >
+            <CardThumbnail
+              svgUrl={hoveredTooltipCard.isBuiltIn ? hoveredTooltipCard.svgUrl : undefined}
+              svgRaw={!hoveredTooltipCard.isBuiltIn ? hoveredTooltipCard.svgRaw : undefined}
+              alt={hoveredTooltipCard.name}
+              style={{ width: "100%", height: "auto", objectFit: "contain" }}
+            />
+          </div>
+        )}
+      </StnModal>
+
+      {/* Card Registration Sub-Modal */}
+      <CardRegistrationForm
+        open={isCardRegOpen}
+        onClose={() => setIsCardRegOpen(false)}
+        onSave={handleAddNewCard}
+        maxColumns={maxColumns}
+      />
+
+      {/* Equipment Assembly Sub-Modal for Type configuration */}
+      {isAssemblyOpen && (
+        <EquipmentAssemblyModal
+          open={isAssemblyOpen}
+          onClose={() => setIsAssemblyOpen(false)}
+          initialModelName={modelName || "새 장비"}
+          inlineModel={{
+            modelId: "temp",
+            modelName: modelName || "새 장비",
+            unit: unit,
+            rackUnit: `${unit}U`,
+            modelSvgRaw: baseChassisRaw || "",
+            baseEquipmentViewSvgRaw: baseChassisRaw || "",
+            baseSvgUrl: baseChassisFileName || "",
+            modelType: "card-based",
+            equipmentSize: parseSvgDimensions(baseChassisRaw || ""),
+            assignedCardIds: assignedCardIds,
+            cardArea: { x: caX, y: caY, width: caWidth, height: caHeight, columns: caColumns, columnWidth: caColWidth },
+            _rowHeights: rowHeights.map(r => parseFloat(r) || defaultRowHeight),
+            _rowColumns: rowColumnsArr.map(c => parseInt(c) || caColumns),
+            _rowGaps: rowGapsArr.map(g => parseFloat(g) || 0),
+            gridMerges: gridMerges,
+            gridColWidths: gridColWidths,
+            gridRowHeights: gridRowHeights
+          } as any}
+          initialCards={editingVariantIndex !== null ? variants[editingVariantIndex].insertedCards : []}
+          onSave={async (res) => {
+            let variantName = prompt("타입 이름을 입력하세요 (예: 기본타입, A타입)", editingVariantIndex !== null ? variants[editingVariantIndex].variantName : (variants.length === 0 ? "기본타입" : "A타입"));
+            if (!variantName) return false;
+
+            variantName = variantName.trim();
+            const nameExists = variants.some((v, idx) => v.variantName === variantName && idx !== editingVariantIndex);
+            if (nameExists) {
+              alert(`"${variantName}" 타입이 이미 존재합니다. 다른 이름을 사용해주세요.`);
+              return false;
+            }
+
+            const next = [...variants];
+            let newVariantPngRaw: string | undefined = undefined;
+
+            // 타입 썸네일 PNG 생성
+            const dims = parseSvgDimensions(modelSvgRaw || baseChassisRaw || "");
+            const parsedRowColumns = rowColumnsArr.map((c) => parseInt(c) || caColumns);
+            const effectiveMaxCols = parsedRowColumns.length > 0 ? Math.max(...parsedRowColumns, 1) : caColumns;
+            const effectiveColWidth = caWidth / effectiveMaxCols;
+
+            try {
+              const composerModel = {
+                modelId: "temp",
+                modelName: modelName.trim(),
+                rackUnit: `${unit}U`,
+                baseSvgUrl: "local",
+                baseEquipmentViewSvgRaw: baseChassisRaw || "",
+                equipmentSize: { width: dims.width, height: dims.height },
+                cardArea: { x: caX, y: caY, width: caWidth, height: caHeight, columns: effectiveMaxCols, columnWidth: effectiveColWidth },
+                _rowHeights: rowHeights.length > 0 ? rowHeights.map(r => parseFloat(r) || 0) : undefined,
+                _rowColumns: rowColumnsArr.length > 0 ? rowColumnsArr.map(c => parseInt(c) || 0) : undefined,
+                _rowGaps: rowGapsArr.length > 0 ? rowGapsArr.map(g => parseFloat(g) || 0) : undefined,
+                gridMerges,
+                gridColWidths,
+                gridRowHeights
+              };
+              // 섀시형 variant thumbnail: 카드가 합성된 SVG를 WebP로 변환 (serverRoom3D 방식)
+              if (baseChassisRaw) {
+                const composedSvg = await generateComposedSvgAsync(
+                  modelName.trim(),
+                  composerModel as any,
+                  res.cards,
+                  [],
+                  "front"
+                );
+                if (composedSvg) {
+                  newVariantPngRaw = await convertSvgToPngAsync(composedSvg, dims.width || 860, dims.height || 200) || undefined;
+                } else {
+                  // fallback: 카드 합성 실패 시 빈 섀시라도 변환
+                  newVariantPngRaw = await convertSvgToPngAsync(baseChassisRaw, dims.width || 860, dims.height || 200) || undefined;
+                }
+              }
+            } catch (err) {
+              console.error("Failed to generate variant PNG on save", err);
+            }
+
+            if (editingVariantIndex !== null) {
+              next[editingVariantIndex] = { ...next[editingVariantIndex], variantName, insertedCards: res.cards, variantPngRaw: newVariantPngRaw };
+            } else {
+              next.push({ variantId: `var-${Date.now()}`, variantName, isDefault: next.length === 0, insertedCards: res.cards, variantPngRaw: newVariantPngRaw });
+            }
+            setVariants(next);
+
+            // Auto-save to store
+
+
+            const finalModelSvgRaw = modelType === "card-based" ? "" : (modelSvgRaw || "");
+            let finalModelPngRaw: string | undefined = undefined;
+
+            setVariants([...next]);
+
+            if (modelType !== "card-based" && !finalModelPngRaw && finalModelSvgRaw) {
+              try {
+                finalModelPngRaw = await convertSvgToPngAsync(finalModelSvgRaw, dims.width || 860, dims.height || 200);
+              } catch (err) {
+                console.error("Failed to generate fallback PNG on variant save", err);
+              }
+            } else if (modelType === "card-based" && baseChassisRaw) {
+              try {
+                const composerModel = {
+                  modelId: "temp",
+                  modelName: modelName.trim(),
+                  rackUnit: `${unit}U`,
+                  baseSvgUrl: "local",
+                  baseEquipmentViewSvgRaw: baseChassisRaw || "",
+                  equipmentSize: { width: dims.width, height: dims.height },
+                  cardArea: { x: caX, y: caY, width: caWidth, height: caHeight, columns: effectiveMaxCols, columnWidth: effectiveColWidth },
+                  _rowHeights: rowHeights.length > 0 ? rowHeights.map(r => parseFloat(r) || 0) : undefined,
+                  _rowColumns: rowColumnsArr.length > 0 ? rowColumnsArr.map(c => parseInt(c) || 0) : undefined,
+                  _rowGaps: rowGapsArr.length > 0 ? rowGapsArr.map(g => parseFloat(g) || 0) : undefined,
+                  gridMerges,
+                  gridColWidths,
+                  gridRowHeights
+                };
+                const defaultCards = next.find(v => v.variantName === "기본타입")?.insertedCards || [];
+                const composedSvg = await generateComposedSvgAsync(modelName.trim(), composerModel as any, defaultCards, [], "front");
+                if (composedSvg) {
+                  finalModelPngRaw = await convertSvgToPngAsync(composedSvg, dims.width || 860, dims.height || 200) || undefined;
+                }
+              } catch (err) {
+                console.error("Failed to generate chassis PNG on variant save", err);
+              }
+            }
+
+            const payload: Omit<import("../../types/equipment").CustomEquipmentModel, "modelId"> = {
+              modelName: modelName.trim(),
+              vendor: vendor,
+              unit,
+              displayName: `[${unit}U] ${modelName.trim()}`,
+              modelSvgRaw: finalModelSvgRaw,
+              modelPngRaw: finalModelPngRaw,
+              rearSvgRaw: useDualView ? rearSvgRaw || undefined : undefined,
+              defaultViewSide: useDualView ? defaultViewSide : "front",
+              modelType,
+              baseEquipmentViewSvgRaw: modelType === "card-based" ? baseChassisRaw || undefined : undefined,
+              cardArea: modelType === "card-based" ? { x: caX, y: caY, width: caWidth, height: caHeight, columns: effectiveMaxCols, columnWidth: effectiveColWidth } : undefined,
+              rowHeights: modelType === "card-based" && rowHeights.length > 0 ? rowHeights.map(r => parseFloat(r) || 0) : undefined,
+              rowColumns: modelType === "card-based" && rowColumnsArr.length > 0 ? rowColumnsArr.map(c => parseInt(c) || 0) : undefined,
+              rowGaps: modelType === "card-based" && rowGapsArr.length > 0 ? rowGapsArr.map(g => parseFloat(g) || 0) : undefined,
+              gridMerges: modelType === "card-based" && gridMerges.length > 0 ? gridMerges : undefined,
+              gridColWidths: modelType === "card-based" && gridColWidths.length > 0 ? gridColWidths : undefined,
+              gridRowHeights: modelType === "card-based" && gridRowHeights.length > 0 ? gridRowHeights : undefined,
+              equipmentSize: { width: dims.width, height: dims.height },
+              assignedCardIds: modelType === "card-based" ? assignedCardIds : [],
+              variants: modelType === "card-based" ? next : undefined,
+              createdAt: editingModelId ? (customModels.find((m) => m.modelId === editingModelId)?.createdAt || new Date().toISOString()) : new Date().toISOString(),
+            };
+
+            if (editingModelId) {
+              updateCustomModel(editingModelId, payload);
+              showToastMsg(`타입 "${variantName}" 저장 및 모델 적용 완료!`, "success");
+            } else {
+              const existing = customModels.find(m => m.modelName === payload.modelName);
+              if (existing) {
+                updateCustomModel(existing.modelId, payload);
+                setEditingModelId(existing.modelId);
+                showToastMsg(`타입 "${variantName}" 저장 및 모델 적용 완료!`, "success");
+              } else {
+                const newId = addCustomModel(payload);
+                setEditingModelId(newId);
+                showToastMsg(`타입 "${variantName}" 저장 및 모델 적용 완료!`, "success");
+              }
+            }
+            setIsAssemblyOpen(false);
+          }}
+        />
+      )}
+
+      {hoveredListThumb && (
+        <div
+          style={{
+            position: "fixed",
+            left: hoveredListThumbPos.x + 15,
+            top: hoveredListThumbPos.y + 15,
+            zIndex: 100000,
+            background: "var(--bg-secondary)",
+            padding: "8px",
+            borderRadius: "8px",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.6)",
+            pointerEvents: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "500px",
+            maxWidth: "80vw"
+          }}
+        >
+          {hoveredListThumb.imgUrl ? (
+            <img src={hoveredListThumb.imgUrl} alt={hoveredListThumb.name} style={{ width: "100%", height: "auto", objectFit: "contain" }} />
+          ) : hoveredListThumb.pngRaw ? (
+            <img src={hoveredListThumb.pngRaw} alt={hoveredListThumb.name} style={{ width: "100%", height: "auto", objectFit: "contain" }} />
+          ) : (
+            <span style={{ fontSize: 24, color: "var(--text-tertiary)" }}>🖥️</span>
+          )}
+        </div>
+      )}
+
+
+      {toast &&
+        createPortal(
+          <div className={`mrm-toast ${toast.type}`}>{toast.message}</div>,
+          document.body,
+        )}
+    </>
+  );
+};

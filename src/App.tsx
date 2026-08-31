@@ -2,40 +2,40 @@ import React, { useRef, useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Icon } from "@iconify/react";
 import { Loader, useProgress } from "@react-three/drei";
-import { Scene } from "./components/Scene";
-import { DevicePanel } from "./components/DevicePanel";
-import { DashboardWidgets } from "./components/DashboardWidgets";
-import { ThemeToggle } from "./components/ThemeToggle";
-import { CyberSpaceToggle } from "./components/CyberSpaceToggle";
-import { CyberSpaceControlPanel } from "./components/CyberSpaceControlPanel";
-import { FocusCarousel } from "./components/FocusCarousel";
-import { UnsavedChangesDialog } from "./components/UnsavedChangesDialog";
-import { DeviceModal } from "./components/DeviceModal";
-import { DeviceTooltip } from "./components/DeviceTooltip";
-import { InitialLoader } from "./components/InitialLoader";
-import { SettingsDropdown } from "./components/SettingsDropdown";
+import { Scene } from "./components/3d/Scene";
+import { DevicePanel } from "./components/device/DevicePanel";
+import { DashboardWidgets } from "./components/layout/DashboardWidgets";
+import { ThemeToggle } from "./components/ui/ThemeToggle";
+import { CyberSpaceToggle } from "./components/layout/CyberSpaceToggle";
+import { CyberSpaceControlPanel } from "./components/layout/CyberSpaceControlPanel";
+import { FocusCarousel } from "./components/layout/FocusCarousel";
+import { UnsavedChangesDialog } from "./components/system/UnsavedChangesDialog";
+import { DeviceModal } from "./components/device/DeviceModal";
+import { DeviceTooltip } from "./components/device/DeviceTooltip";
+import { InitialLoader } from "./components/layout/InitialLoader";
+import { SettingsDropdown } from "./components/layout/SettingsDropdown";
 const ImportExportModal = React.lazy(() =>
-  import("./components/ImportExportModal").then((m) => ({
+  import("./components/system/ImportExportModal").then((m) => ({
     default: m.ImportExportModal,
   })),
 );
 const ModelImporter = React.lazy(() =>
-  import("./components/ModelImporter").then((m) => ({
+  import("./components/3d/ModelImporter").then((m) => ({
     default: m.ModelImporter,
   })),
 );
 const DeviceRegistrationModal = React.lazy(() =>
-  import("./components/DeviceRegistrationModal").then((m) => ({
+  import("./components/device/DeviceRegistrationModal").then((m) => ({
     default: m.DeviceRegistrationModal,
   })),
 );
 const ModelRegistrationModal = React.lazy(() =>
-  import("./components/ModelRegistrationModal/ModelRegistrationModal").then((m) => ({
+  import("./components/model/ModelRegistrationModal/ModelRegistrationModal").then((m) => ({
     default: m.ModelRegistrationModal,
   })),
 );
-import { MyPageModal } from "./components/MyPageModal";
-import { AccountPermissionsModal } from "./components/AccountPermissionsModal";
+import { MyPageModal } from "./components/account/MyPageModal";
+import { AccountPermissionsModal } from "./components/account/AccountPermissionsModal";
 import { useTheme } from "./contexts/ThemeContext";
 import { useStore } from "./store/useStore";
 import { useComposerTaskProgress } from "./hooks/useSvgComposer";
@@ -45,7 +45,7 @@ import {
   sampleNodes,
 } from "./utils/sampleData";
 import { createPortal } from "react-dom";
-import { PortErrorSynchronizer } from "./components/PortErrorSynchronizer";
+import { PortErrorSynchronizer } from "./components/device/PortErrorSynchronizer";
 import { usePreloadThumbnails } from "./hooks/usePreloadThumbnails";
 
 /* ---------- Device Delete Confirmation Modal (top-level, z=99999) ---------- */

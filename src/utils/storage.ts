@@ -1,6 +1,6 @@
 import type { Device, DeviceType, ErrorLevel, HierarchyNode, NodeType, Orientation, Rack, RegisteredDevice, VendorName } from "../types";
 import { DEVICE_TEMPLATES } from "./deviceTemplates";
-import { RACK_WIDTH_STANDARD } from "../components/constants";
+import { RACK_WIDTH_STANDARD } from "../components/layout/constants";
 import {
   migrateGroupNameToNodeId,
   getNodeName, 

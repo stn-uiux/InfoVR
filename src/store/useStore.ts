@@ -10,7 +10,7 @@ import type {
   PortState,
 } from "../types";
 import { type GeneratedPort, type CustomEquipmentModel, type CustomCardDefinition } from "../types/equipment";
-import { GRID_SPACING, RACK_WIDTH_STANDARD } from "../components/constants";
+import { GRID_SPACING, RACK_WIDTH_STANDARD } from "../components/layout/constants";
 import {
   getFrontDirection,
   getEffectiveDimensions,

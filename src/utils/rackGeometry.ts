@@ -1,5 +1,5 @@
 import type { Orientation, Rack, ImportedModel } from "../types";
-import { RACK_DEPTH, GRID_SPACING } from "../components/constants";
+import { RACK_DEPTH, GRID_SPACING } from "../components/layout/constants";
 
 /**
  * Get the front-facing direction vector for a given rack orientation.
