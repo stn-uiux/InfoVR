@@ -136,7 +136,7 @@ export function generatePortMap(
  */
 export function applyPortStatuses(
   ports: GeneratedPort[],
-  portStatusMap: Record<string, "normal" | "critical" | "warning" | "disabled">,
+  portStatusMap: Record<string, "normal" | "critical" | "major" | "minor" | "warning" | "disabled">,
 ): GeneratedPort[] {
   if (!portStatusMap || Object.keys(portStatusMap).length === 0) {
     return ports;
@@ -206,13 +206,16 @@ export function generatedPortsToPortStates(
  * GeneratedPort의 status를 ErrorLevel로 변환
  */
 function mapStatusToErrorLevel(
-  status: "critical" | "warning" | "disabled",
+  status: "critical" | "major" | "minor" | "warning" | "disabled",
 ): "critical" | "major" | "minor" | "warning" {
   switch (status) {
     case "critical":
       return "critical";
+    case "major":
+      return "major";
     case "warning":
       return "warning";
+    case "minor":
     case "disabled":
       return "minor";
     default:
@@ -231,10 +234,10 @@ function mapStatusToErrorLevel(
  */
 export function buildPortStatusMapFromPortStates(
   portStates: PortState[],
-): Record<string, "normal" | "critical" | "warning" | "disabled"> {
+): Record<string, "normal" | "critical" | "major" | "minor" | "warning" | "disabled"> {
   const map: Record<
     string,
-    "normal" | "critical" | "warning" | "disabled"
+    "normal" | "critical" | "major" | "minor" | "warning" | "disabled"
   > = {};
 
   for (const ps of portStates) {
@@ -246,14 +249,16 @@ export function buildPortStatusMapFromPortStates(
       // errorLevel을 기반으로 세분화된 상태 매핑
       switch (ps.errorLevel) {
         case "critical":
-        case "major":
           map[key] = "critical";
+          break;
+        case "major":
+          map[key] = "major";
           break;
         case "warning":
           map[key] = "warning";
           break;
         case "minor":
-          map[key] = "disabled";
+          map[key] = "minor";
           break;
         default:
           map[key] = "critical";

@@ -14,6 +14,8 @@ import type { PortState } from '../types';
 const PORT_STATUS_COLORS: Record<string, string> = {
   normal: "transparent",
   critical: ERROR_COLORS.critical,
+  major: ERROR_COLORS.major,
+  minor: ERROR_COLORS.minor,
   warning: ERROR_COLORS.warning,
   disabled: "#666666",
 };
@@ -311,8 +313,10 @@ function resolvePortInfo(
     statusStr = gp.status.toUpperCase();
     statusColor = gp.status === "normal" ? "#22c55e"
       : gp.status === "critical" ? ERROR_COLORS.critical
-        : gp.status === "warning" ? ERROR_COLORS.warning
-          : "#888";
+        : gp.status === "major" ? ERROR_COLORS.major
+          : gp.status === "minor" ? ERROR_COLORS.minor
+            : gp.status === "warning" ? ERROR_COLORS.warning
+              : "#888";
   } else {
     const ps = portStateMap.get(portId);
     if (ps) {

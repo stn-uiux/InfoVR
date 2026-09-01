@@ -51,6 +51,8 @@ import { ERROR_COLORS } from '../utils/errorHelpers';
 const PORT_STATUS_COLORS: Record<string, string> = {
   normal: "transparent",
   critical: ERROR_COLORS.critical,
+  major: ERROR_COLORS.major,
+  minor: ERROR_COLORS.minor,
   warning: ERROR_COLORS.warning,
   disabled: "#666666",
 };

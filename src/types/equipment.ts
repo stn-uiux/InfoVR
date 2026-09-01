@@ -126,7 +126,7 @@ export interface EquipmentPort {
   /** 포트 유형 (e.g. "qsfp", "sfp", "eth") */
   portType: string;
   /** 포트 상태 */
-  status: "normal" | "critical" | "warning" | "disabled";
+  status: "normal" | "critical" | "major" | "minor" | "warning" | "disabled";
 }
 
 /** [VITE_CACHE_BREAKER_GEN_PORT] */
@@ -142,7 +142,7 @@ export interface GeneratedPort {
   /** 포트 유형 (e.g. "qsfp", "sfp", "port") */
   portType: string;
   /** 포트 상태 (기본: "normal") */
-  status: "normal" | "critical" | "warning" | "disabled";
+  status: "normal" | "critical" | "major" | "minor" | "warning" | "disabled";
   /** SVG path의 d 속성 (포트 위치/크기 추출용) */
   pathD?: string;
 }
