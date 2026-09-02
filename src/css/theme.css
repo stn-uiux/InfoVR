@@ -1157,7 +1157,7 @@ body {
 /* Side panel styles */
 .stn-side-panel {
   position: absolute;
-  top: 56px;
+  top: 50px;
   right: 0;
   bottom: 0;
   background: var(--panel-bg);
