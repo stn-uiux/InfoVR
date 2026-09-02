@@ -131,6 +131,7 @@ export const DevicePanel = () => {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isDeleteRackModalOpen, setIsDeleteRackModalOpen] = useState(false);
   const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
+  const [draggedDeviceId, setDraggedDeviceId] = useState<string | null>(null);
 
   // Filter & Sort state for add-device modal
   const [showUnmountedOnly, setShowUnmountedOnly] = useState(false);
@@ -321,6 +322,7 @@ export const DevicePanel = () => {
     const handleDragStart = (e: React.DragEvent, deviceId: string) => {
       e.dataTransfer.setData("application/json", JSON.stringify({ type: "device", deviceId }));
       e.dataTransfer.effectAllowed = "move";
+      setDraggedDeviceId(deviceId);
     };
 
     const handleDragOver = (e: React.DragEvent, slot: number) => {
@@ -340,6 +342,7 @@ export const DevicePanel = () => {
     const handleDrop = (e: React.DragEvent, slot: number) => {
       e.preventDefault();
       setDragOverSlot(null);
+      setDraggedDeviceId(null);
       try {
         const data = JSON.parse(e.dataTransfer.getData("application/json"));
         if (data.type === "device" && data.deviceId && rack) {
@@ -401,6 +404,7 @@ export const DevicePanel = () => {
             className={`device-tile ${hasError ? "has-error" : ""} ${isHighlighted ? "is-highlighted" : ""}`}
             draggable={isEditMode}
             onDragStart={isEditMode ? (e) => handleDragStart(e, device.itemId) : undefined}
+            onDragEnd={isEditMode ? () => { setDragOverSlot(null); setDraggedDeviceId(null); } : undefined}
             onDragOver={isEditMode ? (e) => handleDragOver(e, u) : undefined}
             onDragLeave={isEditMode ? (e) => handleDragLeave(e, u) : undefined}
             onDrop={isEditMode ? (e) => handleDrop(e, u) : undefined}
@@ -627,6 +631,79 @@ export const DevicePanel = () => {
       }
     }
 
+    let previewRender = null;
+    if (isEditMode && dragOverSlot !== null && draggedDeviceId !== null) {
+      const draggedDevice = rack.devices.find((d) => d.itemId === draggedDeviceId);
+      if (draggedDevice) {
+        const bottomPx = (dragOverSlot - 1) * TOTAL_SLOT_HEIGHT + 6; // 4px padding + 2px offset to align perfectly
+        const regDev = findRegDevice(draggedDevice.deviceId);
+        const displayName = (regDev ? regDev.title || regDev.modelName : (draggedDevice.modelName ?? draggedDevice.title)) || "Device";
+        const viewSide = regDev?.defaultViewSide || draggedDevice.defaultViewSide || "front";
+        
+        let customSrc = undefined;
+        if (isChassisModel(regDev?.modelName ?? draggedDevice.modelName ?? "")) {
+          const customModels = useStore.getState().customModels;
+          const customModel = customModels.find(m => m.modelName === (regDev?.modelName ?? draggedDevice.modelName));
+          if (customModel && customModel.modelPngRaw) {
+            customSrc = customModel.modelPngRaw;
+          }
+        }
+        
+        const imageSrc = customSrc || resolveDeviceImage(regDev?.modelName ?? draggedDevice.modelName, viewSide);
+        const hasImage = !!imageSrc;
+        
+        const endSlot = dragOverSlot + draggedDevice.size - 1;
+        const exceedsBound = endSlot > rack.rackSize;
+        
+        const hasCollision = rack.devices.some(d => {
+          if (d.itemId === draggedDeviceId) return false;
+          const dStart = d.position;
+          const dEnd = d.position + d.size - 1;
+          return dragOverSlot <= dEnd && endSlot >= dStart;
+        });
+
+        const isInvalid = exceedsBound || hasCollision;
+        
+        const bgColor = isInvalid ? "rgba(239, 68, 68, 0.4)" : "rgba(16, 185, 129, 0.4)";
+        const borderColor = isInvalid ? "#ef4444" : "#10b981";
+
+        const effectiveSize = draggedDevice.size; // Let it overflow if it exceeds bounds so they see why it fails
+        const effectiveHeightPx = effectiveSize * TOTAL_SLOT_HEIGHT - SLOT_MARGIN;
+
+        previewRender = (
+          <div
+            style={{
+              position: "absolute",
+              bottom: `${bottomPx}px`,
+              left: 4,
+              right: 4,
+              height: `${effectiveHeightPx}px`,
+              backgroundColor: bgColor,
+              border: `2px dashed ${borderColor}`,
+              borderRadius: "var(--radius-sm)",
+              zIndex: 10,
+              pointerEvents: "none",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              overflow: "hidden",
+            }}
+          >
+            {hasImage && (
+              <img 
+                src={imageSrc} 
+                alt="preview" 
+                style={{ position: "absolute", width: "100%", height: "100%", opacity: 0.5, objectFit: "fill", zIndex: 1 }} 
+              />
+            )}
+            <div style={{ position: "relative", zIndex: 2, color: "#fff", fontWeight: "bold", textShadow: "0 1px 4px rgba(0,0,0,0.8)" }}>
+              {displayName} ({draggedDevice.size}U)
+            </div>
+          </div>
+        );
+      }
+    }
+
     return (
       <div
         style={{
@@ -637,9 +714,11 @@ export const DevicePanel = () => {
           borderRadius: "var(--radius-md)",
           padding: "4px",
           marginTop: "10px",
+          position: "relative",
         }}
       >
         {rendered}
+        {previewRender}
       </div>
     );
   };
