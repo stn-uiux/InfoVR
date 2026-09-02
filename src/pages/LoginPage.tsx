@@ -1,6 +1,7 @@
 import React from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Icon } from "@iconify/react";
+import logoDarkFull from "../assets/logo/InfoVR_dark_full.svg";
 
 export const LoginPage = () => {
   const navigate = useNavigate();
@@ -22,8 +23,7 @@ export const LoginPage = () => {
         <div className="auth-card">
           <div className="auth-card-content">
             <div className="auth-logo">
-              <Icon icon="fluent:box-24-filled" className="auth-logo-icon" />
-              <h1 className="auth-title">InfoVR</h1>
+              <img src={logoDarkFull} alt="InfoVR Logo" style={{ height: "64px" }} />
             </div>
             
             <p className="auth-subtitle">

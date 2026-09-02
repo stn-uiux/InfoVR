@@ -4905,7 +4905,6 @@ input:checked+.slider:before {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-right: 4px;
 }
 
 .comm-logo-circle {
@@ -5072,7 +5071,7 @@ input:checked+.slider:before {
 /* --- Importer --- */
 .mi-main-wrapper {
   position: absolute;
-  top: 56px;
+  top: 50px;
   left: 0;
   bottom: 0;
   z-index: 100;

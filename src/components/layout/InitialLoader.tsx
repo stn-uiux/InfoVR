@@ -4,6 +4,7 @@ import { useStore } from "../../store/useStore";
 import { useComposerTaskProgress } from "../../hooks/useSvgComposer";
 import { preloadThumbnail } from "../device/CardThumbnail";
 import { cardDefinitions, equipmentModels } from "../../utils/cardAssets";
+import logoDark from "../../assets/logo/InfoVR_dark.svg";
 
 export const InitialLoader = () => {
   const { active, progress, total } = useProgress();
@@ -65,14 +66,9 @@ export const InitialLoader = () => {
         color: "#ffffff",
       }}
     >
-      <div className="comm-logo-circle" style={{ width: 64, height: 64, marginBottom: 24, padding: 12 }}>
-        <svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-          <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-          <line x1="12" y1="22.08" x2="12" y2="12"></line>
-        </svg>
+      <div style={{ width: 180, height: 180, marginBottom: 16, display: 'flex', justifyContent: 'center' }}>
+        <img src={logoDark} alt="InfoVR Logo" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
       </div>
-      <h2 style={{ fontFamily: "Outfit", margin: 0, fontSize: "2rem", letterSpacing: "-0.5px" }}>InfoVR</h2>
       <p style={{ color: "var(--text-tertiary)", marginTop: 8 }}>
         {active ? `3D 자원 불러오는 중... ${Math.round(progress)}%` : "3D 환경을 준비하는 중..."}
       </p>

@@ -47,6 +47,8 @@ import {
 import { createPortal } from "react-dom";
 import { PortErrorSynchronizer } from "./components/device/PortErrorSynchronizer";
 import { usePreloadThumbnails } from "./hooks/usePreloadThumbnails";
+import logoLightFull from "./assets/logo/InfoVR_light_full.svg";
+import logoDarkFull from "./assets/logo/InfoVR_dark_full.svg";
 
 /* ---------- Device Delete Confirmation Modal (top-level, z=99999) ---------- */
 const DeviceDeleteConfirmModal = () => {
@@ -184,6 +186,10 @@ const Toast = () => {
 };
 
 function App() {
+  const { theme } = useTheme();
+  const isDarkMode = theme === "dark";
+  const logoSrc = isDarkMode ? logoDarkFull : logoLightFull;
+
   const navigate = useNavigate();
   // Phase 2-A: 개별 셀렉터로 불필요 리렌더 방지
   const addRack = useStore((s) => s.addRack);
@@ -323,17 +329,7 @@ function App() {
       >
         {/* Logo Area */}
         <div className="comm-logo-container">
-          <div className="comm-logo-circle">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-              <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-              <line x1="12" y1="22.08" x2="12" y2="12"></line>
-            </svg>
-          </div>
-          <div className="comm-logo-text-col">
-            <h1 className="comm-logo-h1">InfoVR</h1>
-            <p className="comm-logo-p">3D Server Room Architecture</p>
-          </div>
+          <img src={logoSrc} alt="InfoVR Logo" style={{ height: "32px", cursor: "pointer" }} onClick={() => navigate("/")} />
         </div>
 
 
