@@ -123,11 +123,20 @@ export const RegistrationFormModal = ({
         setInsertedCards(initialTemplate?.variant?.insertedCards || []);
         setInsertedModules([]);
         setGeneratedPorts([]);
+        setSelectedModelIdx(0);
+        setDeviceName("");
+        setIp("");
 
         setDefaultViewSide("front");
       }
     });
   }, [isOpen, editingDeviceId, activeNodeId, registeredDevices, effectiveTemplates]);
+
+  const handleClose = () => {
+    if (window.confirm("작성 중인 정보가 저장되지 않습니다. 창을 닫으시겠습니까?")) {
+      onClose();
+    }
+  };
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -190,13 +199,23 @@ export const RegistrationFormModal = ({
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="drm-reg-modal-overlay" onClick={onClose}>
+    <div className="drm-reg-modal-overlay" onClick={handleClose}>
       <div className="drm-reg-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="drm-form-title">
-          {editingDeviceId ? "장비 정보 수정" : "새 장비 등록"}
+        <div className="drm-reg-modal-header">
+          <div className="drm-form-title">
+            {editingDeviceId ? "장비 정보 수정" : "새 장비 등록"}
+          </div>
+          <button 
+            onClick={handleClose}
+            className="drm-reg-modal-close"
+            aria-label="닫기"
+          >
+            &times;
+          </button>
         </div>
 
-        <div className="drm-form-grid">
+        <div className="drm-reg-modal-body">
+          <div className="drm-form-grid">
           <StnFormField label="위치" error={errors.nodeId}>
             <NodePicker
               nodes={nodes}
@@ -381,10 +400,13 @@ export const RegistrationFormModal = ({
           </div>
         )}
 
-        <div className="drm-form-actions">
+        </div>
+
+        <div className="drm-reg-modal-footer">
+          <div className="drm-form-actions">
           <button
             className="comm-btn comm-btn-lg comm-btn-secondary"
-            onClick={onClose}
+            onClick={handleClose}
           >
             취소
           </button>
@@ -394,6 +416,7 @@ export const RegistrationFormModal = ({
           >
             {editingDeviceId ? "저장하기" : "등록하기"}
           </button>
+        </div>
         </div>
       </div>
       {isAssemblyOpen && (

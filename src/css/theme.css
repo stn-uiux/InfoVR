@@ -81,7 +81,7 @@
   --toolbar-bg: rgba(255, 255, 255, 0.8);
   --toolbar-border: rgba(255, 255, 255, 0.5);
   /* Modal */
-  --modal-bg: rgba(255, 255, 255, 0.65);
+  --modal-bg: rgba(255, 255, 255, 0.8);
   --modal-backdrop: rgba(31, 43, 58, 0.4);
   --modal-border: #dbdfea;
   /* Shadows */
@@ -799,6 +799,8 @@ body {
 /* Input styles */
 .stn-input {
   width: 100%;
+  height: 38px;
+  box-sizing: border-box;
   padding: var(--spacing-sm) var(--spacing-md);
   border: 1px solid var(--border-medium);
   border-radius: var(--radius-md);
