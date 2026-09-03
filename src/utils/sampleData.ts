@@ -180,8 +180,14 @@ const generateGroupRacks = (
           
           let portId = `port-${portNum}`;
           if (device.insertedCards && device.insertedCards.length > 0) {
-            const firstCard = device.insertedCards[0];
-            portId = `${firstCard.shelfNo}/${firstCard.slotNo}/port-${portNum}`;
+            // Find a data-bearing card instead of blindly picking the first card (which is often a management card with no data ports)
+            const dataCard = device.insertedCards.find(c => 
+              !c.cardFileName.toLowerCase().includes("cpiom") && 
+              !c.cardFileName.toLowerCase().includes("r-series-9") &&
+              !c.cardFileName.toLowerCase().includes("cpm")
+            ) || device.insertedCards[0];
+            
+            portId = `${dataCard.shelfNo}/${dataCard.slotNo}/port-${portNum}`;
           }
 
           device.portStates = [{

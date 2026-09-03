@@ -30,10 +30,22 @@ export function usePortInteraction(
   generatedPortMap: Map<string, GeneratedPort>,
   editable: boolean = true,
 ) {
-  const portStateMap = useMemo(
-    () => new Map(portStates.map(p => [p.portId, p])),
-    [portStates]
-  );
+  const portStateMap = useMemo(() => {
+    const map = new Map<string, PortState>();
+    portStates.forEach(ps => {
+      map.set(ps.portId, ps);
+      
+      // Fallback for non-modular devices that use data-local-port instead of id
+      if (!isModularDevice && ps.portId.startsWith("port-")) {
+        const localPort = ps.portId.replace("port-", "");
+        map.set(localPort, ps);
+        map.set(`eth-${localPort}`, ps);
+        map.set(`sfp-${localPort}`, ps);
+        map.set(`qsfp-${localPort}`, ps);
+      }
+    });
+    return map;
+  }, [portStates, isModularDevice]);
 
   useEffect(() => {
     let activePortEl: SVGElement | null = null;
@@ -360,7 +372,15 @@ function applyErrorBlinking(
   } else {
     portStates.filter(p => p.status === "error").forEach((ps) => {
       const color = ps.errorLevel && ERROR_COLORS[ps.errorLevel] ? ERROR_COLORS[ps.errorLevel] : "#ef4444";
-      const el = container.querySelector(`[id='${ps.portId}']`) as SVGElement | null;
+      
+      let el = container.querySelector(`[id='${ps.portId}']`) as SVGElement | null;
+      
+      if (!el && ps.portId.startsWith("port-")) {
+        const localPort = ps.portId.replace("port-", "");
+        el = (container.querySelector(`[data-local-port='${localPort}']`) ||
+              container.querySelector(`[id='eth-${localPort}']`)) as SVGElement | null;
+      }
+      
       if (el) {
         const animName = `blink-${ps.portId.replace(/[^a-z0-9]/gi, "-")}`;
         ensureKeyframe(animName, color);

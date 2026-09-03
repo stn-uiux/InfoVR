@@ -153,15 +153,21 @@ export function applyPortStatuses(
       const prefixMatch = port.realPortNumber.match(/^(\d+\/\d+\/)/);
       const prefix = prefixMatch ? prefixMatch[1] : "";
 
+      const pType = port.portType.toLowerCase();
+      const isDataPort = pType === "port" || pType === "unknown" || 
+                         pType.includes("sfp") || pType.includes("qsfp") || pType === "ethernet";
+
       newStatus = 
-        portStatusMap[partialKey1] || 
         portStatusMap[partialKey2] || 
-        portStatusMap[`port-${partialKey1}`] || 
-        portStatusMap[`port-${partialKey2}`] ||
-        (prefix ? portStatusMap[`${prefix}${partialKey1}`] : undefined) ||
-        (prefix ? portStatusMap[`${prefix}${partialKey2}`] : undefined) ||
-        (prefix ? portStatusMap[`${prefix}port-${partialKey1}`] : undefined) ||
-        (prefix ? portStatusMap[`${prefix}port-${partialKey2}`] : undefined);
+        (prefix ? portStatusMap[`${prefix}${partialKey2}`] : undefined);
+
+      if (!newStatus && isDataPort) {
+        newStatus = 
+          portStatusMap[partialKey1] || 
+          portStatusMap[`port-${partialKey1}`] || 
+          (prefix ? portStatusMap[`${prefix}${partialKey1}`] : undefined) ||
+          (prefix ? portStatusMap[`${prefix}port-${partialKey1}`] : undefined);
+      }
     }
 
     if (newStatus && newStatus !== port.status) {
