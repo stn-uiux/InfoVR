@@ -132,6 +132,7 @@ export const DevicePanel = () => {
   const [isDeleteRackModalOpen, setIsDeleteRackModalOpen] = useState(false);
   const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
   const [draggedDeviceId, setDraggedDeviceId] = useState<string | null>(null);
+  const [dragGrabOffset, setDragGrabOffset] = useState<number>(0);
 
   // Filter & Sort state for add-device modal
   const [showUnmountedOnly, setShowUnmountedOnly] = useState(false);
@@ -319,17 +320,31 @@ export const DevicePanel = () => {
     const SLOT_MARGIN = 2;
     const TOTAL_SLOT_HEIGHT = SLOT_HEIGHT + SLOT_MARGIN;
 
+    const getSlotFromEvent = (e: React.DragEvent<HTMLElement>, startU: number, deviceSize: number) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const y = e.clientY - rect.top;
+      const slotOffset = Math.floor((rect.height - y) / TOTAL_SLOT_HEIGHT);
+      return startU + Math.max(0, Math.min(deviceSize - 1, slotOffset));
+    };
+
     const handleDragStart = (e: React.DragEvent, deviceId: string) => {
       e.dataTransfer.setData("application/json", JSON.stringify({ type: "device", deviceId }));
       e.dataTransfer.effectAllowed = "move";
+      
+      // 브라우저 기본 드래그 썸네일(고스트 이미지) 제거
+      const img = new Image();
+      img.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+      e.dataTransfer.setDragImage(img, 0, 0);
+      
       setDraggedDeviceId(deviceId);
     };
 
     const handleDragOver = (e: React.DragEvent, slot: number) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
-      if (dragOverSlot !== slot) {
-        setDragOverSlot(slot);
+      const targetSlot = slot - dragGrabOffset;
+      if (dragOverSlot !== targetSlot) {
+        setDragOverSlot(targetSlot);
       }
     };
 
@@ -343,10 +358,12 @@ export const DevicePanel = () => {
       e.preventDefault();
       setDragOverSlot(null);
       setDraggedDeviceId(null);
+      setDragGrabOffset(0);
       try {
         const data = JSON.parse(e.dataTransfer.getData("application/json"));
         if (data.type === "device" && data.deviceId && rack) {
-          const result = moveDeviceInRack(rack.rackId, data.deviceId, slot);
+          const targetSlot = slot - dragGrabOffset;
+          const result = moveDeviceInRack(rack.rackId, data.deviceId, targetSlot);
           if (!result.success) {
             showToast(result.reason || "이동할 수 없습니다.", "error");
           }
@@ -396,18 +413,28 @@ export const DevicePanel = () => {
           : UNIFIED_DEVICE_BORDER;
 
         const isHighlighted = highlightedDeviceId === device.itemId;
-        const isDragOver = dragOverSlot === u;
+        const isDragOver = dragOverSlot !== null && dragOverSlot >= u && dragOverSlot < u + device.size;
 
         rendered.push(
           <div
             key={`dev-${u}`}
             className={`device-tile ${hasError ? "has-error" : ""} ${isHighlighted ? "is-highlighted" : ""}`}
             draggable={isEditMode}
-            onDragStart={isEditMode ? (e) => handleDragStart(e, device.itemId) : undefined}
-            onDragEnd={isEditMode ? () => { setDragOverSlot(null); setDraggedDeviceId(null); } : undefined}
-            onDragOver={isEditMode ? (e) => handleDragOver(e, u) : undefined}
-            onDragLeave={isEditMode ? (e) => handleDragLeave(e, u) : undefined}
-            onDrop={isEditMode ? (e) => handleDrop(e, u) : undefined}
+            onDragStart={isEditMode ? (e) => {
+              const hoverSlot = getSlotFromEvent(e, u, device.size);
+              setDragGrabOffset(hoverSlot - u);
+              handleDragStart(e, device.itemId);
+            } : undefined}
+            onDragEnd={isEditMode ? () => { setDragOverSlot(null); setDraggedDeviceId(null); setDragGrabOffset(0); } : undefined}
+            onDragOver={isEditMode ? (e) => {
+              const hoverSlot = getSlotFromEvent(e, u, device.size);
+              handleDragOver(e, hoverSlot);
+            } : undefined}
+            onDragLeave={isEditMode ? (e) => handleDragLeave(e, dragOverSlot ?? u) : undefined}
+            onDrop={isEditMode ? (e) => {
+              const hoverSlot = getSlotFromEvent(e, u, device.size);
+              handleDrop(e, hoverSlot);
+            } : undefined}
             style={{
               height: `${heightPx}px`,
               backgroundColor: isDragOver ? "var(--bg-hover)" : bg,
@@ -696,8 +723,35 @@ export const DevicePanel = () => {
                 style={{ position: "absolute", width: "100%", height: "100%", opacity: 0.5, objectFit: "fill", zIndex: 1 }} 
               />
             )}
-            <div style={{ position: "relative", zIndex: 2, color: "#fff", fontWeight: "bold", textShadow: "0 1px 4px rgba(0,0,0,0.8)" }}>
-              {displayName} ({draggedDevice.size}U)
+            <div style={{ 
+              position: "relative", 
+              zIndex: 2, 
+              color: "#fff", 
+              fontWeight: "bold", 
+              textShadow: "0 1px 4px rgba(0,0,0,0.8)", 
+              textAlign: "center",
+              display: "flex",
+              flexDirection: draggedDevice.size === 1 ? "row" : "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: draggedDevice.size === 1 ? "8px" : "2px",
+              fontSize: draggedDevice.size === 1 ? "var(--font-size-xs)" : "inherit",
+              width: "100%",
+              padding: "0 8px",
+              boxSizing: "border-box"
+            }}>
+              <div style={{ color: isInvalid ? "#fca5a5" : "#6ee7b7", whiteSpace: "nowrap" }}>
+                Target: {dragOverSlot === endSlot ? `U${dragOverSlot}` : `U${dragOverSlot} ~ U${endSlot}`}
+              </div>
+              {draggedDevice.size === 1 && <div style={{ color: "rgba(255,255,255,0.5)" }}>|</div>}
+              <div style={{
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                minWidth: 0
+              }}>
+                {displayName} {draggedDevice.size !== 1 && `(${draggedDevice.size}U)`}
+              </div>
             </div>
           </div>
         );
