@@ -6,7 +6,7 @@ import { OrbitControls } from "three-stdlib";
 import { U_HEIGHT, GRID_SPACING } from "../layout/constants";
 
 export const CameraController = () => {
-  const { camera, controls } = useThree();
+  const { camera, controls, invalidate } = useThree();
   const selectedRackId = useStore((state) => state.selectedRackId);
   const focusedRackId = useStore((state) => state.focusedRackId);
 
@@ -68,6 +68,7 @@ export const CameraController = () => {
         );
         vTargetZoom.current = 1;
         isAnimating.current = true;
+        invalidate();
       } else {
         useStore.getState().fitToScene();
       }
@@ -180,6 +181,7 @@ export const CameraController = () => {
     vTargetZoom.current = targetZoom;
 
     isAnimating.current = true;
+    invalidate();
     // 리액트가 랙을 숨길(unmount/invisible) 수 있도록 카메라 이동을 2프레임 지연시킵니다.
     animationDelayFrames.current = 2;
   }, [camera, controls, setPreFocusCameraState]);
@@ -353,6 +355,7 @@ export const CameraController = () => {
 
     isAnimating.current = true;
     lastProcessedRackId.current = null; // Ensure we can re-select models if needed
+    invalidate();
   }, [triggerFitToScene, camera]);
 
   // Main interaction effect
