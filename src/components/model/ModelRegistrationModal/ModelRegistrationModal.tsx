@@ -2411,10 +2411,10 @@ export const ModelRegistrationModal: React.FC = () => {
             maxWidth: "80vw"
           }}
         >
-          {hoveredListThumb.imgUrl ? (
-            <img src={hoveredListThumb.imgUrl} alt={hoveredListThumb.name} style={{ width: "100%", height: "auto", objectFit: "contain" }} />
-          ) : hoveredListThumb.pngRaw ? (
+          {hoveredListThumb.pngRaw ? (
             <img src={hoveredListThumb.pngRaw} alt={hoveredListThumb.name} style={{ width: "100%", height: "auto", objectFit: "contain" }} />
+          ) : hoveredListThumb.imgUrl ? (
+            <img src={hoveredListThumb.imgUrl} alt={hoveredListThumb.name} style={{ width: "100%", height: "auto", objectFit: "contain" }} />
           ) : (
             <span style={{ fontSize: 24, color: "var(--text-tertiary)" }}>🖥️</span>
           )}
