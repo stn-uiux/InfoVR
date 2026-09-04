@@ -21,6 +21,39 @@ import { GRID_SPACING } from "../layout/constants";
 import { useTheme } from "../../contexts/ThemeContext";
 import { GlobalFocusLights } from "./GlobalFocusLights";
 
+/**
+ * Optimizes performance by baking shadow maps statically when objects are not moving.
+ * Instead of calculating complex lighting/shadows on every frame (which is very expensive with many lights),
+ * we only update the shadow map once when models or racks change, or continuously only while dragging.
+ */
+const ShadowOptimizer = () => {
+  const { gl } = useThree();
+  const isDragging = useStore((s) => s.isDragging);
+  const draggingModelId = useStore((s) => s.draggingModelId);
+  const isEditMode = useStore((s) => s.isEditMode);
+
+  // Robustly hash all properties that could affect the physical geometry or lighting of the scene
+  const racksHash = useStore((s) =>
+    s.racks.map(r => `${r.rackId}-${r.position.join()}-${r.orientation}-${r.rackSize}`).join()
+  );
+  const modelsHash = useStore((s) =>
+    s.importedModels.map(m => `${m.itemId}-${m.position.join()}-${m.rotation?.join()}-${m.lightParams?.intensity}-${m.lightParams?.color}-${m.lightParams?.castShadow}`).join()
+  );
+
+  useEffect(() => {
+    if (isDragging || draggingModelId) {
+      // Continuously update shadows only while dragging to see real-time preview
+      gl.shadowMap.autoUpdate = true;
+    } else {
+      // Static view: freeze the shadow map and render it exactly once
+      gl.shadowMap.autoUpdate = false;
+      gl.shadowMap.needsUpdate = true;
+    }
+  }, [gl, isDragging, draggingModelId, isEditMode, racksHash, modelsHash]);
+
+  return null;
+};
+
 /** Error boundary that silently catches Environment HDR load failures (e.g. offline) */
 class EnvironmentErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -121,7 +154,7 @@ const SceneReadyMonitor = ({ isReadyToMonitor }: { isReadyToMonitor: boolean }) 
       }
       return;
     }
-    
+
     if (frameCount.current < 5) {
       frameCount.current++;
       state.invalidate();
@@ -254,15 +287,15 @@ export const Scene = () => {
     // Front & Back walls (along X axis)
     for (let i = 1; i < panelCountX; i++) {
       const x = i * panelWidthX - halfW;
-      points.push(x, -h/2, halfL, x, h/2, halfL);
-      points.push(x, -h/2, -halfL, x, h/2, -halfL);
+      points.push(x, -h / 2, halfL, x, h / 2, halfL);
+      points.push(x, -h / 2, -halfL, x, h / 2, -halfL);
     }
-    
+
     // Left & Right walls (along Z axis)
     for (let i = 1; i < panelCountZ; i++) {
       const z = i * panelWidthZ - halfL;
-      points.push(halfW, -h/2, z, halfW, h/2, z);
-      points.push(-halfW, -h/2, z, -halfW, h/2, z);
+      points.push(halfW, -h / 2, z, halfW, h / 2, z);
+      points.push(-halfW, -h / 2, z, -halfW, h / 2, z);
     }
 
     const geom = new BufferGeometry();
@@ -379,6 +412,8 @@ export const Scene = () => {
         </>
       )}
 
+      <ShadowOptimizer />
+
       {/* Global Focus Lights to avoid Shader recompilation freezes on selection */}
       <GlobalFocusLights />
 
@@ -437,94 +472,94 @@ export const Scene = () => {
               <group userData={{ isGizmo: true }}>
                 <PivotControls
                   visible={csCustomSpaceSize && isRoomSelected}
-                activeAxes={csCustomSpaceSize && isRoomSelected ? [true, false, true] : [false, false, false]}
-                scale={100}
-                anchor={[0, -1, 0]}
-                depthTest={false}
-                fixed
-                matrix={csOffsetMatrix}
-                disableRotations={true}
-                disableScaling={true}
-                onDragStart={() => {
-                  const controls = useStore.getState()._controlsRef as any;
-                  if (controls) controls.enabled = false;
-                }}
-                onDrag={(local) => {
-                  const position = new Vector3();
-                  position.setFromMatrixPosition(local);
-                  // Update ref instead of store to avoid double-transform feedback loop
-                  liveOffset.current = {
-                    x: Math.round(position.x * 100),
-                    z: Math.round(position.z * 100)
-                  };
-                }}
-                onDragEnd={() => {
-                  const controls = useStore.getState()._controlsRef as any;
-                  if (controls) controls.enabled = true;
-                  // Commit to store once on drag end
-                  useStore.getState().setCyberSpaceConfig({
-                    csOffsetXCm: liveOffset.current.x,
-                    csOffsetZCm: liveOffset.current.z
-                  });
-                }}
-              >
-                <group position={[0, 2.0, 0]} userData={{ isInnerContent: true }}>
-                  <mesh raycast={() => null}>
-                    <boxGeometry args={[dynamicWidth, 4.0, dynamicLength]} />
-                    <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-                    <Edges 
-                      scale={1.0} 
-                      color={isDarkMode ? (isRoomSelected ? "#10b981" : "#38bdf8") : (isRoomSelected ? "#059669" : "#0ea5e9")}
-                      raycast={() => null}
-                    />
-                    {wallLinesGeometry.attributes.position && (
-                      <lineSegments geometry={wallLinesGeometry} raycast={() => null}>
-                        <lineBasicMaterial 
-                          color={isDarkMode ? (isRoomSelected ? "#10b981" : "#38bdf8") : (isRoomSelected ? "#059669" : "#0ea5e9")} 
-                          transparent 
-                          opacity={isRoomSelected ? 0.5 : 0.25} 
-                        />
-                      </lineSegments>
-                    )}
-                  </mesh>
-                  {/* Invisible floor mesh for easier click selection */}
-                  {csCustomSpaceSize && (
-                    <mesh 
-                      rotation={[-Math.PI / 2, 0, 0]} 
-                      position={[0, -2.005, 0]}
-                      onClick={(e) => {
-                        if (e.button !== 0) return; // Only left-click
-                        if (e.delta > 15) return; // Ignore drags
-
-                        // Only select the floor if it was the front-most object clicked
-                        // (prevents selecting floor when clicking a Rack that doesn't stop propagation)
-                        if (e.intersections.length > 0 && e.intersections[0].object !== e.object) {
-                          return;
-                        }
-
-                        e.stopPropagation();
-                        useStore.getState().selectRack(null);
-                        useStore.getState().selectModel(null);
-                        setIsRoomSelected(true);
-                      }}
-                      onPointerOver={(e) => {
-                        e.stopPropagation();
-                        document.body.style.cursor = "pointer";
-                      }}
-                      onPointerOut={() => {
-                        document.body.style.cursor = "auto";
-                      }}
-                    >
-                      <planeGeometry args={[dynamicWidth, dynamicLength]} />
-                      <meshBasicMaterial 
-                        color={isDarkMode ? (isRoomSelected ? "#10b981" : "#38bdf8") : (isRoomSelected ? "#059669" : "#0ea5e9")} 
-                        transparent 
-                        opacity={0.3} 
-                        depthWrite={false} 
+                  activeAxes={csCustomSpaceSize && isRoomSelected ? [true, false, true] : [false, false, false]}
+                  scale={100}
+                  anchor={[0, -1, 0]}
+                  depthTest={false}
+                  fixed
+                  matrix={csOffsetMatrix}
+                  disableRotations={true}
+                  disableScaling={true}
+                  onDragStart={() => {
+                    const controls = useStore.getState()._controlsRef as any;
+                    if (controls) controls.enabled = false;
+                  }}
+                  onDrag={(local) => {
+                    const position = new Vector3();
+                    position.setFromMatrixPosition(local);
+                    // Update ref instead of store to avoid double-transform feedback loop
+                    liveOffset.current = {
+                      x: Math.round(position.x * 100),
+                      z: Math.round(position.z * 100)
+                    };
+                  }}
+                  onDragEnd={() => {
+                    const controls = useStore.getState()._controlsRef as any;
+                    if (controls) controls.enabled = true;
+                    // Commit to store once on drag end
+                    useStore.getState().setCyberSpaceConfig({
+                      csOffsetXCm: liveOffset.current.x,
+                      csOffsetZCm: liveOffset.current.z
+                    });
+                  }}
+                >
+                  <group position={[0, 2.0, 0]} userData={{ isInnerContent: true }}>
+                    <mesh raycast={() => null}>
+                      <boxGeometry args={[dynamicWidth, 4.0, dynamicLength]} />
+                      <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+                      <Edges
+                        scale={1.0}
+                        color={isDarkMode ? (isRoomSelected ? "#10b981" : "#38bdf8") : (isRoomSelected ? "#059669" : "#0ea5e9")}
+                        raycast={() => null}
                       />
+                      {wallLinesGeometry.attributes.position && (
+                        <lineSegments geometry={wallLinesGeometry} raycast={() => null}>
+                          <lineBasicMaterial
+                            color={isDarkMode ? (isRoomSelected ? "#10b981" : "#38bdf8") : (isRoomSelected ? "#059669" : "#0ea5e9")}
+                            transparent
+                            opacity={isRoomSelected ? 0.5 : 0.25}
+                          />
+                        </lineSegments>
+                      )}
                     </mesh>
-                  )}
-                </group>
+                    {/* Invisible floor mesh for easier click selection */}
+                    {csCustomSpaceSize && (
+                      <mesh
+                        rotation={[-Math.PI / 2, 0, 0]}
+                        position={[0, -2.005, 0]}
+                        onClick={(e) => {
+                          if (e.button !== 0) return; // Only left-click
+                          if (e.delta > 15) return; // Ignore drags
+
+                          // Only select the floor if it was the front-most object clicked
+                          // (prevents selecting floor when clicking a Rack that doesn't stop propagation)
+                          if (e.intersections.length > 0 && e.intersections[0].object !== e.object) {
+                            return;
+                          }
+
+                          e.stopPropagation();
+                          useStore.getState().selectRack(null);
+                          useStore.getState().selectModel(null);
+                          setIsRoomSelected(true);
+                        }}
+                        onPointerOver={(e) => {
+                          e.stopPropagation();
+                          document.body.style.cursor = "pointer";
+                        }}
+                        onPointerOut={() => {
+                          document.body.style.cursor = "auto";
+                        }}
+                      >
+                        <planeGeometry args={[dynamicWidth, dynamicLength]} />
+                        <meshBasicMaterial
+                          color={isDarkMode ? (isRoomSelected ? "#10b981" : "#38bdf8") : (isRoomSelected ? "#059669" : "#0ea5e9")}
+                          transparent
+                          opacity={0.3}
+                          depthWrite={false}
+                        />
+                      </mesh>
+                    )}
+                  </group>
                 </PivotControls>
               </group>
             )}
@@ -532,15 +567,17 @@ export const Scene = () => {
               position={[0, -0.01, 0]}
               args={[40, 40]}
               cellSize={GRID_SPACING}
+              cellThickness={1}
               cellColor={gridCellColor}
               sectionSize={GRID_SPACING * 5}
+              sectionThickness={1}
               sectionColor={gridSectionColor}
               fadeDistance={50}
               infiniteGrid
               followCamera={false}
             />
             {/* Center Origin Marker */}
-            <group position={[0, -0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <group position={[0, 0.008, 0]} rotation={[-Math.PI / 2, 0, 0]}>
               <mesh renderOrder={1}>
                 <ringGeometry args={[0.3, 0.35, 32]} />
                 <meshBasicMaterial color={isDarkMode ? "#3b82f6" : "#2563eb"} transparent opacity={0.8} depthTest={false} />

@@ -14,18 +14,18 @@ const NEON_BLUE = new THREE.Color(0.2, 0.6, 2.0).multiplyScalar(2);
 function SceneEnvironment({ fogColor, fogIntensity }: { fogColor: string, fogIntensity: number }) {
   const scene = useThree(state => state.scene);
   const isEditMode = useStore(state => state.isEditMode);
-  
+
   useEffect(() => {
     // CSS 배경(그라데이션)이 투과되어 보이도록 3D 솔리드 배경 제거
     scene.background = null;
-    
+
     if (isEditMode) {
       scene.fog = null;
     } else {
       // Adjusted fog back to match space project's visual depth
       scene.fog = new THREE.Fog(fogColor, 20 / Math.max(0.1, fogIntensity), 150 / Math.max(0.1, fogIntensity));
     }
-    
+
     return () => {
       scene.background = null;
       scene.fog = null;
@@ -270,68 +270,68 @@ export function CyberSpaceEnvironment() {
       <group visible={!isEditMode}>
         <SceneEnvironment fogColor={csFogColor} fogIntensity={csFogIntensity} />
 
-      {csIsLightMode ? (
-        <>
-          <ambientLight intensity={1.2 * csBrightness} color="#ffffff" />
-          <hemisphereLight color="#ffffff" groundColor="#ffffff" intensity={0.8 * csBrightness} />
-          <directionalLight position={[10, 20, 10]} intensity={0.4 * csBrightness} color="#ffffff" castShadow />
-          <directionalLight position={[-10, 15, -10]} intensity={0.2 * csBrightness} color="#f0f8ff" />
-        </>
-      ) : (
-        <>
-          <ambientLight intensity={0.5 * csBrightness} color="#93c5fd" />
-          <directionalLight position={[0, 20, 0]} intensity={1.5 * csBrightness} color="#e0f2fe" castShadow />
-        </>
-      )}
+        {csIsLightMode ? (
+          <>
+            <ambientLight intensity={1.2 * csBrightness} color="#ffffff" />
+            <hemisphereLight color="#ffffff" groundColor="#ffffff" intensity={0.8 * csBrightness} />
+            <directionalLight position={[10, 20, 10]} intensity={0.4 * csBrightness} color="#ffffff" castShadow />
+            <directionalLight position={[-10, 15, -10]} intensity={0.2 * csBrightness} color="#f0f8ff" />
+          </>
+        ) : (
+          <>
+            <ambientLight intensity={0.5 * csBrightness} color="#93c5fd" />
+            <directionalLight position={[0, 20, 0]} intensity={1.5 * csBrightness} color="#e0f2fe" castShadow />
+          </>
+        )}
 
-      {cyberSpaceEnabled && csIsVisible && (
-        <group position={[csCustomSpaceSize ? csOffsetXCm / 100 : 0, 0, csCustomSpaceSize ? csOffsetZCm / 100 : 0]}>
-          {/* Floor Dark Recessed Background */}
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
-            <planeGeometry args={[roomWidth + 0.1, roomLength + 0.1]} />
-            <meshStandardMaterial color={csIsLightMode ? "#94a3b8" : "#0f172a"} roughness={0.9} metalness={0.0} />
-          </mesh>
+        {cyberSpaceEnabled && csIsVisible && (
+          <group position={[csCustomSpaceSize ? csOffsetXCm / 100 : 0, 0, csCustomSpaceSize ? csOffsetZCm / 100 : 0]}>
+            {/* Floor Dark Recessed Background */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
+              <planeGeometry args={[roomWidth + 0.1, roomLength + 0.1]} />
+              <meshStandardMaterial color={csIsLightMode ? "#94a3b8" : "#0f172a"} roughness={0.9} metalness={0.0} />
+            </mesh>
 
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-            <planeGeometry args={[roomWidth - 0.02, roomLength - 0.02]} />
-            <MeshReflectorMaterial
-              blur={[400, 400]}
-              resolution={1024}
-              mixBlur={csIsLightMode ? 1.0 : 3.0}
-              mixStrength={csIsLightMode ? 0.8 : 4.0}
-              roughness={csFloorRoughness}
-              depthScale={1.2}
-              minDepthThreshold={0.4}
-              maxDepthThreshold={1.4}
-              color={csFloorColor}
-              metalness={csIsLightMode ? 0.0 : 0.4}
-              mirror={csFloorMirror}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+              <planeGeometry args={[roomWidth - 0.02, roomLength - 0.02]} />
+              <MeshReflectorMaterial
+                blur={[400, 400]}
+                resolution={1024}
+                mixBlur={csIsLightMode ? 1.0 : 3.0}
+                mixStrength={csIsLightMode ? 0.8 : 4.0}
+                roughness={csFloorRoughness}
+                depthScale={1.2}
+                minDepthThreshold={0.4}
+                maxDepthThreshold={1.4}
+                color={csFloorColor}
+                metalness={csIsLightMode ? 0.0 : 0.4}
+                mirror={csFloorMirror}
+              />
+            </mesh>
+
+            <Grid
+              position={[0, 0.00005, 0]}
+              args={[roomWidth - 0.02, roomLength - 0.02]}
+              cellSize={0.5}
+              cellThickness={0.8}
+              cellColor={csIsLightMode ? '#f1f5f9' : '#0a1a33'}
+              sectionSize={0}
+              fadeDistance={Math.max(roomWidth, roomLength)}
+              fadeStrength={1}
             />
-          </mesh>
 
-          <Grid
-            position={[0, 0.005, 0]}
-            args={[roomWidth - 0.02, roomLength - 0.02]}
-            cellSize={0.5}
-            cellThickness={0.6}
-            cellColor={csIsLightMode ? '#f1f5f9' : '#0a1a33'}
-            sectionSize={0}
-            fadeDistance={Math.max(roomWidth, roomLength)}
-            fadeStrength={1}
-          />
-
-          <RoomGeometry
-            brightness={csBrightness}
-            roomWidthCm={roomWidth * 100}
-            roomLengthCm={roomLength * 100}
-            ceilingLightIntensity={csCeilingLightIntensity}
-            neonIntensity={csNeonIntensity}
-            wallColor={csWallColor}
-            ceilingColor={csCeilingColor}
-            isLightMode={csIsLightMode}
-          />
-        </group>
-      )}
+            <RoomGeometry
+              brightness={csBrightness}
+              roomWidthCm={roomWidth * 100}
+              roomLengthCm={roomLength * 100}
+              ceilingLightIntensity={csCeilingLightIntensity}
+              neonIntensity={csNeonIntensity}
+              wallColor={csWallColor}
+              ceilingColor={csCeilingColor}
+              isLightMode={csIsLightMode}
+            />
+          </group>
+        )}
       </group>
 
       <EffectComposer enabled={!isEditMode}>
