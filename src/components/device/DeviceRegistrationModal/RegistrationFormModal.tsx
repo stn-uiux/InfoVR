@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { NodePicker } from "./NodePicker";
-import { StnSelect } from "../../ui/StnSelect";
 import { StnFormField } from "../../ui/StnFormField";
 import { StnInput } from "../../ui/StnInput";
 import { EquipmentAssemblyModal } from "../../model/EquipmentAssemblyModal";
@@ -228,24 +227,19 @@ export const RegistrationFormModal = ({
           <StnFormField label="모델">
             <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
               <div style={{ flex: 1 }}>
-                <StnSelect
-                  options={effectiveTemplates.map((t, i) => ({
-                    label: `[${t.uSize}U] ${t.modelName}${t.isCustom ? ' ★' : ''}`,
-                    value: i,
-                  }))}
+                <select
+                  className="stn-input"
                   value={selectedModelIdx}
-                  onChange={(val) => {
-                    const idx = Number(val);
+                  onChange={(e) => {
+                    const idx = Number(e.target.value);
                     setSelectedModelIdx(idx);
                     const nextTemplate = effectiveTemplates[idx];
                     if (nextTemplate) {
                       setVendor(nextTemplate.vendor);
                       setInsertedCards(nextTemplate?.variant?.insertedCards || []);
-
                     } else {
                       setVendor("Nokia");
                       setInsertedCards([]);
-
                     }
                     setInsertedModules([]);
                     setGeneratedPorts([]);
@@ -253,8 +247,13 @@ export const RegistrationFormModal = ({
                     const nextCustom = customModels.find((m) => m.modelId === nextTemplate?.customModelId || m.modelName === nextTemplate?.modelName);
                     setDefaultViewSide(nextCustom?.defaultViewSide || "front");
                   }}
-                  placeholder="장비 모델 선택"
-                />
+                >
+                  {effectiveTemplates.map((t, i) => (
+                    <option key={i} value={i}>
+                      {`[${t.uSize}U] ${t.modelName}${t.isCustom ? ' ★' : ''}`}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </StnFormField>

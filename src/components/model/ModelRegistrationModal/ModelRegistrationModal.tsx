@@ -5,7 +5,6 @@ import { createPortal } from "react-dom";
 import { useStore } from "../../../store/useStore";
 import { StnFormField } from "../../ui/StnFormField";
 import { StnInput } from "../../ui/StnInput";
-import { StnSelect } from "../../ui/StnSelect";
 import type {
   CustomModelType,
   CardWidthType,
@@ -1076,10 +1075,13 @@ export const ModelRegistrationModal: React.FC = () => {
                   </StnFormField>
 
                   <StnFormField label="제조사" required>
-                    <StnSelect
+                    <select
+                      className="stn-input"
                       value={vendor}
-                      onChange={(val) => setVendor(val.toString())}
-                      options={[
+                      onChange={(e) => setVendor(e.target.value)}
+                    >
+                      <option value="" disabled>제조사를 선택하세요</option>
+                      {[
                         { label: "AXGATE", value: "AXGATE" },
                         { label: "Cisco", value: "Cisco" },
                         { label: "Ciena", value: "Ciena" },
@@ -1093,9 +1095,10 @@ export const ModelRegistrationModal: React.FC = () => {
                         { label: "Supermicro", value: "Supermicro" },
                         { label: "Ubiquoss", value: "Ubiquoss" },
                         { label: "Woorinet", value: "Woorinet" }
-                      ]}
-                      placeholder="제조사를 선택하세요"
-                    />
+                      ].map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
                   </StnFormField>
 
                   <StnFormField label="폼 팩터" required>

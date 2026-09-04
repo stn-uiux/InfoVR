@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { StnModal } from "../ui/StnModal";
-import { StnSelect } from "../ui/StnSelect";
 
 interface CreateAccountModalProps {
   open: boolean;
@@ -99,22 +98,34 @@ export const CreateAccountModal: React.FC<CreateAccountModalProps> = ({
         <div style={{ display: "flex", gap: "16px" }}>
           <div className="stn-form-group" style={{ flex: 1, marginBottom: 0 }}>
             <label className="stn-form-label">그룹</label>
-            <StnSelect
+            <select
+              className="stn-input"
               value={groupId}
-              onChange={(val) => setGroupId(val as string)}
-              options={groupOptions}
-              placeholder="그룹 선택"
-            />
+              onChange={(e) => setGroupId(e.target.value)}
+            >
+              <option value="" disabled>그룹 선택</option>
+              {groupOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="stn-form-group" style={{ flex: 1, marginBottom: 0 }}>
             <label className="stn-form-label">권한</label>
-            <StnSelect
+            <select
+              className="stn-input"
               value={role}
-              onChange={(val) => setRole(val as string)}
-              options={roleOptions}
-              placeholder="권한 선택"
-            />
+              onChange={(e) => setRole(e.target.value)}
+            >
+              <option value="" disabled>권한 선택</option>
+              {roleOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 

@@ -3,7 +3,6 @@ import { Icon } from "@iconify/react";
 import { StnBadge, StnBadgeVariant } from "../ui/StnBadge";
 import { useStore } from "../../store/useStore";
 import { StnModal } from "../ui/StnModal";
-import { StnSelect } from "../ui/StnSelect";
 import { StnTable, StnTableColumn } from "../ui/StnTable";
 import { CreateAccountModal } from "./CreateAccountModal";
 
@@ -535,7 +534,7 @@ export const AccountPermissionsModal = () => {
     { key: "name", title: "이름", sortable: true, sortValue: (u) => u.name, render: (u) => <div className="user-info-row"><div className={`user-avatar-sm role-${u.role}`}><Icon icon="fluent:person-24-filled" /></div><div className="user-name">{u.name}</div></div> },
     { key: "email", title: "아이디", sortable: true, sortValue: (u) => u.email, render: (u) => <div className="user-email">{u.email}</div> },
     { key: "group", title: "그룹", width: "120px", sortable: true, sortValue: (u) => getGroupName(u.groupId), render: (u) => <StnBadge variant="secondary">{getGroupName(u.groupId)}</StnBadge> },
-    { key: "roleSelect", title: "기본 권한", width: "200px", sortable: true, sortValue: (u) => u.role, render: (u) => <div style={{ width: "160px", margin: "0 auto" }}><StnSelect size="sm" value={u.role} onChange={(v) => handleRoleChange(u.id, v as string)} options={[{ value: "admin", label: "관리자 (Admin)" }, { value: "editor", label: "편집자 (Editor)" }, { value: "viewer", label: "조회자 (Viewer)" }, { value: "pending", label: "승인대기 (Pending)" }]} /></div> },
+    { key: "roleSelect", title: "기본 권한", width: "200px", sortable: true, sortValue: (u) => u.role, render: (u) => <div style={{ width: "160px", margin: "0 auto" }}><select className="stn-input" style={{ height: "32px", fontSize: "13px" }} value={u.role} onChange={(e) => handleRoleChange(u.id, e.target.value)}><option value="admin">관리자 (Admin)</option><option value="editor">편집자 (Editor)</option><option value="viewer">조회자 (Viewer)</option><option value="pending">승인대기 (Pending)</option></select></div> },
     { key: "roomAccess", title: "전산실 접근", width: "160px", render: (u) => { 
       const c = u.allowedRooms.length, a = c === ALL_ROOM_IDS.length; 
       return (
@@ -573,7 +572,7 @@ export const AccountPermissionsModal = () => {
               <div className="modal-batch-toolbar">
                 <span className="modal-batch-count">{selectedIds.length}개 선택됨</span>
                 <div style={{ width: "160px" }}>
-                  <StnSelect size="sm" value={batchGroupId} onChange={(v) => setBatchGroupId(v as string)} options={allGroupOptions} placeholder="그룹 선택" />
+                  <select className="stn-input" style={{ height: "32px", fontSize: "13px" }} value={batchGroupId} onChange={(e) => setBatchGroupId(e.target.value)}><option value="" disabled>그룹 선택</option>{allGroupOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select>
                 </div>
                 <button className="comm-btn comm-btn-sm comm-btn-primary" onClick={handleBatchGroupMove} disabled={!batchGroupId}>그룹 이동</button>
                 <button className="comm-btn comm-btn-sm comm-btn-ghost" style={{ color: "var(--severity-critical)" }} onClick={handleBatchDelete}>
@@ -615,7 +614,7 @@ export const AccountPermissionsModal = () => {
               <div className="modal-batch-toolbar">
                 <span className="modal-batch-count">{selectedIds.length}개 선택됨</span>
                 <div style={{ width: "160px" }}>
-                  <StnSelect size="sm" value={batchRole} onChange={(v) => setBatchRole(v as AccountRole)} options={[{ value: "admin", label: "관리자 (Admin)" }, { value: "editor", label: "편집자 (Editor)" }, { value: "viewer", label: "조회자 (Viewer)" }, { value: "pending", label: "승인대기 (Pending)" }]} />
+                  <select className="stn-input" style={{ height: "32px", fontSize: "13px" }} value={batchRole} onChange={(e) => setBatchRole(e.target.value as AccountRole)}><option value="admin">관리자 (Admin)</option><option value="editor">편집자 (Editor)</option><option value="viewer">조회자 (Viewer)</option><option value="pending">승인대기 (Pending)</option></select>
                 </div>
                 <button className="comm-btn comm-btn-primary" onClick={handleBatchRoleUpdate} style={{ padding: "6px 16px", minHeight: "38px" }}>일괄 적용</button>
               </div>
