@@ -312,7 +312,7 @@ export function CyberSpaceEnvironment() {
             <Grid
               position={[0, 0.00005, 0]}
               args={[roomWidth - 0.02, roomLength - 0.02]}
-              cellSize={0.5}
+              cellSize={0.6}
               cellThickness={0.8}
               cellColor={csIsLightMode ? '#f1f5f9' : '#0a1a33'}
               sectionSize={0}

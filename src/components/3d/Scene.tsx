@@ -564,13 +564,13 @@ export const Scene = () => {
               </group>
             )}
             <Grid
-              position={[0, -0.01, 0]}
+              position={[0, -0.02, 0]}
               args={[40, 40]}
-              cellSize={GRID_SPACING}
-              cellThickness={1}
+              cellSize={1}
+              cellThickness={0.7}
               cellColor={gridCellColor}
-              sectionSize={GRID_SPACING * 5}
-              sectionThickness={1}
+              sectionSize={5}
+              sectionThickness={0.8}
               sectionColor={gridSectionColor}
               fadeDistance={50}
               infiniteGrid
