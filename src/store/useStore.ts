@@ -62,6 +62,7 @@ export interface CyberSpaceConfig {
   csCeilingColor: string;
   csFloorColor: string;
   csFogColor: string;
+  csLowSpecMode: boolean;
 }
 
 export const DEFAULT_CYBER_SPACE_CONFIG: CyberSpaceConfig = {
@@ -84,6 +85,7 @@ export const DEFAULT_CYBER_SPACE_CONFIG: CyberSpaceConfig = {
   csCeilingColor: '#859cba',
   csFloorColor: '#373942',
   csFogColor: '#0a1324',
+  csLowSpecMode: false,
 };
 
 export const LIGHT_THEME_CYBER_SPACE_CONFIG: CyberSpaceConfig = {
@@ -101,6 +103,7 @@ export const LIGHT_THEME_CYBER_SPACE_CONFIG: CyberSpaceConfig = {
   csNeonIntensity: 6.0,
   csFloorMirror: 0.0,
   csFloorRoughness: 1.0,
+  csLowSpecMode: false,
 };
 
 interface CameraControlsRef {
@@ -174,6 +177,7 @@ export interface AppState {
   csCeilingColor: string;
   csFloorColor: string;
   csFogColor: string;
+  csLowSpecMode: boolean;
 
   nodeEnvironments: Record<string, Partial<CyberSpaceConfig>>;
 
@@ -579,9 +583,10 @@ export const useStore = create<AppState>()(
       setCyberSpaceTheme: (isLight) => set((state) => {
         const themeConfig = isLight ? LIGHT_THEME_CYBER_SPACE_CONFIG : DEFAULT_CYBER_SPACE_CONFIG;
 
-        // Preserve custom size values when swapping theme
-        const sizeConfig = {
+        // Preserve custom size values and low spec mode when swapping theme
+        const preservedState = {
           cyberSpaceEnabled: state.cyberSpaceEnabled,
+          csLowSpecMode: state.csLowSpecMode,
           csCustomSpaceSize: state.csCustomSpaceSize,
           csRoomWidthCm: state.csRoomWidthCm,
           csRoomLengthCm: state.csRoomLengthCm,
@@ -589,7 +594,7 @@ export const useStore = create<AppState>()(
           csOffsetZCm: state.csOffsetZCm
         };
 
-        const newConfig = { ...themeConfig, ...sizeConfig };
+        const newConfig = { ...themeConfig, ...preservedState };
 
         return { ...state, ...newConfig };
       }),

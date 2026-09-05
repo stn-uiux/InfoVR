@@ -240,13 +240,7 @@ const LightMesh = ({ model }: { model: ImportedModel }) => {
         position={[0, 0, 0]}
         intensity={params.intensity}
         color={params.color}
-        castShadow={params.castShadow}
-        shadow-mapSize={[params.shadowMapSize, params.shadowMapSize]}
-        shadow-camera-far={50}
-        shadow-camera-left={-15}
-        shadow-camera-right={15}
-        shadow-camera-top={15}
-        shadow-camera-bottom={-15}
+        castShadow={false}
       />
     </group>
   );

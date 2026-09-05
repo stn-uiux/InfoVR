@@ -6,6 +6,7 @@ import { Scene } from "./components/3d/Scene";
 import { DevicePanel } from "./components/device/DevicePanel";
 import { DashboardWidgets } from "./components/layout/DashboardWidgets";
 import { ThemeToggle } from "./components/ui/ThemeToggle";
+import { LowSpecToggle } from "./components/ui/LowSpecToggle";
 import { CyberSpaceToggle } from "./components/layout/CyberSpaceToggle";
 import { CyberSpaceControlPanel } from "./components/layout/CyberSpaceControlPanel";
 import { FocusCarousel } from "./components/layout/FocusCarousel";
@@ -542,8 +543,9 @@ function App() {
             </span>
           </div>
 
-          <CyberSpaceToggle />
+          {/* <CyberSpaceToggle /> */}
           <ThemeToggle />
+          <LowSpecToggle />
           <SettingsDropdown />
         </div>
       </div>

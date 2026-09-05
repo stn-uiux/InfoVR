@@ -235,8 +235,8 @@
 
 /* Fix browser autofill background and text color */
 .auth-input:-webkit-autofill,
-.auth-input:-webkit-autofill:hover, 
-.auth-input:-webkit-autofill:focus, 
+.auth-input:-webkit-autofill:hover,
+.auth-input:-webkit-autofill:focus,
 .auth-input:-webkit-autofill:active {
   -webkit-box-shadow: 0 0 0px 1000px #131a2c inset !important;
   -webkit-text-fill-color: #ffffff !important;
@@ -423,6 +423,14 @@
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
+  overflow: visible;
+}
+
+.settings-dropdown-btn svg,
+.settings-dropdown-btn .iconify {
+  font-size: 15px !important;
+  width: 15px;
+  height: 15px;
 }
 
 .settings-dropdown-btn:hover {
@@ -476,6 +484,12 @@
   width: 100%;
   text-align: left;
   cursor: pointer;
+}
+
+.settings-dropdown-item svg,
+.settings-dropdown-item .iconify {
+  flex-shrink: 0;
+  overflow: visible;
 }
 
 .settings-dropdown-item:hover {

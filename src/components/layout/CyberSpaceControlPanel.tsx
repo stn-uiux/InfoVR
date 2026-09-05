@@ -16,6 +16,7 @@ export const CyberSpaceControlPanel = () => {
     csWallColor,
     csCeilingColor,
     csFloorColor,
+    csLowSpecMode,
     setCyberSpaceConfig,
     toggleCyberSpaceTheme,
   } = useStore();

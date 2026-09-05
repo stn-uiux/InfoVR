@@ -249,12 +249,27 @@ export function CyberSpaceEnvironment() {
     csCeilingColor,
     csFloorColor,
     csFogColor,
+    csLowSpecMode,
     racks,
     isEditMode,
   } = useStore();
 
   const activeNodeId = useStore((state) => state.activeNodeId);
   const importedModels = useStore((state) => state.importedModels);
+
+  const { scene, invalidate } = useThree();
+
+  useEffect(() => {
+    let count = 0;
+    let timer: any;
+    const trigger = () => {
+      invalidate();
+      count++;
+      if (count < 10) timer = setTimeout(trigger, 50);
+    };
+    trigger();
+    return () => clearTimeout(timer);
+  }, [csLowSpecMode, invalidate]);
 
   const { width: roomWidth, length: roomLength } = calculateDynamicRoomSize(
     racks,
@@ -292,22 +307,33 @@ export function CyberSpaceEnvironment() {
               <meshStandardMaterial color={csIsLightMode ? "#94a3b8" : "#0f172a"} roughness={0.9} metalness={0.0} />
             </mesh>
 
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-              <planeGeometry args={[roomWidth - 0.02, roomLength - 0.02]} />
-              <MeshReflectorMaterial
-                blur={[400, 400]}
-                resolution={1024}
-                mixBlur={csIsLightMode ? 1.0 : 3.0}
-                mixStrength={csIsLightMode ? 0.8 : 4.0}
-                roughness={csFloorRoughness}
-                depthScale={1.2}
-                minDepthThreshold={0.4}
-                maxDepthThreshold={1.4}
-                color={csFloorColor}
-                metalness={csIsLightMode ? 0.0 : 0.4}
-                mirror={csFloorMirror}
-              />
-            </mesh>
+            {csLowSpecMode ? (
+              <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+                <planeGeometry args={[roomWidth - 0.02, roomLength - 0.02]} />
+                <meshStandardMaterial 
+                  color={csFloorColor} 
+                  roughness={csFloorRoughness} 
+                  metalness={csIsLightMode ? 0.0 : 0.4} 
+                />
+              </mesh>
+            ) : (
+              <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+                <planeGeometry args={[roomWidth - 0.02, roomLength - 0.02]} />
+                <MeshReflectorMaterial
+                  blur={[400, 400]}
+                  resolution={512}
+                  mixBlur={csIsLightMode ? 1.0 : 3.0}
+                  mixStrength={csIsLightMode ? 0.8 : 4.0}
+                  roughness={csFloorRoughness}
+                  depthScale={1.2}
+                  minDepthThreshold={0.4}
+                  maxDepthThreshold={1.4}
+                  color={csFloorColor}
+                  metalness={csIsLightMode ? 0.0 : 0.4}
+                  mirror={csFloorMirror}
+                />
+              </mesh>
+            )}
 
             <Grid
               position={[0, 0.00005, 0]}
@@ -335,8 +361,8 @@ export function CyberSpaceEnvironment() {
       </group>
 
       <EffectComposer enabled={!isEditMode}>
-        <N8AO aoRadius={1} intensity={csAoIntensity} distanceFalloff={0.2} color="black" />
-        <Bloom luminanceThreshold={csIsLightMode ? 2.0 : 0.8} mipmapBlur levels={7} intensity={0.7 * Math.max(0.5, csBrightness) * csBloomIntensity} />
+        <N8AO aoRadius={1} intensity={csLowSpecMode ? 0 : csAoIntensity} distanceFalloff={0.2} color="black" />
+        <Bloom luminanceThreshold={csIsLightMode ? 2.0 : 0.8} mipmapBlur levels={7} intensity={csLowSpecMode ? 0 : 0.7 * Math.max(0.5, csBrightness) * csBloomIntensity} />
         <Vignette eskil={false} offset={0.1} darkness={csIsLightMode ? 0.25 : 0.5} />
       </EffectComposer>
     </>
