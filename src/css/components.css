@@ -1712,7 +1712,6 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  transition: all 0.2s;
 }
 
 .drm-form-select-option:hover {
@@ -1761,7 +1760,6 @@
   font-size: 14px;
   background-color: var(--bg-secondary);
   color: var(--text-primary);
-  transition: all 0.2s;
   outline: none;
   width: 100%;
 }
@@ -2074,7 +2072,6 @@
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
   animation: drm-pop-in 0.2s ease-out;
 }
 
@@ -2299,7 +2296,6 @@
   height: 38px;
   border-radius: 10px;
   border: 1px solid var(--border-medium);
-  transition: all 0.2s;
 }
 
 .drm-checkbox-label:hover {
@@ -2332,7 +2328,6 @@
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
-  transition: all 0.2s;
   user-select: none;
 }
 
@@ -2517,7 +2512,6 @@
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   backdrop-filter: none;
   border-top: 1px solid var(--border-weak);
 }
@@ -2579,7 +2573,6 @@
   justify-content: center;
   color: var(--text-tertiary);
   border-radius: 4px;
-  transition: all 0.2s;
 }
 
 .tree-collapse-handle:hover {
@@ -2847,7 +2840,6 @@
   border-radius: 8px;
   border: 1px solid var(--border-weak);
   cursor: pointer;
-  transition: all 0.2s;
 }
 
 .tree-toggle-item:hover {
@@ -3417,7 +3409,6 @@ input:checked+.slider:before {
   justify-content: center;
   cursor: pointer;
   border-radius: 50%;
-  transition: all 0.2s;
   font-size: 18px;
   line-height: 0;
 }
@@ -3588,7 +3579,6 @@ input:checked+.slider:before {
   border: 1px solid var(--border-medium, #2a2d35);
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s;
   background: var(--bg-primary, #111217);
   text-align: center;
 }
@@ -3663,7 +3653,6 @@ input:checked+.slider:before {
   border: 2px dashed var(--border-medium, #2a2d35);
   border-radius: 12px;
   cursor: pointer;
-  transition: all 0.2s;
   background: var(--bg-primary, #111217);
   text-align: center;
 }
@@ -4097,7 +4086,6 @@ input:checked+.slider:before {
   font-weight: 600;
   cursor: pointer;
   border: 1px solid var(--border-medium, #2a2d35);
-  transition: all 0.2s;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -4408,7 +4396,6 @@ input:checked+.slider:before {
   cursor: pointer;
   background: transparent;
   color: var(--text-tertiary, #5f6377);
-  transition: all 0.2s;
 }
 
 .mrm-tab:hover {
@@ -4625,7 +4612,6 @@ input:checked+.slider:before {
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
 }
 
 .error-toggle-btn:hover {
@@ -5398,7 +5384,6 @@ input:checked+.slider:before {
   border: 1px solid;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all 0.2s;
 }
 
 .mrm-btn-sm:hover:not(:disabled) {
@@ -5899,7 +5884,6 @@ input:checked+.slider:before {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s ease;
 }
 
 .focus-nav-btn:hover {
@@ -6060,7 +6044,6 @@ input:checked+.slider:before {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
 }
 
 .mi-layer-btn.is-locked {
@@ -6312,7 +6295,6 @@ input:checked+.slider:before {
   color: var(--text-primary);
   font-size: var(--font-size-md, 14px);
   cursor: pointer;
-  transition: all 0.2s;
   user-select: none;
 }
 
@@ -6571,7 +6553,6 @@ input:checked+.slider:before {
   display: flex;
   align-items: center;
   gap: 8px;
-  transition: all 0.2s;
 }
 
 .modal-tab-btn.active {

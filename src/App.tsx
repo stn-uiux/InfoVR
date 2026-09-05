@@ -673,7 +673,6 @@ const FitToModelsButton = () => {
           boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
           color: isDarkMode ? "#ffffff" : "#111827",
           cursor: "pointer",
-          transition: "all 0.2s ease",
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = "scale(1.05)";
