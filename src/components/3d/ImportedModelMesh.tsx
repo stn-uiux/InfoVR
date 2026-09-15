@@ -249,17 +249,19 @@ const LightMesh = ({ model }: { model: ImportedModel }) => {
 /* ------------------------------------------------------------------ */
 /*  GLB mesh — loads from dataUrl (base64 or public URL)               */
 /* ------------------------------------------------------------------ */
-const GltfMesh = ({ url }: { url: string }) => {
+const GltfMesh = ({ url, onLoaded }: { url: string; onLoaded?: (size: [number, number, number]) => void }) => {
   const { scene: gltfScene } = useGLTF(url);
 
-  const cloned = useMemo(() => {
+  const clonedData = useMemo(() => {
     if (!gltfScene) return null;
     const clone = gltfScene.clone(true);
 
     // Calculate bounding box for auto-centering
     const box = new Box3().setFromObject(clone);
     const center = new Vector3();
+    const size = new Vector3();
     box.getCenter(center);
+    box.getSize(size);
 
     // Center X, Z and set bottom (min Y) to 0 so it sits on the floor
     clone.position.set(-center.x, -box.min.y, -center.z);
@@ -270,11 +272,17 @@ const GltfMesh = ({ url }: { url: string }) => {
         child.receiveShadow = true;
       }
     });
-    return clone;
+    return { clone, size: [size.x, size.y, size.z] as [number, number, number] };
   }, [gltfScene]);
 
-  if (!cloned) return null;
-  return <primitive object={cloned} />;
+  useEffect(() => {
+    if (clonedData?.size && onLoaded) {
+      onLoaded(clonedData.size);
+    }
+  }, [clonedData, onLoaded]);
+
+  if (!clonedData) return null;
+  return <primitive object={clonedData.clone} />;
 };
 
 /* ------------------------------------------------------------------ */
@@ -460,7 +468,14 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
       ) : (
         <GltfErrorBoundary key={model.id}>
           <Suspense fallback={null}>
-            <GltfMesh url={model.dataUrl} />
+            <GltfMesh 
+              url={model.dataUrl} 
+              onLoaded={(size) => {
+                if (!model.baseSize || model.baseSize[0] !== size[0] || model.baseSize[1] !== size[1] || model.baseSize[2] !== size[2]) {
+                  updateModel(model.id, { baseSize: size });
+                }
+              }}
+            />
           </Suspense>
         </GltfErrorBoundary>
       )}

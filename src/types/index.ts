@@ -280,6 +280,8 @@ export interface ImportedModel {
   position: [number, number, number];
   rotation: [number, number, number]; // Euler angles in radians
   scale: [number, number, number];
+  /** Actual physical base size of the model (x, y, z) in meters before scaling */
+  baseSize?: [number, number, number];
   /** Per-model movement toggle: true = movable, false = locked (default: false) */
   isMoveEnabled?: boolean;
   /** If set, this model is a built-in default model */

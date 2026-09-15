@@ -1352,6 +1352,28 @@ const ModelProperties = ({
         15,
       )}
       {vec3Block("Scale", model.scale, (v) => onUpdate({ scale: v }), 0.1)}
+      {(() => {
+        const baseSizeX = model.baseSize?.[0] ?? 1;
+        const baseSizeY = model.baseSize?.[1] ?? 1;
+        const baseSizeZ = model.baseSize?.[2] ?? 1;
+        return vec3Block(
+          "Size (cm)",
+          [
+            model.scale[0] * baseSizeX * 100,
+            model.scale[1] * baseSizeY * 100,
+            model.scale[2] * baseSizeZ * 100,
+          ],
+          (v) =>
+            onUpdate({
+              scale: [
+                v[0] / (baseSizeX * 100),
+                v[1] / (baseSizeY * 100),
+                v[2] / (baseSizeZ * 100),
+              ],
+            }),
+          1,
+        );
+      })()}
 
       {/* Wall-specific parametric controls */}
       {model.builtinType === "Wall" &&
