@@ -14,6 +14,10 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        arcVRoom: path.resolve(__dirname, 'arcVRoom/index.html'),
+      },
       output: {
         manualChunks: {
           three: ['three'],

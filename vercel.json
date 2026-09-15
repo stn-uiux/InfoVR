@@ -1,6 +1,14 @@
 {
   "rewrites": [
     {
+      "source": "/arcVRoom/(.*)",
+      "destination": "/arcVRoom/index.html"
+    },
+    {
+      "source": "/arcVRoom",
+      "destination": "/arcVRoom/index.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

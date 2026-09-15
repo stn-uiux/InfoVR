@@ -35,8 +35,7 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/dashboard" element={<App />} />
           
           {/* Existing Routes */}
-          <Route path="/arcVRoom" element={<App />} />
-          <Route path="/arcVRoom/" element={<App />} />
+
           <Route
             path="/port-wizard"
             element={
