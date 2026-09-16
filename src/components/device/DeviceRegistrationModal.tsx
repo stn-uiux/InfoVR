@@ -817,6 +817,26 @@ export const DeviceRegistrationModal = () => {
                         </div>
 
                         <div className="drm-action-cluster">
+                          {selectedIds.size > 0 && (
+                            <button
+                              className="comm-btn comm-btn-md comm-btn-secondary"
+                              style={{ color: "var(--severity-critical)", borderColor: "var(--severity-critical)" }}
+                              onClick={() => {
+                                const state = useStore.getState();
+                                const mountedCount = Array.from(selectedIds).filter(id => state.findExistingMount(id)).length;
+                                let msg = `선택한 ${selectedIds.size}개의 장비를 삭제하시겠습니까?`;
+                                if (mountedCount > 0) {
+                                  msg += `\n(⚠️ 이 중 ${mountedCount}개는 랙에 배치되어 있으며 함께 제거됩니다.)`;
+                                }
+                                if (window.confirm(msg)) {
+                                  state.removeRegisteredDevices(Array.from(selectedIds));
+                                  setSelectedIds(new Set());
+                                }
+                              }}
+                            >
+                              <Icon icon="material-symbols:delete" className="icon" /> 선택 삭제
+                            </button>
+                          )}
                           <input
                             type="file"
                             accept=".xlsx"

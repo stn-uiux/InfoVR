@@ -319,6 +319,7 @@ export interface AppState {
   setShowEquipmentInTree: (show: boolean) => void;
   addRegisteredDevice: (device: Omit<RegisteredDevice, "deviceId">) => void;
   removeRegisteredDevice: (id: string) => void;
+  removeRegisteredDevices: (ids: string[]) => void;
   updateRegisteredDevice: (
     id: string,
     updates: Partial<RegisteredDevice> & { generatedPorts?: GeneratedPort[] },
@@ -1498,6 +1499,33 @@ export const useStore = create<AppState>()(
           return {
             registeredDevices: state.registeredDevices.filter(
               (d) => d.deviceId !== id,
+            ),
+            racks: updatedRacks,
+            layouts: state.activeNodeId
+              ? {
+                ...state.layouts,
+                [state.activeNodeId]: {
+                  ...state.layouts[state.activeNodeId],
+                  racks: updatedRacks,
+                },
+              }
+              : state.layouts,
+          };
+        });
+      },
+
+      removeRegisteredDevices: (ids) => {
+        if (!ids || ids.length === 0) return;
+        get().pushUndoState();
+        set((state) => {
+          const idSet = new Set(ids);
+          const updatedRacks = state.racks.map((rack) => ({
+            ...rack,
+            devices: rack.devices.filter((d) => d.deviceId && !idSet.has(d.deviceId)),
+          }));
+          return {
+            registeredDevices: state.registeredDevices.filter(
+              (d) => !idSet.has(d.deviceId),
             ),
             racks: updatedRacks,
             layouts: state.activeNodeId
