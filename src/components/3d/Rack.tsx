@@ -504,11 +504,14 @@ export const Rack = memo(({
 
             const hitGizmoHelper = e.intersections.some((hit) => {
               let obj: Object3D | null = hit.object;
+              let isInner = false;
+              let isGizmo = false;
               while (obj) {
-                if (obj.userData?.isGizmoHelper || obj.userData?.isGizmo) return true;
+                if (obj.userData?.isInnerContent) isInner = true;
+                if (obj.userData?.isGizmoHelper || obj.userData?.isGizmo) isGizmo = true;
                 obj = obj.parent;
               }
-              return false;
+              return isGizmo && !isInner;
             });
             if (hitGizmoHelper) return;
 
@@ -539,11 +542,14 @@ export const Rack = memo(({
             if (useStore.getState().isGizmoHovered) return;
             const hitGizmoHelper = e.intersections.some((hit) => {
               let obj: Object3D | null = hit.object;
+              let isInner = false;
+              let isGizmo = false;
               while (obj) {
-                if (obj.userData?.isGizmoHelper || obj.userData?.isGizmo) return true;
+                if (obj.userData?.isInnerContent) isInner = true;
+                if (obj.userData?.isGizmoHelper || obj.userData?.isGizmo) isGizmo = true;
                 obj = obj.parent;
               }
-              return false;
+              return isGizmo && !isInner;
             });
             if (hitGizmoHelper) return;
 
