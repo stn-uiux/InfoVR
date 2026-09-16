@@ -317,6 +317,18 @@ function App() {
     }
   }, [initialLoadDone, isCanvasReady, active, pendingComposerTasks]);
 
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!toolbarRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        document.documentElement.style.setProperty('--header-height', `${entry.target.getBoundingClientRect().height}px`);
+      }
+    });
+    observer.observe(toolbarRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   const loadSample = () => {
     // 3D 리렌더링 트리거
     loadState(sampleRacks, undefined, sampleRegisteredDevices, sampleNodes);
@@ -350,6 +362,7 @@ function App() {
 
       {/* UI Overlay Layer (Toolbar) */}
       <div
+        ref={toolbarRef}
         className="comm-toolbar comm-toolbar-absolute"
       >
         {/* Logo Area */}
@@ -494,8 +507,11 @@ function App() {
                 accept=".xlsx"
                 onChange={handleToolbarImportFile}
               />
+            </div>
 
-              <div className="comm-toolbar-divider" style={{ margin: "0 4px" }} />
+            <div className="comm-toolbar-divider" style={{ margin: "0 4px" }} />
+
+            <div className="comm-toolbar-group">
 
               <button
                 className="comm-btn comm-btn-md comm-btn-secondary"
@@ -530,11 +546,14 @@ function App() {
                 accept=".json"
                 onChange={handleLayoutImportFile}
               />
+            </div>
 
-              <div
-                className="comm-toolbar-divider"
-                style={{ height: "20px", margin: "0 8px" }}
-              />
+            <div
+              className="comm-toolbar-divider"
+              style={{ height: "20px", margin: "0 8px" }}
+            />
+
+            <div className="comm-toolbar-group">
 
               <button
                 className={`comm-btn comm-btn-md ${isDirty && !(isSyncingPorts || is3DLoading) ? "comm-btn-primary" : "comm-btn-secondary"}`}

@@ -1001,7 +1001,7 @@ select.stn-input option {
 .comm-toolbar {
   display: flex;
   align-items: center;
-  gap: var(--spacing-md);
+  gap: var(--spacing-sm);
   padding: var(--spacing-xs) var(--spacing-md);
   background: var(--toolbar-bg);
   border-bottom: 1px solid var(--toolbar-border);
@@ -1009,7 +1009,8 @@ select.stn-input option {
   flex-wrap: wrap;
   z-index: 1000;
   width: 100%;
-  height: 50px;
+  height: auto;
+  min-height: 50px;
   box-sizing: border-box;
 }
 
@@ -1171,7 +1172,7 @@ select.stn-input option {
 /* Side panel styles */
 .stn-side-panel {
   position: absolute;
-  top: 50px;
+  top: var(--header-height, 50px);
   right: 0;
   bottom: 0;
   background: var(--panel-bg);

@@ -5100,7 +5100,7 @@ input:checked+.slider:before {
 /* --- Importer --- */
 .mi-main-wrapper {
   position: absolute;
-  top: 50px;
+  top: var(--header-height, 50px);
   left: 0;
   bottom: 0;
   z-index: 100;
