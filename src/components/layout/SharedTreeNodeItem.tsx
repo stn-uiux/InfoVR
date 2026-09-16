@@ -173,9 +173,9 @@ export const SharedTreeNodeItem = React.memo(({
         onContextMenu={(e) => {
           if (onContextMenu) onContextMenu(e, node.nodeId);
         }}
-        draggable={isDraggable && node.parentId !== null}
+        draggable={isDraggable && node.parentId !== null && !isRenaming}
         onDragStart={(e) => {
-          if (!isDraggable || node.parentId === null || !onDragStart) {
+          if (!isDraggable || node.parentId === null || !onDragStart || isRenaming) {
             e.preventDefault();
             return;
           }
