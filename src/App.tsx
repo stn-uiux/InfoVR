@@ -50,6 +50,7 @@ import { PortErrorSynchronizer } from "./components/device/PortErrorSynchronizer
 import { usePreloadThumbnails } from "./hooks/usePreloadThumbnails";
 import logoLightFull from "./assets/logo/InfoVR_light_full.svg";
 import logoDarkFull from "./assets/logo/InfoVR_dark_full.svg";
+import { exportRoomLayoutJson, importRoomLayoutJson } from "./utils/roomLayoutStorage";
 
 /* ---------- Device Delete Confirmation Modal (top-level, z=99999) ---------- */
 const DeviceDeleteConfirmModal = () => {
@@ -225,6 +226,10 @@ function App() {
 
   usePreloadThumbnails();
 
+  const activeNodeId = useStore((s) => s.activeNodeId);
+  const activeNode = nodes.find(n => n.nodeId === activeNodeId);
+  const isRoomNode = activeNode?.type === "room";
+
   const isDirty = useMemo(() => {
     // Keep these store slices as render triggers for getIsDirty().
     void racks;
@@ -269,6 +274,25 @@ function App() {
   }, [undo, redo, saveChanges]);
 
   const toolbarImportInputRef = useRef<HTMLInputElement>(null);
+  const layoutImportInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLayoutImportClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    layoutImportInputRef.current?.click();
+  };
+
+  const handleLayoutImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const activeNodeId = useStore.getState().activeNodeId;
+      if (activeNodeId) {
+        importRoomLayoutJson(activeNodeId, file, useStore.getState());
+      }
+    }
+    if (layoutImportInputRef.current) {
+      layoutImportInputRef.current.value = "";
+    }
+  };
 
   const isModalOpen =
     deviceRegistrationModalOpen ||
@@ -446,18 +470,22 @@ function App() {
                   setDeviceRegistrationModalOpen(false);
                   setImportExportModalRackId("all");
                 }}
-                title="Export Room Data"
+                disabled={!isRoomNode}
+                style={{ opacity: isRoomNode ? 1 : 0.5, cursor: isRoomNode ? "pointer" : "not-allowed" }}
+                title="Export Room Data (Excel)"
               >
                 <Icon icon="material-symbols:upload" className="icon" />
-                내보내기
+                Excel 내보내기
               </button>
               <button
                 className="comm-btn comm-btn-md comm-btn-secondary"
-                title="Import Room Data"
+                title="Import Room Data (Excel)"
                 onClick={handleToolbarImportClick}
+                disabled={!isRoomNode}
+                style={{ opacity: isRoomNode ? 1 : 0.5, cursor: isRoomNode ? "pointer" : "not-allowed" }}
               >
                 <Icon icon="material-symbols:download" className="icon" />
-                가져오기
+                Excel 가져오기
               </button>
               <input
                 type="file"
@@ -465,6 +493,42 @@ function App() {
                 className="comm-hidden"
                 accept=".xlsx"
                 onChange={handleToolbarImportFile}
+              />
+
+              <div className="comm-toolbar-divider" style={{ margin: "0 4px" }} />
+
+              <button
+                className="comm-btn comm-btn-md comm-btn-secondary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const activeNodeId = useStore.getState().activeNodeId;
+                  if (activeNodeId) {
+                    exportRoomLayoutJson(activeNodeId, useStore.getState());
+                  }
+                }}
+                disabled={!isRoomNode}
+                style={{ opacity: isRoomNode ? 1 : 0.5, cursor: isRoomNode ? "pointer" : "not-allowed" }}
+                title="Export Layout Template (JSON)"
+              >
+                <Icon icon="mdi:code-json" className="icon" />
+                통합 내보내기
+              </button>
+              <button
+                className="comm-btn comm-btn-md comm-btn-secondary"
+                title="Import Layout Template (JSON)"
+                onClick={handleLayoutImportClick}
+                disabled={!isRoomNode}
+                style={{ opacity: isRoomNode ? 1 : 0.5, cursor: isRoomNode ? "pointer" : "not-allowed" }}
+              >
+                <Icon icon="mdi:file-upload-outline" className="icon" />
+                통합 가져오기
+              </button>
+              <input
+                type="file"
+                ref={layoutImportInputRef}
+                className="comm-hidden"
+                accept=".json"
+                onChange={handleLayoutImportFile}
               />
 
               <div

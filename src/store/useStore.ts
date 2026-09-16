@@ -389,6 +389,12 @@ export interface AppState {
       { racks: Rack[]; registeredDevices: RegisteredDevice[] }
     >,
   ) => void;
+  replaceRoomLayout: (
+    roomId: string,
+    newRacks: Rack[],
+    newModels: ImportedModel[],
+    newDevices: RegisteredDevice[]
+  ) => void;
   updateDevicePortStates: (
     deviceId: string,
     newPortStates: import("../types").PortState[]
@@ -2409,6 +2415,38 @@ export const useStore = create<AppState>()(
               : state.registeredDevices,
             selectedRackId: null,
             focusedRackId: null,
+            selectedDeviceId: null,
+          };
+        });
+      },
+
+      replaceRoomLayout: (roomId, newRacks, newModels, newDevices) => {
+        set((state) => {
+          // Remove old devices for racks in this room, then add new devices
+          const rackIdsToReplace = new Set(state.layouts[roomId]?.racks?.map(r => r.rackId) || []);
+          const newRackIds = new Set(newRacks.map(r => r.rackId));
+          const updatedRegDevices = state.registeredDevices.filter(
+            (d) => d.deviceGroupId !== roomId
+          );
+
+          const updatedLayouts = {
+            ...state.layouts,
+            [roomId]: {
+              racks: newRacks,
+              importedModels: newModels,
+            },
+          };
+
+          const isCurrentNode = state.activeNodeId === roomId;
+
+          return {
+            layouts: updatedLayouts,
+            racks: isCurrentNode ? newRacks : state.racks,
+            importedModels: isCurrentNode ? newModels : state.importedModels,
+            registeredDevices: [...updatedRegDevices, ...newDevices],
+            selectedRackId: null,
+            focusedRackId: null,
+            selectedModelId: null,
             selectedDeviceId: null,
           };
         });
