@@ -291,6 +291,7 @@ const GltfMesh = ({ url, onLoaded }: { url: string; onLoaded?: (size: [number, n
 export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
   const selectedModelId = useStore((s) => s.selectedModelId);
   const isEditMode = useStore((s) => s.isEditMode);
+  const isObstructing = useStore((s) => s.obstructingModelIds.includes(model.id));
   const isSelected = selectedModelId === model.id;
   const isMoveEnabled = model.isMoveEnabled ?? false;
 
@@ -534,7 +535,7 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
   );
 
   return (
-    <group userData={{ isModelContainer: true, modelId: model.id }}>
+    <group userData={{ isModelContainer: true, modelId: model.id }} visible={!isObstructing}>
       {shouldTransform ? (
         <group userData={{ isGizmo: true }}>
           <PivotControls

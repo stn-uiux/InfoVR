@@ -434,6 +434,7 @@ export const CameraController = () => {
           const camDirZ = Math.cos(orientationRad);
 
           const obstructingIds: string[] = [];
+          const obstructingModelIds: string[] = [];
           const allRacks = storeState.racks.filter(
             (r) => r.mapId === storeState.activeNodeId && r.rackId !== storeState.focusedRackId
           );
@@ -489,6 +490,48 @@ export const CameraController = () => {
             }
           }
 
+          // Imported Models Obstructing Logic
+          const allModels = storeState.importedModels;
+
+          for (const other of allModels) {
+            const otherX = other.position[0];
+            const otherZ = other.position[2];
+
+            const dx = otherX - rackX;
+            const dz = otherZ - rackZ;
+
+            const projFront = dx * camDirX + dz * camDirZ;
+            const perpDistFront = Math.abs(dx * camDirZ - dz * camDirX);
+
+            const depth = other.baseSize ? other.baseSize[2] * other.scale[2] : 1.0;
+            const width = other.baseSize ? other.baseSize[0] * other.scale[0] : 1.0;
+            const height = other.baseSize ? other.baseSize[1] * other.scale[1] : 2.0;
+            const radius = Math.max(depth, width) / 2 + 0.6; // Slightly padded
+
+            if (projFront > 0.3 && perpDistFront < radius + 1.0) {
+              const camPosToUse = isAnimating.current ? vTargetPos.current : camera.position;
+              const camXZ = new Vector2(camPosToUse.x, camPosToUse.z);
+              const targetXZ = new Vector2(rackX, rackZ);
+              const dirXZ = new Vector2().subVectors(targetXZ, camXZ);
+              const distToTargetXZ = dirXZ.length();
+              if (distToTargetXZ === 0) continue;
+              dirXZ.normalize();
+
+              const otherXZ = new Vector2(otherX, otherZ);
+              const vecToOtherXZ = new Vector2().subVectors(otherXZ, camXZ);
+              const projSightXZ = vecToOtherXZ.dot(dirXZ);
+
+              if (projSightXZ > -radius && projSightXZ < distToTargetXZ + radius) {
+                const perpSqXZ = Math.max(0, vecToOtherXZ.lengthSq() - projSightXZ * projSightXZ);
+                const perpDistSightXZ = Math.sqrt(perpSqXZ);
+
+                if (perpDistSightXZ < radius + 0.5) {
+                  obstructingModelIds.push(other.id);
+                }
+              }
+            }
+          }
+
           // 이동(애니메이션) 중에는 이미 숨겨진 랙이 잠깐 나타나는 깜빡임 현상을 방지하기 위해 합집합 유지
           let nextIds = obstructingIds;
           if (isAnimating.current) {
@@ -502,10 +545,21 @@ export const CameraController = () => {
           if (currentSorted.length !== nextSorted.length || !currentSorted.every((id, i) => id === nextSorted[i])) {
             storeState.setObstructingRackIds(nextSorted);
           }
+
+          let nextModelIds = obstructingModelIds;
+          if (isAnimating.current) {
+            nextModelIds = Array.from(new Set([...storeState.obstructingModelIds, ...obstructingModelIds]));
+          }
+          const currentSortedModels = [...storeState.obstructingModelIds].sort();
+          const nextSortedModels = nextModelIds.sort();
+          if (currentSortedModels.length !== nextSortedModels.length || !currentSortedModels.every((id, i) => id === nextSortedModels[i])) {
+            storeState.setObstructingModelIds(nextSortedModels);
+          }
         }
-      } else if (storeState.obstructingRackIds.length > 0) {
-        // 포커스가 해제되어 랙 전체 보기(줌아웃) 상태일 때는 숨김 처리된 랙을 모두 다시 나타나게 합니다.
-        storeState.setObstructingRackIds([]);
+      } else if (storeState.obstructingRackIds.length > 0 || storeState.obstructingModelIds.length > 0) {
+        // 포커스가 해제되어 랙 전체 보기(줌아웃) 상태일 때는 숨김 처리된 랙/모델을 모두 다시 나타나게 합니다.
+        if (storeState.obstructingRackIds.length > 0) storeState.setObstructingRackIds([]);
+        if (storeState.obstructingModelIds.length > 0) storeState.setObstructingModelIds([]);
       }
     }
 

@@ -118,6 +118,7 @@ export interface AppState {
   highlightedPortId: string | null;
   focusedRackId: string | null;
   obstructingRackIds: string[];
+  obstructingModelIds: string[];
   isDragging: boolean;
   draggingRackId: string | null;
   dragPosition: [number, number] | null;
@@ -275,6 +276,7 @@ export interface AppState {
   selectDevice: (id: string | null, portId?: string | null) => void;
   focusRack: (id: string | null) => void;
   setObstructingRackIds: (ids: string[]) => void;
+  setObstructingModelIds: (ids: string[]) => void;
   setPreFocusCameraState: (state: CameraState | null) => void;
   setDragging: (
     isDragging: boolean,
@@ -531,6 +533,7 @@ export const useStore = create<AppState>()(
       highlightedPortId: null,
       focusedRackId: null,
       obstructingRackIds: [],
+      obstructingModelIds: [],
       isDragging: false,
       draggingRackId: null,
       dragPosition: null,
@@ -1139,6 +1142,9 @@ export const useStore = create<AppState>()(
           redoStack: [], // Clear redo stack on node switch
           selectedRackId: null,
           focusedRackId: null,
+          obstructingRackIds: [],
+          obstructingModelIds: [],
+          hoveredRackId: null,
           selectedDeviceId: null,
           isDragging: false,
           draggingRackId: null,
@@ -1766,6 +1772,8 @@ export const useStore = create<AppState>()(
           selectedRackId: id,
           focusedRackId: null,
           obstructingRackIds: [],
+          obstructingModelIds: [],
+          hoveredRackId: null,
           selectedDeviceId: null,
           selectedModelId: id ? null : state.selectedModelId,
           hoveredDevice: null,
@@ -1794,6 +1802,9 @@ export const useStore = create<AppState>()(
 
       setObstructingRackIds: (ids) => {
         set({ obstructingRackIds: ids });
+      },
+      setObstructingModelIds: (ids) => {
+        set({ obstructingModelIds: ids });
       },
       setPreFocusCameraState: (state) => set({ preFocusCameraState: state }),
       setDragging: (isDragging, rackId = null, offset = null) =>
