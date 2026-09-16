@@ -27,7 +27,7 @@ export const DeviceRow = React.memo(({
 }: DeviceRowProps) => {
   return (
     <tr onClick={() => onLocate(device)}>
-      <td className="col-check">
+      <td className="col-check" onClick={(e) => e.stopPropagation()}>
         <div
           style={{
             display: "flex",
@@ -41,7 +41,6 @@ export const DeviceRow = React.memo(({
             type="checkbox"
             checked={isSelected}
             onChange={(e) => {
-              e.stopPropagation();
               onSelect(device.deviceId, e.target.checked);
             }}
           />

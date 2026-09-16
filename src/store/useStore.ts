@@ -1527,7 +1527,7 @@ export const useStore = create<AppState>()(
             const matchIdx = existing.findIndex(
               (ex) =>
                 ex.deviceGroupId === newDev.deviceGroupId &&
-                (ex.macAddr === newDev.macAddr ||
+                ((ex.macAddr && newDev.macAddr && ex.macAddr === newDev.macAddr) ||
                   (ex.title === newDev.title && ex.IPAddr === newDev.IPAddr)),
             );
 

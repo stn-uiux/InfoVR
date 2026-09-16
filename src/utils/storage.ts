@@ -765,7 +765,7 @@ export const parseRegisteredDevicesFromExcel = (
             const deviceName = String(r.title || "").trim();
             const vendor = String(r.vendor || "Nokia").trim() as VendorName;
 
-            if (!modelName || !mac || !ip) return null;
+            if (!modelName || !ip || !deviceName) return null;
 
             const template = DEVICE_TEMPLATES.find(
               (t) =>
