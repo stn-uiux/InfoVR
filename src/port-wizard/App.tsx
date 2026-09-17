@@ -568,17 +568,35 @@ Return the data in this JSON format:
       img.onload = resolve;
     });
 
-    const width = img.naturalWidth;
-    const height = img.naturalHeight;
+    let exportWidth = img.naturalWidth;
+    let exportHeight = img.naturalHeight;
+
+    // Scale down if width exceeds 1000px
+    if (exportWidth > 1000) {
+      exportHeight = Math.round(exportHeight * (1000 / exportWidth));
+      exportWidth = 1000;
+    }
+
+    // Draw to canvas to resize and compress
+    const canvas = document.createElement("canvas");
+    canvas.width = exportWidth;
+    canvas.height = exportHeight;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.drawImage(img, 0, 0, exportWidth, exportHeight);
+    }
+    
+    // Compress as WebP (supports transparency, falls back to PNG if unsupported)
+    const compressedImage = canvas.toDataURL("image/webp", 0.85);
 
     // 1. Generate SVG Paths for ports
     const paths = ports
       .map((port) => {
         const [ymin, xmin, ymax, xmax] = port.box_2d;
-        const x = (xmin / 1000) * width;
-        const y = (ymin / 1000) * height;
-        const w = ((xmax - xmin) / 1000) * width;
-        const h = ((ymax - ymin) / 1000) * height;
+        const x = (xmin / 1000) * exportWidth;
+        const y = (ymin / 1000) * exportHeight;
+        const w = ((xmax - xmin) / 1000) * exportWidth;
+        const h = ((ymax - ymin) / 1000) * exportHeight;
 
         // Create a rectangle path: Move to (x,y), Horizontal to (x+w), Vertical to (y+h), Horizontal to (x), Close path
         const pathData = `M ${x} ${y} H ${x + w} V ${y + h} H ${x} Z`;
@@ -596,10 +614,10 @@ Return the data in this JSON format:
 
     // 2. Construct the full SVG string
     const svgString = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<svg width="${exportWidth}" height="${exportHeight}" viewBox="0 0 ${exportWidth} ${exportHeight}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
   <title>Hardware Port Analysis</title>
   <!-- Original Image Background -->
-  <image href="${image}" width="${width}" height="${height}" />
+  <image href="${compressedImage}" xlink:href="${compressedImage}" width="${exportWidth}" height="${exportHeight}" />
   
   <!-- Port Analysis Paths -->
   <g id="ports-layer">
