@@ -17,14 +17,25 @@ export const DEFAULT_WALL_PARAMS: WallParams = {
   length: 5,
   thickness: 0.15,
   color: "#8a8a8a",
+  roughness: 0.5,
+  metalness: 0.1,
+  opacity: 1.0,
 };
 
 /** Default light parameters */
 export const DEFAULT_LIGHT_PARAMS: LightParams = {
-  intensity: 1.5,
+  intensity: 1.0,
   color: "#ffffff",
   castShadow: true,
   shadowMapSize: 1024,
+};
+
+/** Default glass parameters for imported models with glass materials */
+export const DEFAULT_GLASS_PARAMS = {
+  color: "#aaccff",
+  roughness: 0.1,
+  metalness: 0.5,
+  opacity: 0.4,
 };
 
 /** Default partition parameters */

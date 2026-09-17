@@ -30,8 +30,10 @@ const WallMesh = ({ model }: { model: ImportedModel }) => {
       <boxGeometry args={[params.length, params.height, params.thickness]} />
       <meshStandardMaterial
         color={params.color}
-        roughness={0.85}
-        metalness={0.05}
+        roughness={params.roughness ?? 0.85}
+        metalness={params.metalness ?? 0.05}
+        transparent={(params.opacity ?? 1.0) < 1.0}
+        opacity={params.opacity ?? 1.0}
       />
     </mesh>
   );
@@ -246,10 +248,20 @@ const LightMesh = ({ model }: { model: ImportedModel }) => {
   );
 };
 
+import type { GlassParams } from "../../types";
+
 /* ------------------------------------------------------------------ */
 /*  GLB mesh — loads from dataUrl (base64 or public URL)               */
 /* ------------------------------------------------------------------ */
-const GltfMesh = ({ url, onLoaded }: { url: string; onLoaded?: (size: [number, number, number]) => void }) => {
+const GltfMesh = ({ 
+  url, 
+  onLoaded,
+  glassParams
+}: { 
+  url: string; 
+  onLoaded?: (size: [number, number, number], hasGlass: boolean) => void;
+  glassParams?: GlassParams;
+}) => {
   const { scene: gltfScene } = useGLTF(url);
 
   const clonedData = useMemo(() => {
@@ -266,20 +278,58 @@ const GltfMesh = ({ url, onLoaded }: { url: string; onLoaded?: (size: [number, n
     // Center X, Z and set bottom (min Y) to 0 so it sits on the floor
     clone.position.set(-center.x, -box.min.y, -center.z);
 
+    let foundGlass = false;
     clone.traverse((child) => {
       if ((child as Mesh).isMesh) {
         child.castShadow = true;
         child.receiveShadow = true;
+        
+        const mesh = child as Mesh;
+        if (mesh.material) {
+          const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          materials.forEach(mat => {
+            const name = mat.name.toLowerCase();
+            const isGlass = name.includes("glass") || mat.transparent || name === "lambert2";
+            if (isGlass) {
+              foundGlass = true;
+            }
+          });
+        }
       }
     });
-    return { clone, size: [size.x, size.y, size.z] as [number, number, number] };
+    return { clone, size: [size.x, size.y, size.z] as [number, number, number], hasGlass: foundGlass };
   }, [gltfScene]);
 
   useEffect(() => {
     if (clonedData?.size && onLoaded) {
-      onLoaded(clonedData.size);
+      onLoaded(clonedData.size, clonedData.hasGlass);
     }
   }, [clonedData, onLoaded]);
+
+  // Apply glassParams dynamically
+  useEffect(() => {
+    if (!clonedData?.clone || !glassParams) return;
+    clonedData.clone.traverse((child) => {
+      if ((child as Mesh).isMesh) {
+        const mesh = child as Mesh;
+        if (mesh.material) {
+          const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          materials.forEach(mat => {
+            const name = mat.name.toLowerCase();
+            const isGlass = name.includes("glass") || mat.transparent || name === "lambert2";
+            if (isGlass) {
+              if ('color' in mat) (mat as any).color.set(glassParams.color);
+              if ('roughness' in mat) (mat as any).roughness = glassParams.roughness;
+              if ('metalness' in mat) (mat as any).metalness = glassParams.metalness;
+              mat.transparent = true;
+              mat.opacity = glassParams.opacity;
+              mat.needsUpdate = true;
+            }
+          });
+        }
+      }
+    });
+  }, [clonedData, glassParams]);
 
   if (!clonedData) return null;
   return <primitive object={clonedData.clone} />;
@@ -477,9 +527,17 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
           <Suspense fallback={null}>
             <GltfMesh 
               url={model.dataUrl} 
-              onLoaded={(size) => {
+              glassParams={model.glassParams}
+              onLoaded={(size, hasGlass) => {
+                const updates: any = {};
                 if (!model.baseSize || model.baseSize[0] !== size[0] || model.baseSize[1] !== size[1] || model.baseSize[2] !== size[2]) {
-                  updateModel(model.id, { baseSize: size });
+                  updates.baseSize = size;
+                }
+                if (model.hasGlass !== hasGlass) {
+                  updates.hasGlass = hasGlass;
+                }
+                if (Object.keys(updates).length > 0) {
+                  updateModel(model.id, updates);
                 }
               }}
             />

@@ -1,12 +1,19 @@
 import { Icon } from "@iconify/react";
 import React, { useRef, useState, useCallback, useEffect } from "react";
 import { useStore } from "../../store/useStore";
-import type { ImportedModel, WallParams, PartitionParams, LightParams } from "../../types";
+import type {
+  ImportedModel,
+  WallParams,
+  PartitionParams,
+  LightParams,
+  GlassParams,
+} from "../../types";
 import {
   BUILTIN_MODELS,
   DEFAULT_WALL_PARAMS,
   DEFAULT_PARTITION_PARAMS,
   DEFAULT_LIGHT_PARAMS,
+  DEFAULT_GLASS_PARAMS,
 } from "../../utils/builtinModels";
 import type { BuiltinModelDef } from "../../utils/builtinModels";
 import {
@@ -1226,6 +1233,17 @@ const updateWallParam = (
   onUpdate({ wallParams: { ...current, [field]: value } });
 };
 
+/** Helper to update a single glass param field */
+const updateGlassParam = (
+  model: ImportedModel,
+  onUpdate: ModelPropertiesProps["onUpdate"],
+  field: keyof GlassParams,
+  value: number | string,
+) => {
+  const current = model.glassParams ?? DEFAULT_GLASS_PARAMS;
+  onUpdate({ glassParams: { ...current, [field]: value } });
+};
+
 /** Helper to update a single partition param field */
 const updatePartitionParam = (
   model: ImportedModel,
@@ -1351,11 +1369,16 @@ const ModelProperties = ({
           }),
         15,
       )}
-      {vec3Block("Scale", model.scale, (v) => onUpdate({ scale: v }), 0.1)}
+      {model.builtinType !== "Wall" && 
+        vec3Block("Scale", model.scale, (v) => onUpdate({ scale: v }), 0.1)}
       {(() => {
-        const baseSizeX = model.baseSize?.[0] ?? 1;
-        const baseSizeY = model.baseSize?.[1] ?? 1;
-        const baseSizeZ = model.baseSize?.[2] ?? 1;
+        const isWall = model.builtinType === "Wall";
+        const wp = model.wallParams ?? DEFAULT_WALL_PARAMS;
+        
+        const baseSizeX = isWall ? wp.length : (model.baseSize?.[0] ?? 1);
+        const baseSizeY = isWall ? wp.height : (model.baseSize?.[1] ?? 1);
+        const baseSizeZ = isWall ? wp.thickness : (model.baseSize?.[2] ?? 1);
+
         return vec3Block(
           "Size (cm)",
           [
@@ -1363,75 +1386,33 @@ const ModelProperties = ({
             model.scale[1] * baseSizeY * 100,
             model.scale[2] * baseSizeZ * 100,
           ],
-          (v) =>
-            onUpdate({
-              scale: [
-                v[0] / (baseSizeX * 100),
-                v[1] / (baseSizeY * 100),
-                v[2] / (baseSizeZ * 100),
-              ],
-            }),
+          (v) => {
+            if (isWall) {
+              // Update wallParams directly, adjusting for current scale so visual size matches input
+              updateWallParam(model, onUpdate, "length", Math.max(0.1, v[0] / 100 / model.scale[0]));
+              updateWallParam(model, onUpdate, "height", Math.max(0.1, v[1] / 100 / model.scale[1]));
+              updateWallParam(model, onUpdate, "thickness", Math.max(0.01, v[2] / 100 / model.scale[2]));
+            } else {
+              onUpdate({
+                scale: [
+                  v[0] / (baseSizeX * 100),
+                  v[1] / (baseSizeY * 100),
+                  v[2] / (baseSizeZ * 100),
+                ],
+              });
+            }
+          },
           1,
         );
       })()}
 
-      {/* Wall-specific parametric controls */}
       {model.builtinType === "Wall" &&
         (() => {
           const wp = model.wallParams ?? DEFAULT_WALL_PARAMS;
           return (
             <div className="comm-mb-16">
-              <label
-                className="comm-label-block"
-              >
-                Wall Parameters
-              </label>
-              <div className="comm-flex-gap-8 comm-mb-8">
-                {numInput(
-                  "Height",
-                  wp.height,
-                  (v) =>
-                    updateWallParam(
-                      model,
-                      onUpdate,
-                      "height",
-                      Math.max(0.1, v),
-                    ),
-                  0.5,
-                )}
-                {numInput(
-                  "Length",
-                  wp.length,
-                  (v) =>
-                    updateWallParam(
-                      model,
-                      onUpdate,
-                      "length",
-                      Math.max(0.1, v),
-                    ),
-                  0.5,
-                )}
-                {numInput(
-                  "Thick",
-                  wp.thickness,
-                  (v) =>
-                    updateWallParam(
-                      model,
-                      onUpdate,
-                      "thickness",
-                      Math.max(0.01, v),
-                    ),
-                  0.05,
-                )}
-              </div>
-              <div
-                className="comm-flex-center-8"
-              >
-                <span
-                  className="comm-label-sm"
-                >
-                  COLOR
-                </span>
+              <div className="comm-flex-center-8 comm-mb-12">
+                <span className="comm-label-sm" style={{ width: "70px" }}>COLOR</span>
                 <input
                   type="color"
                   value={wp.color}
@@ -1440,11 +1421,124 @@ const ModelProperties = ({
                   }
                   className="comm-btn-icon-small"
                 />
-                <span
-                  className="comm-text-tertiary-sm"
-                >
-                  {wp.color}
-                </span>
+                <span className="comm-text-tertiary-sm">{wp.color}</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  <span className="comm-label-sm" style={{ width: "70px" }}>Roughness</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={wp.roughness ?? 0.5}
+                    onChange={(e) => updateWallParam(model, onUpdate, "roughness", parseFloat(e.target.value))}
+                    style={{ flex: 1, margin: "0 8px" }}
+                  />
+                  <span className="comm-text-tertiary-sm" style={{ width: "30px", textAlign: "right" }}>
+                    {(wp.roughness ?? 0.5).toFixed(2)}
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  <span className="comm-label-sm" style={{ width: "70px" }}>Metalness</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={wp.metalness ?? 0.1}
+                    onChange={(e) => updateWallParam(model, onUpdate, "metalness", parseFloat(e.target.value))}
+                    style={{ flex: 1, margin: "0 8px" }}
+                  />
+                  <span className="comm-text-tertiary-sm" style={{ width: "30px", textAlign: "right" }}>
+                    {(wp.metalness ?? 0.1).toFixed(2)}
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  <span className="comm-label-sm" style={{ width: "70px" }}>Opacity</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={wp.opacity ?? 1.0}
+                    onChange={(e) => updateWallParam(model, onUpdate, "opacity", parseFloat(e.target.value))}
+                    style={{ flex: 1, margin: "0 8px" }}
+                  />
+                  <span className="comm-text-tertiary-sm" style={{ width: "30px", textAlign: "right" }}>
+                    {(wp.opacity ?? 1.0).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+      {/* Glass-specific parametric controls */}
+      {model.hasGlass &&
+        (() => {
+          const gp = model.glassParams ?? DEFAULT_GLASS_PARAMS;
+          return (
+            <div className="comm-mb-16">
+              <label className="comm-label-block">Glass Materials</label>
+              <div className="comm-flex-center-8 comm-mb-12">
+                <span className="comm-label-sm" style={{ width: "70px" }}>COLOR</span>
+                <input
+                  type="color"
+                  value={gp.color}
+                  onChange={(e) =>
+                    updateGlassParam(model, onUpdate, "color", e.target.value)
+                  }
+                  className="comm-btn-icon-small"
+                />
+                <span className="comm-text-tertiary-sm">{gp.color}</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  <span className="comm-label-sm" style={{ width: "70px" }}>Roughness</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={gp.roughness ?? 0.1}
+                    onChange={(e) => updateGlassParam(model, onUpdate, "roughness", parseFloat(e.target.value))}
+                    style={{ flex: 1, margin: "0 8px" }}
+                  />
+                  <span className="comm-text-tertiary-sm" style={{ width: "30px", textAlign: "right" }}>
+                    {(gp.roughness ?? 0.1).toFixed(2)}
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  <span className="comm-label-sm" style={{ width: "70px" }}>Metalness</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={gp.metalness ?? 0.5}
+                    onChange={(e) => updateGlassParam(model, onUpdate, "metalness", parseFloat(e.target.value))}
+                    style={{ flex: 1, margin: "0 8px" }}
+                  />
+                  <span className="comm-text-tertiary-sm" style={{ width: "30px", textAlign: "right" }}>
+                    {(gp.metalness ?? 0.5).toFixed(2)}
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  <span className="comm-label-sm" style={{ width: "70px" }}>Opacity</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={gp.opacity ?? 0.4}
+                    onChange={(e) => updateGlassParam(model, onUpdate, "opacity", parseFloat(e.target.value))}
+                    style={{ flex: 1, margin: "0 8px" }}
+                  />
+                  <span className="comm-text-tertiary-sm" style={{ width: "30px", textAlign: "right" }}>
+                    {(gp.opacity ?? 0.4).toFixed(2)}
+                  </span>
+                </div>
               </div>
             </div>
           );

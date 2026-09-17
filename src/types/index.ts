@@ -260,6 +260,9 @@ export interface WallParams {
   length: number; // X축 길이 (미터)
   thickness: number; // Z축 두께 (미터)
   color: string; // hex color
+  roughness?: number; // 거칠기 (0~1)
+  metalness?: number; // 금속성 (0~1)
+  opacity?: number; // 투명도 (0~1)
 }
 
 // Light 파라메트릭 파라미터
@@ -268,6 +271,14 @@ export interface LightParams {
   color: string; // hex color
   castShadow: boolean; // 그림자 여부
   shadowMapSize: number; // 그림자 해상도 (256 ~ 4096)
+}
+
+// Glass 재질 파라미터 오버라이드
+export interface GlassParams {
+  color: string;
+  roughness: number;
+  metalness: number;
+  opacity: number;
 }
 
 // 임포트된 3D 모델
@@ -292,4 +303,8 @@ export interface ImportedModel {
   partitionParams?: PartitionParams;
   /** Light-specific parameters (only when builtinType === "Light") */
   lightParams?: LightParams;
+  /** Whether this model has any material with 'glass' in its name */
+  hasGlass?: boolean;
+  /** User-defined overrides for glass materials */
+  glassParams?: GlassParams;
 }
