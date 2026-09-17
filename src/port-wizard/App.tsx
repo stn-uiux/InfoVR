@@ -443,7 +443,7 @@ Precision Requirements:
 
 Return the data in this JSON format:
 {
-  "analysis": "Brief technical description of the device (MUST be written in Korean)",
+  "analysis": "Brief technical description of the device (MUST be written in natural Korean language. Do NOT add spaces between every letter. Use standard word spacing 띄어쓰기.)",
   "modelName": "Identified device model name (e.g. Cisco Catalyst 9300)",
   "ports": [
     { "portName": "string", "portNumber": "string", "box_2d": [ymin, xmin, ymax, xmax] }
@@ -466,7 +466,7 @@ Return the data in this JSON format:
               properties: {
                 analysis: {
                   type: Type.STRING,
-                  description: "Brief technical summary of detected hardware. MUST be written in Korean language.",
+                  description: "Brief technical summary of detected hardware. MUST be written in natural Korean language. Use standard Korean word spacing (띄어쓰기) and do NOT insert spaces between every single character.",
                 },
                 modelName: {
                   type: Type.STRING,
@@ -519,7 +519,8 @@ Return the data in this JSON format:
         result = await response.json();
       }
 
-      setAnalysis(result.analysis || "Mapping complete. Hardware identified.");
+      let finalAnalysis = result.analysis || "Mapping complete. Hardware identified.";
+      setAnalysis(finalAnalysis);
       if (result.modelName) {
         setDownloadFileName(result.modelName.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase());
       }
@@ -585,7 +586,7 @@ Return the data in this JSON format:
     if (ctx) {
       ctx.drawImage(img, 0, 0, exportWidth, exportHeight);
     }
-    
+
     // Compress as WebP (supports transparency, falls back to PNG if unsupported)
     const compressedImage = canvas.toDataURL("image/webp", 0.85);
 
@@ -670,7 +671,7 @@ ${paths}
         const next = [...prev];
         selectedIndices.forEach((idx) => {
           const box = next[idx].box_2d;
-          
+
           if (e.ctrlKey) {
             // Resize (modify width/height by changing bottom/right edges)
             next[idx] = {
@@ -901,14 +902,14 @@ ${paths}
       prev.map((p, index) =>
         index === i
           ? {
-              ...p,
-              box_2d: [
-                p.box_2d[0],
-                p.box_2d[1],
-                p.box_2d[2],
-                Math.min(1000, p.box_2d[1] + val),
-              ],
-            }
+            ...p,
+            box_2d: [
+              p.box_2d[0],
+              p.box_2d[1],
+              p.box_2d[2],
+              Math.min(1000, p.box_2d[1] + val),
+            ],
+          }
           : p,
       ),
     );
@@ -925,14 +926,14 @@ ${paths}
       prev.map((p, index) =>
         index === i
           ? {
-              ...p,
-              box_2d: [
-                p.box_2d[0],
-                p.box_2d[1],
-                Math.min(1000, p.box_2d[0] + normH),
-                p.box_2d[3],
-              ],
-            }
+            ...p,
+            box_2d: [
+              p.box_2d[0],
+              p.box_2d[1],
+              Math.min(1000, p.box_2d[0] + normH),
+              p.box_2d[3],
+            ],
+          }
           : p,
       ),
     );
@@ -1457,9 +1458,8 @@ ${paths}
 
               <button
                 onClick={() => setEditMode(!editMode)}
-                className={`wizard-toolbar__edit-btn ${
-                  editMode ? "wizard-toolbar__edit-btn--active" : ""
-                }`}
+                className={`wizard-toolbar__edit-btn ${editMode ? "wizard-toolbar__edit-btn--active" : ""
+                  }`}
               >
                 {editMode ? (
                   <Icon icon="lucide:lock" />
@@ -1531,41 +1531,40 @@ ${paths}
                     )}
                   </div>
                   <div className="wizard-zoom-controls">
-                  <button
-                    onClick={() => setZoom(1)}
-                    className="wizard-zoom__fit-btn"
-                    title="화면에 맞추기"
-                  >
-                    맞춤
-                  </button>
-                  <div className="wizard-zoom__divider" />
-                  <div className="wizard-zoom__slider-group">
-                    <Icon icon="lucide:zoom-out" className="wizard-zoom__icon" />
-                    <input
-                      type="range"
-                      min="0.1"
-                      max="5"
-                      step="0.05"
-                      value={zoom}
-                      onChange={(e) => setZoom(parseFloat(e.target.value))}
-                      className="wizard-zoom__range"
-                    />
-                    <Icon icon="lucide:zoom-in" className="wizard-zoom__icon" />
-                  </div>
-                  <div className="wizard-zoom__percent">
-                    {Math.round(zoom * 100)}%
-                  </div>
+                    <button
+                      onClick={() => setZoom(1)}
+                      className="wizard-zoom__fit-btn"
+                      title="화면에 맞추기"
+                    >
+                      맞춤
+                    </button>
+                    <div className="wizard-zoom__divider" />
+                    <div className="wizard-zoom__slider-group">
+                      <Icon icon="lucide:zoom-out" className="wizard-zoom__icon" />
+                      <input
+                        type="range"
+                        min="0.1"
+                        max="5"
+                        step="0.05"
+                        value={zoom}
+                        onChange={(e) => setZoom(parseFloat(e.target.value))}
+                        className="wizard-zoom__range"
+                      />
+                      <Icon icon="lucide:zoom-in" className="wizard-zoom__icon" />
+                    </div>
+                    <div className="wizard-zoom__percent">
+                      {Math.round(zoom * 100)}%
+                    </div>
                   </div>
                 </>
               )}
 
               <div
                 ref={containerRef}
-                className={`wizard-canvas ${
-                  !image
-                    ? "wizard-canvas--empty"
-                    : "wizard-canvas--loaded"
-                }`}
+                className={`wizard-canvas ${!image
+                  ? "wizard-canvas--empty"
+                  : "wizard-canvas--loaded"
+                  }`}
                 style={
                   image
                     ? { display: "flex", cursor: editMode ? "default" : "grab" }
@@ -1624,7 +1623,7 @@ ${paths}
                     onMouseDown={(e) => {
                       // Start pan or selection drag
                       const target = e.target as HTMLElement;
-                      const isValidTarget = 
+                      const isValidTarget =
                         target === e.currentTarget ||
                         target === imageRef.current ||
                         target.closest('.wizard-cropper__svg') ||
@@ -1883,13 +1882,13 @@ ${paths}
                                     placeholder="이름"
                                     value={
                                       selectedIndices.length > 0 &&
-                                      selectedIndices.every(
-                                        (idx) =>
-                                          ports[idx].portName ===
-                                          ports[selectedIndices[0]].portName,
-                                      )
+                                        selectedIndices.every(
+                                          (idx) =>
+                                            ports[idx].portName ===
+                                            ports[selectedIndices[0]].portName,
+                                        )
                                         ? ports[selectedIndices[0]]?.portName ||
-                                          ""
+                                        ""
                                         : ""
                                     }
                                     onFocus={() => saveHistory()}
@@ -1910,7 +1909,7 @@ ${paths}
                                   const vHeight =
                                     imageSize.width > 0
                                       ? (imageSize.height / imageSize.width) *
-                                        1000
+                                      1000
                                       : 1000;
 
                                   const isSameW =
@@ -1919,18 +1918,18 @@ ${paths}
                                       (idx) =>
                                         Math.round(
                                           ports[idx].box_2d[3] -
-                                            ports[idx].box_2d[1],
+                                          ports[idx].box_2d[1],
                                         ) ===
                                         Math.round(
                                           ports[selectedIndices[0]].box_2d[3] -
-                                            ports[selectedIndices[0]].box_2d[1],
+                                          ports[selectedIndices[0]].box_2d[1],
                                         ),
                                     );
                                   const commonW = isSameW
                                     ? Math.round(
-                                        ports[selectedIndices[0]].box_2d[3] -
-                                          ports[selectedIndices[0]].box_2d[1],
-                                      )
+                                      ports[selectedIndices[0]].box_2d[3] -
+                                      ports[selectedIndices[0]].box_2d[1],
+                                    )
                                     : 0;
 
                                   const isSameH =
@@ -1941,7 +1940,7 @@ ${paths}
                                           ((ports[idx].box_2d[2] -
                                             ports[idx].box_2d[0]) /
                                             1000) *
-                                            vHeight,
+                                          vHeight,
                                         ) ===
                                         Math.round(
                                           ((ports[selectedIndices[0]]
@@ -1949,16 +1948,16 @@ ${paths}
                                             ports[selectedIndices[0]]
                                               .box_2d[0]) /
                                             1000) *
-                                            vHeight,
+                                          vHeight,
                                         ),
                                     );
                                   const commonH = isSameH
                                     ? Math.round(
-                                        ((ports[selectedIndices[0]].box_2d[2] -
-                                          ports[selectedIndices[0]].box_2d[0]) /
-                                          1000) *
-                                          vHeight,
-                                      )
+                                      ((ports[selectedIndices[0]].box_2d[2] -
+                                        ports[selectedIndices[0]].box_2d[0]) /
+                                        1000) *
+                                      vHeight,
+                                    )
                                     : 0;
 
                                   return (
@@ -1980,18 +1979,18 @@ ${paths}
                                                 prev.map((p, i) =>
                                                   selectedIndices.includes(i)
                                                     ? {
-                                                        ...p,
-                                                        box_2d: [
-                                                          p.box_2d[0],
-                                                          p.box_2d[1],
-                                                          p.box_2d[2],
-                                                          Math.min(
-                                                            1000,
-                                                            p.box_2d[1] +
-                                                              newVal,
-                                                          ),
-                                                        ],
-                                                      }
+                                                      ...p,
+                                                      box_2d: [
+                                                        p.box_2d[0],
+                                                        p.box_2d[1],
+                                                        p.box_2d[2],
+                                                        Math.min(
+                                                          1000,
+                                                          p.box_2d[1] +
+                                                          newVal,
+                                                        ),
+                                                      ],
+                                                    }
                                                     : p,
                                                 ),
                                               );
@@ -2010,22 +2009,22 @@ ${paths}
                                                 e.target.value === ""
                                                   ? 0
                                                   : parseInt(e.target.value) ||
-                                                    0;
+                                                  0;
                                               setPorts((prev) =>
                                                 prev.map((p, i) =>
                                                   selectedIndices.includes(i)
                                                     ? {
-                                                        ...p,
-                                                        box_2d: [
-                                                          p.box_2d[0],
-                                                          p.box_2d[1],
-                                                          p.box_2d[2],
-                                                          Math.min(
-                                                            1000,
-                                                            p.box_2d[1] + val,
-                                                          ),
-                                                        ],
-                                                      }
+                                                      ...p,
+                                                      box_2d: [
+                                                        p.box_2d[0],
+                                                        p.box_2d[1],
+                                                        p.box_2d[2],
+                                                        Math.min(
+                                                          1000,
+                                                          p.box_2d[1] + val,
+                                                        ),
+                                                      ],
+                                                    }
                                                     : p,
                                                 ),
                                               );
@@ -2041,18 +2040,18 @@ ${paths}
                                                 prev.map((p, i) =>
                                                   selectedIndices.includes(i)
                                                     ? {
-                                                        ...p,
-                                                        box_2d: [
-                                                          p.box_2d[0],
-                                                          p.box_2d[1],
-                                                          p.box_2d[2],
-                                                          Math.min(
-                                                            1000,
-                                                            p.box_2d[1] +
-                                                              newVal,
-                                                          ),
-                                                        ],
-                                                      }
+                                                      ...p,
+                                                      box_2d: [
+                                                        p.box_2d[0],
+                                                        p.box_2d[1],
+                                                        p.box_2d[2],
+                                                        Math.min(
+                                                          1000,
+                                                          p.box_2d[1] +
+                                                          newVal,
+                                                        ),
+                                                      ],
+                                                    }
                                                     : p,
                                                 ),
                                               );
@@ -2082,17 +2081,17 @@ ${paths}
                                                 prev.map((p, i) =>
                                                   selectedIndices.includes(i)
                                                     ? {
-                                                        ...p,
-                                                        box_2d: [
-                                                          p.box_2d[0],
-                                                          p.box_2d[1],
-                                                          Math.min(
-                                                            1000,
-                                                            p.box_2d[0] + normH,
-                                                          ),
-                                                          p.box_2d[3],
-                                                        ],
-                                                      }
+                                                      ...p,
+                                                      box_2d: [
+                                                        p.box_2d[0],
+                                                        p.box_2d[1],
+                                                        Math.min(
+                                                          1000,
+                                                          p.box_2d[0] + normH,
+                                                        ),
+                                                        p.box_2d[3],
+                                                      ],
+                                                    }
                                                     : p,
                                                 ),
                                               );
@@ -2111,24 +2110,24 @@ ${paths}
                                                 e.target.value === ""
                                                   ? 0
                                                   : parseInt(e.target.value) ||
-                                                    0;
+                                                  0;
                                               const normH =
                                                 (val / vHeight) * 1000;
                                               setPorts((prev) =>
                                                 prev.map((p, i) =>
                                                   selectedIndices.includes(i)
                                                     ? {
-                                                        ...p,
-                                                        box_2d: [
-                                                          p.box_2d[0],
-                                                          p.box_2d[1],
-                                                          Math.min(
-                                                            1000,
-                                                            p.box_2d[0] + normH,
-                                                          ),
-                                                          p.box_2d[3],
-                                                        ],
-                                                      }
+                                                      ...p,
+                                                      box_2d: [
+                                                        p.box_2d[0],
+                                                        p.box_2d[1],
+                                                        Math.min(
+                                                          1000,
+                                                          p.box_2d[0] + normH,
+                                                        ),
+                                                        p.box_2d[3],
+                                                      ],
+                                                    }
                                                     : p,
                                                 ),
                                               );
@@ -2146,17 +2145,17 @@ ${paths}
                                                 prev.map((p, i) =>
                                                   selectedIndices.includes(i)
                                                     ? {
-                                                        ...p,
-                                                        box_2d: [
-                                                          p.box_2d[0],
-                                                          p.box_2d[1],
-                                                          Math.min(
-                                                            1000,
-                                                            p.box_2d[0] + normH,
-                                                          ),
-                                                          p.box_2d[3],
-                                                        ],
-                                                      }
+                                                      ...p,
+                                                      box_2d: [
+                                                        p.box_2d[0],
+                                                        p.box_2d[1],
+                                                        Math.min(
+                                                          1000,
+                                                          p.box_2d[0] + normH,
+                                                        ),
+                                                        p.box_2d[3],
+                                                      ],
+                                                    }
                                                     : p,
                                                 ),
                                               );
@@ -2193,7 +2192,7 @@ ${paths}
                                   </button>
                                 </div>
 
-                                <div className="wizard-multiselect__section-divider"  />
+                                <div className="wizard-multiselect__section-divider" />
 
                                 <div className="wizard-actions__count-col">
                                   <span className="wizard-actions__count">
@@ -2340,14 +2339,14 @@ ${paths}
                     onClick={toggleAllCategories}
                     title={
                       collapsedCategories.size >=
-                      new Set(ports.map((p) => p.portName || "UNNAMED")).size
+                        new Set(ports.map((p) => p.portName || "UNNAMED")).size
                         ? "전체 펼치기"
                         : "전체 접기"
                     }
                     className="wizard-registry__collapse-btn"
                   >
                     {collapsedCategories.size >=
-                    new Set(ports.map((p) => p.portName || "UNNAMED")).size ? (
+                      new Set(ports.map((p) => p.portName || "UNNAMED")).size ? (
                       <Icon icon="lucide:chevron-right" className="wizard-registry__collapse-icon" />
                     ) : (
                       <Icon icon="lucide:chevron-down" className="wizard-registry__collapse-icon" />
@@ -2402,12 +2401,11 @@ ${paths}
                                 <div
                                   key={`reg-${originalIdx}`}
                                   id={`port-list-item-${originalIdx}`}
-                                  className={`wizard-reg-item ${
-                                    activePort === originalIdx ||
+                                  className={`wizard-reg-item ${activePort === originalIdx ||
                                     selectedIndices.includes(originalIdx)
-                                      ? "wizard-reg-item--active"
-                                      : ""
-                                  }`}
+                                    ? "wizard-reg-item--active"
+                                    : ""
+                                    }`}
                                   onMouseEnter={() =>
                                     setActivePort(originalIdx)
                                   }

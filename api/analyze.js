@@ -50,7 +50,8 @@ Precision Requirements:
 
 Return the data in this JSON format:
 {
-  "analysis": "Brief technical description of the device (MUST be written in Korean)",
+  "analysis": "Brief technical description of the device (MUST be written in natural Korean language. Do NOT add spaces between every letter. Use standard word spacing 띄어쓰기.)",
+  "modelName": "Identified device model name (e.g. Cisco Catalyst 9300)",
   "ports": [
     { "portName": "string", "portNumber": "string", "box_2d": [ymin, xmin, ymax, xmax] }
   ]
@@ -72,7 +73,11 @@ Return the data in this JSON format:
           properties: {
             analysis: {
               type: Type.STRING,
-              description: "Brief technical summary of detected hardware. MUST be written in Korean language.",
+              description: "Brief technical summary of detected hardware. MUST be written in natural Korean language. Use standard Korean word spacing (띄어쓰기) and do NOT insert spaces between every single character.",
+            },
+            modelName: {
+              type: Type.STRING,
+              description: "The specific hardware model name (e.g. Cisco Catalyst 9300)",
             },
             ports: {
               type: Type.ARRAY,
