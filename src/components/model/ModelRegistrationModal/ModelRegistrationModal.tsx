@@ -342,6 +342,9 @@ export const ModelRegistrationModal: React.FC = () => {
 
   // Tabs: "register" | "list"
   const [activeTab, setActiveTab] = useState<"register" | "list">("list");
+  const [sortBy, setSortBy] = useState<"size" | "name">("size");
+  const [filterVendor, setFilterVendor] = useState<string>("All");
+  const [filterType, setFilterType] = useState<string>("All");
 
   interface AvailableCard {
     id: string;
@@ -379,6 +382,7 @@ export const ModelRegistrationModal: React.FC = () => {
   // Form state
   const [modelName, setModelName] = useState("");
   const [vendor, setVendor] = useState("Cisco");
+  const [deviceType, setDeviceType] = useState<"Switch" | "Router" | "Server">("Router");
   const [unit, setUnit] = useState<number>(1);
   const [modelType, setModelType] = useState<CustomModelType>("normal");
   const [modelSvgRaw, setModelSvgRaw] = useState<string | null>(null);
@@ -511,13 +515,13 @@ export const ModelRegistrationModal: React.FC = () => {
 
   const currentFormStateStr = useMemo(() => {
     return JSON.stringify({
-      modelName, vendor, unit, modelType, modelSvgFileName, useDualView, rearSvgFileName, defaultViewSide,
+      modelName, vendor, deviceType, unit, modelType, modelSvgFileName, useDualView, rearSvgFileName, defaultViewSide,
       baseChassisFileName, caXStr, caYStr, caWidthStr, caHeightStr, caColumnsStr, caColWidthStr, caRowCountStr,
       rowHeights, uniformRowHeight, rowColumnsArr, uniformRowColumns, rowGapsArr, uniformRowGap,
       gridColWidths, gridRowHeights, gridMerges, assignedCardIds, variants
     });
   }, [
-    modelName, vendor, unit, modelType, modelSvgFileName, useDualView, rearSvgFileName, defaultViewSide,
+    modelName, vendor, deviceType, unit, modelType, modelSvgFileName, useDualView, rearSvgFileName, defaultViewSide,
     baseChassisFileName, caXStr, caYStr, caWidthStr, caHeightStr, caColumnsStr, caColWidthStr, caRowCountStr,
     rowHeights, uniformRowHeight, rowColumnsArr, uniformRowColumns, rowGapsArr, uniformRowGap,
     gridColWidths, gridRowHeights, gridMerges, assignedCardIds, variants
@@ -545,6 +549,7 @@ export const ModelRegistrationModal: React.FC = () => {
   const resetForm = useCallback(() => {
     setModelName("");
     setVendor("Nokia");
+    setDeviceType("Router");
     setUnit(1);
     setModelType("normal");
     setModelSvgRaw(null);
@@ -594,6 +599,7 @@ export const ModelRegistrationModal: React.FC = () => {
     setEditingModelId(modelId);
     setModelName(model.modelName);
     setVendor(model.vendor || "Nokia");
+    setDeviceType(model.type || "Router");
     setUnit(model.unit);
     setModelType(model.modelType);
     setModelSvgRaw(model.modelSvgRaw);
@@ -923,6 +929,7 @@ export const ModelRegistrationModal: React.FC = () => {
     const payload: Omit<import("../../../types/equipment").CustomEquipmentModel, "modelId"> = {
       modelName: modelName.trim(),
       vendor: vendor,
+      type: deviceType,
       unit,
       displayName: `[${unit}U] ${modelName.trim()}`,
       modelSvgRaw: finalModelSvgRaw,
@@ -966,6 +973,7 @@ export const ModelRegistrationModal: React.FC = () => {
   }, [
     modelName,
     vendor,
+    deviceType,
     unit,
     modelSvgRaw,
     useDualView,
@@ -1009,6 +1017,57 @@ export const ModelRegistrationModal: React.FC = () => {
   const availableCards = useMemo(() => {
     return allAvailableCards;
   }, [allAvailableCards]);
+
+  const uniqueVendors = useMemo(() => {
+    const defaultVendors = DEVICE_TEMPLATES.map(t => t.vendor);
+    const customVendors = customModels.map(m => m.vendor || "Nokia");
+    return Array.from(new Set([...defaultVendors, ...customVendors])).filter(Boolean).sort();
+  }, [customModels]);
+
+  const uniqueTypes = useMemo(() => {
+    const defaultTypes = DEVICE_TEMPLATES.map(t => t.type);
+    const customTypes = customModels.map(m => m.type || "Router");
+    return Array.from(new Set([...defaultTypes, ...customTypes])).filter(Boolean).sort();
+  }, [customModels]);
+
+  const sortedDefaultTemplates = useMemo(() => {
+    const list = [...DEVICE_TEMPLATES.filter((t) => {
+      if (deletedDefaultTemplates.includes(t.modelName)) return false;
+      if (filterVendor !== "All" && t.vendor !== filterVendor) return false;
+      if (filterType !== "All" && t.type !== filterType) return false;
+      return true;
+    })];
+    return list.sort((a, b) => {
+      if (sortBy === "size" && a.uSize !== b.uSize) return a.uSize - b.uSize;
+      return a.modelName.localeCompare(b.modelName);
+    });
+  }, [deletedDefaultTemplates, sortBy, filterVendor, filterType]);
+
+  const sortedHiddenTemplates = useMemo(() => {
+    const list = [...DEVICE_TEMPLATES.filter((t) => {
+      if (!deletedDefaultTemplates.includes(t.modelName)) return false;
+      if (filterVendor !== "All" && t.vendor !== filterVendor) return false;
+      if (filterType !== "All" && t.type !== filterType) return false;
+      return true;
+    })];
+    return list.sort((a, b) => {
+      if (sortBy === "size" && a.uSize !== b.uSize) return a.uSize - b.uSize;
+      return a.modelName.localeCompare(b.modelName);
+    });
+  }, [deletedDefaultTemplates, sortBy, filterVendor, filterType]);
+
+  const sortedCustomModels = useMemo(() => {
+    const list = [...customModels.filter(m => {
+      if (DEVICE_TEMPLATES.some(t => t.modelName === m.modelName)) return false;
+      if (filterVendor !== "All" && (m.vendor || "Nokia") !== filterVendor) return false;
+      if (filterType !== "All" && (m.type || "Router") !== filterType) return false;
+      return true;
+    })];
+    return list.sort((a, b) => {
+      if (sortBy === "size" && a.unit !== b.unit) return a.unit - b.unit;
+      return a.modelName.localeCompare(b.modelName);
+    });
+  }, [customModels, sortBy, filterVendor, filterType]);
 
   if (!isOpen) return null;
 
@@ -1054,7 +1113,7 @@ export const ModelRegistrationModal: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="mrm-form-grid" style={{ gridTemplateColumns: "1.2fr 0.8fr 1fr 1.5fr" }}>
+                <div className="mrm-form-grid" style={{ gridTemplateColumns: "1.2fr 0.8fr 1fr 1fr 1.5fr" }}>
                   <StnFormField label="모델명" required error={errors.modelName}>
                     <StnInput
                       type="text"
@@ -1081,23 +1140,26 @@ export const ModelRegistrationModal: React.FC = () => {
                       onChange={(e) => setVendor(e.target.value)}
                     >
                       <option value="" disabled>제조사를 선택하세요</option>
-                      {[
-                        { label: "AXGATE", value: "AXGATE" },
-                        { label: "Cisco", value: "Cisco" },
-                        { label: "Ciena", value: "Ciena" },
-                        { label: "Coweaver", value: "Coweaver" },
-                        { label: "Dasan", value: "Dasan" },
-                        { label: "Dell", value: "Dell" },
-                        { label: "Edgecore", value: "Edgecore" },
-                        { label: "Juniper", value: "Juniper" },
-                        { label: "Nokia", value: "Nokia" },
-                        { label: "Rebellions", value: "Rebellions" },
-                        { label: "Supermicro", value: "Supermicro" },
-                        { label: "Ubiquoss", value: "Ubiquoss" },
-                        { label: "Woorinet", value: "Woorinet" }
-                      ].map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      {Array.from(new Set([
+                        "AXGATE", "Cisco", "Ciena", "Coweaver", "Dasan", "Dell", "Edgecore",
+                        "Juniper", "Nokia", "Rebellions", "Supermicro", "Ubiquoss", "Woorinet",
+                        "3Com", "Aruba", "HP", "IBM", "Fujitsu", "Piolink",
+                        ...uniqueVendors
+                      ])).sort((a, b) => a.localeCompare(b)).map(v => (
+                        <option key={v} value={v}>{v}</option>
                       ))}
+                    </select>
+                  </StnFormField>
+
+                  <StnFormField label="종류" required>
+                    <select
+                      className="stn-input"
+                      value={deviceType}
+                      onChange={(e) => setDeviceType(e.target.value as "Switch" | "Router" | "Server")}
+                    >
+                      <option value="Router">Router</option>
+                      <option value="Switch">Switch</option>
+                      <option value="Server">Server</option>
                     </select>
                   </StnFormField>
 
@@ -1710,32 +1772,61 @@ export const ModelRegistrationModal: React.FC = () => {
           <>
             {/* Body: Registered Models List */}
             <div className="mrm-body">
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{
                   fontSize: 12, fontWeight: 700, color: "var(--text-tertiary)",
                   textTransform: "uppercase", letterSpacing: "0.05em",
                   padding: "8px 0 6px",
                 }}>
-                  기본 장비 모델 ({DEVICE_TEMPLATES.filter((t) => !deletedDefaultTemplates.includes(t.modelName)).length})
+                  기본 장비 모델 ({sortedDefaultTemplates.length})
                 </div>
-                <button
-                  className="comm-btn comm-btn-primary comm-btn-md"
-                  onClick={() => {
-                    setIsFormLoading(true);
-                    resetForm();
-                    setActiveTab("register");
-                    setIsFormLoading(false);
-                  }}
-                  style={{ gap: 6, display: "inline-flex", alignItems: "center" }}
-                >
-                  <Icon icon="material-symbols:add" style={{ width: 16, height: 16 }} />
-                  새 모델 등록
-                </button>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <select
+                    className="stn-input stn-input-md"
+                    value={filterVendor}
+                    onChange={(e) => setFilterVendor(e.target.value)}
+                    style={{ minWidth: 100, width: "auto", flexShrink: 0 }}
+                  >
+                    <option value="All">모든 제조사</option>
+                    {uniqueVendors.map(v => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                  <select
+                    className="stn-input stn-input-md"
+                    value={filterType}
+                    onChange={(e) => setFilterType(e.target.value)}
+                    style={{ minWidth: 100, width: "auto", flexShrink: 0 }}
+                  >
+                    <option value="All">모든 종류</option>
+                    {uniqueTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <select
+                    className="stn-input stn-input-md"
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as "size" | "name")}
+                    style={{ minWidth: 100, width: "auto", flexShrink: 0 }}
+                  >
+                    <option value="size">크기순 정렬</option>
+                    <option value="name">이름순 정렬</option>
+                  </select>
+                  <button
+                    className="comm-btn comm-btn-primary comm-btn-md"
+                    onClick={() => {
+                      setIsFormLoading(true);
+                      resetForm();
+                      setActiveTab("register");
+                      setIsFormLoading(false);
+                    }}
+                    style={{ gap: 6, display: "inline-flex", alignItems: "center", whiteSpace: "nowrap", flexShrink: 0 }}
+                  >
+                    <Icon icon="material-symbols:add" style={{ width: 16, height: 16 }} />
+                    새 모델 등록
+                  </button>
+                </div>
               </div>
               {/* Default (Built-in) Models */}
               <div style={{ marginBottom: 8 }}>
                 <div className="mrm-models-list">
-                  {DEVICE_TEMPLATES.filter((t) => !deletedDefaultTemplates.includes(t.modelName)).map((tmpl) => {
+                  {sortedDefaultTemplates.map((tmpl) => {
                     const overrideModel = customModels.find((m) => m.modelName === tmpl.modelName);
                     const eqModel = equipmentModels.find((m) => m.modelName === tmpl.modelName);
                     const isCardBased = !!overrideModel || !!eqModel;
@@ -1988,17 +2079,17 @@ export const ModelRegistrationModal: React.FC = () => {
               </div>
 
               {/* Hidden Default Models */}
-              {deletedDefaultTemplates.length > 0 && (
+              {sortedHiddenTemplates.length > 0 && (
                 <div style={{ marginBottom: 8 }}>
                   <div style={{
                     fontSize: 12, fontWeight: 700, color: "var(--text-tertiary)",
                     textTransform: "uppercase", letterSpacing: "0.05em",
                     padding: "8px 0 6px",
                   }}>
-                    숨김 처리된 기본 모델 ({deletedDefaultTemplates.length})
+                    숨김 처리된 기본 모델 ({sortedHiddenTemplates.length})
                   </div>
                   <div className="mrm-models-list" style={{ opacity: 0.6 }}>
-                    {DEVICE_TEMPLATES.filter((t) => deletedDefaultTemplates.includes(t.modelName)).map((tmpl) => {
+                    {sortedHiddenTemplates.map((tmpl) => {
                       const overrideModel = customModels.find((m) => m.modelName === tmpl.modelName);
                       const eqModel = equipmentModels.find((m) => m.modelName === tmpl.modelName);
                       const isCardBased = !!overrideModel || !!eqModel;
@@ -2070,11 +2161,11 @@ export const ModelRegistrationModal: React.FC = () => {
                   padding: "8px 0 6px", borderBottom: "1px solid var(--border-weak)",
                   marginBottom: 8,
                 }}>
-                  커스텀 모델 ({customModels.filter(m => !DEVICE_TEMPLATES.some(t => t.modelName === m.modelName)).length})
+                  커스텀 모델 ({sortedCustomModels.length})
                 </div>
-                {customModels.filter(m => !DEVICE_TEMPLATES.some(t => t.modelName === m.modelName)).length > 0 ? (
+                {sortedCustomModels.length > 0 ? (
                   <div className="mrm-models-list">
-                    {customModels.filter(m => !DEVICE_TEMPLATES.some(t => t.modelName === m.modelName)).map((model) => (
+                    {sortedCustomModels.map((model) => (
                       <div key={model.modelId} className="mrm-model-row">
                         <span className={`model-type-tag ${model.modelType}`}>
                           {model.modelType === "normal" ? "고정형" : "섀시형"}
@@ -2351,6 +2442,7 @@ export const ModelRegistrationModal: React.FC = () => {
             const payload: Omit<import("../../../types/equipment").CustomEquipmentModel, "modelId"> = {
               modelName: modelName.trim(),
               vendor: vendor,
+              type: deviceType,
               unit,
               displayName: `[${unit}U] ${modelName.trim()}`,
               modelSvgRaw: finalModelSvgRaw,

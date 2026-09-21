@@ -260,7 +260,8 @@ export const DeviceSvgPreview = memo(({
           baseSvgEl.setAttribute('viewBox', `0 0 ${parseInt(w, 10)} ${parseInt(h, 10)}`);
         }
         baseSvgEl.setAttribute("width", "100%");
-        baseSvgEl.setAttribute("height", "auto");
+        baseSvgEl.removeAttribute("height");
+        baseSvgEl.style.height = "auto";
         if (maxWidth) {
           baseSvgEl.style.maxWidth = maxWidth;
         }

@@ -68,7 +68,7 @@ function parseAssetName(filename: string): { modelName: string; side: EquipmentV
   let baseName = filename.replace(/\.(png|svg)$/i, "");
   baseName = baseName.replace(/^\[\d+U\]\s*/, "").trim();
   
-  const sideMatch = baseName.match(/\s+(front|back|rear)$/i);
+  const sideMatch = baseName.match(/[\s_]+(front|back|rear)$/i);
   if (!sideMatch) return { modelName: baseName, side: "front" };
 
   const side = sideMatch[1].toLowerCase() === "front" ? "front" : "rear";

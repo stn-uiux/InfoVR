@@ -37,6 +37,31 @@ export const DEVICE_TEMPLATES: DeviceTemplate[] = [
   { modelName: "DELL-R640", type: "Server", uSize: 1, vendor: "Dell" },
   { modelName: "ECS4650-54T", type: "Switch", uSize: 1, vendor: "Edgecore" },
   { modelName: "AS-4125GS-TNRT2", type: "Server", uSize: 4, vendor: "Supermicro" },
+  
+  // Gwacheon Assets
+  { modelName: "3C16985B", type: "Switch", uSize: 1, vendor: "3Com" },
+  { modelName: "7210SAS-S-24", type: "Router", uSize: 1, vendor: "Nokia" },
+  { modelName: "7220_IXR-D3L", type: "Router", uSize: 1, vendor: "Nokia" },
+  { modelName: "7220_IXR_D2L", type: "Router", uSize: 1, vendor: "Nokia" },
+  { modelName: "CSE 512L-260B", type: "Server", uSize: 1, vendor: "Supermicro" },
+  { modelName: "CX6300M-24", type: "Switch", uSize: 1, vendor: "Aruba" },
+  { modelName: "R230", type: "Server", uSize: 1, vendor: "Dell" },
+  { modelName: "R450", type: "Server", uSize: 1, vendor: "Dell" },
+  { modelName: "Tifront-G24", type: "Switch", uSize: 1, vendor: "Piolink" },
+  { modelName: "V6848XG_dasan", type: "Switch", uSize: 1, vendor: "Dasan" },
+  { modelName: "WS-C3560E-24TD-S", type: "Switch", uSize: 1, vendor: "Cisco" },
+  { modelName: "WS-C3560E-24TD-SD", type: "Switch", uSize: 1, vendor: "Cisco" },
+  { modelName: "WS-C3560X-24T-L", type: "Switch", uSize: 1, vendor: "Cisco" },
+  { modelName: "X3550-M3", type: "Server", uSize: 1, vendor: "IBM" },
+  { modelName: "X3550-M4", type: "Server", uSize: 1, vendor: "IBM" },
+  { modelName: "DL380-G9", type: "Server", uSize: 2, vendor: "HP" },
+  { modelName: "DL380P-G8", type: "Server", uSize: 2, vendor: "HP" },
+  { modelName: "PAS_K", type: "Server", uSize: 2, vendor: "Piolink" },
+  { modelName: "R730", type: "Server", uSize: 2, vendor: "Dell" },
+  { modelName: "R740", type: "Server", uSize: 2, vendor: "Dell" },
+  { modelName: "RX2540-M1", type: "Server", uSize: 2, vendor: "Fujitsu" },
+  { modelName: "X3650-M4", type: "Server", uSize: 2, vendor: "IBM" },
+  { modelName: "DL580-G7", type: "Server", uSize: 4, vendor: "HP" },
 ];
 
 /**
@@ -55,7 +80,7 @@ export function getEffectiveTemplates(
         const appendedName = v.variantName === "기본타입" ? m.modelName : `${m.modelName} ${v.variantName}`;
         customTemplates.push({
           modelName: appendedName,
-          type: "Router" as DeviceType,
+          type: (m.type || "Router") as DeviceType,
           uSize: m.unit,
           vendor: (m.vendor || "Nokia") as VendorName,
           isCustom: true,
@@ -66,7 +91,7 @@ export function getEffectiveTemplates(
     } else {
       customTemplates.push({
         modelName: m.modelName,
-        type: "Router" as DeviceType,
+        type: (m.type || "Router") as DeviceType,
         uSize: m.unit,
         vendor: (m.vendor || "Nokia") as VendorName,
         isCustom: true,
@@ -82,5 +107,15 @@ export function getEffectiveTemplates(
     (t) => !deletedDefaultTemplates.includes(t.modelName) && !customModelNames.has(t.modelName),
   );
 
-  return [...customTemplates, ...filteredDefaults];
+  const combined = [...customTemplates, ...filteredDefaults];
+
+  // 정렬 기준: 1. 장비 크기(uSize) 오름차순, 2. 모델명 알파벳순
+  combined.sort((a, b) => {
+    if (a.uSize !== b.uSize) {
+      return a.uSize - b.uSize;
+    }
+    return a.modelName.localeCompare(b.modelName);
+  });
+
+  return combined;
 }

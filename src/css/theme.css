@@ -809,6 +809,31 @@ body {
   font-family: var(--font-family);
 }
 
+/* Input Sizing Tiers */
+.stn-input-lg {
+  height: var(--btn-h-lg);
+  font-size: var(--btn-font-lg);
+  padding: 0 var(--btn-px-lg);
+}
+
+.stn-input-md {
+  height: var(--btn-h-md);
+  font-size: var(--btn-font-md);
+  padding: 0 var(--btn-px-md);
+}
+
+.stn-input-sm {
+  height: var(--btn-h-sm);
+  font-size: var(--btn-font-sm);
+  padding: 0 var(--btn-px-sm);
+}
+
+select.stn-input.stn-input-lg,
+select.stn-input.stn-input-md,
+select.stn-input.stn-input-sm {
+  padding-right: 32px;
+}
+
 select.stn-input {
   appearance: none;
   background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='24' height='24'%3E%3Cpath fill='%23888' d='M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z'/%3E%3C/svg%3E");

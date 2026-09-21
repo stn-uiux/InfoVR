@@ -32,6 +32,12 @@ export type VendorName =
   | "Supermicro"
   | "Ubiquoss"
   | "Woorinet"
+  | "3Com"
+  | "Aruba"
+  | "HP"
+  | "IBM"
+  | "Fujitsu"
+  | "Piolink"
   // Legacy mappings for existing templates/data
   | "코위버PTN"
   | "CISCO"
