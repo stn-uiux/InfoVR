@@ -617,6 +617,11 @@ function composeCards(
       continue;
     }
 
+    if (card.widthType === "vfull" && equipModel.cardArea) {
+      cardH = equipModel.cardArea.height;
+      y = equipModel.cardArea.y;
+    }
+
     const vb = cardSvgEl.getAttribute("viewBox");
     const parts = vb ? vb.split(/\s+/).map(Number) : [0, 0, 100, 20];
     const origW = parts[2] || 100;

@@ -43,10 +43,11 @@ export type VendorName =
   | "CISCO"
   | "Huawei"
   | "유비쿼스"
+  | "텔레필드"
   | string;
 
 // 장비 타입
-export type DeviceType = "Switch" | "Router" | "Server";
+export type DeviceType = "Switch" | "Router" | "Server" | "MSPP";
 
 /** 
  * [VITE_CACHE_BREAKER_9999] 

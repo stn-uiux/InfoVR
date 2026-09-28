@@ -3793,7 +3793,8 @@ input:checked+.slider:before {
   width: 100%;
 }
 
-.mrm-side-preview .mrm-svg-preview svg {
+.mrm-side-preview .mrm-svg-preview svg,
+.mrm-side-preview .mrm-svg-preview img {
   max-height: 220px;
 }
 
@@ -3822,7 +3823,8 @@ input:checked+.slider:before {
   overflow: hidden;
 }
 
-.mrm-svg-preview svg {
+.mrm-svg-preview svg,
+.mrm-svg-preview img {
   max-width: 100%;
   max-height: 180px;
   height: auto;
@@ -3834,7 +3836,8 @@ input:checked+.slider:before {
   overflow: auto;
 }
 
-.mrm-svg-preview--chassis svg {
+.mrm-svg-preview--chassis svg,
+.mrm-svg-preview--chassis img {
   max-height: none;
   overflow: visible;
 }

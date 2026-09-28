@@ -368,6 +368,11 @@ export const DeviceSvgPreview = memo(({
             }
           } else continue;
 
+          if (card.widthType === "vfull" && (equipModel as PreviewEquipmentModel).cardArea) {
+            cardH = (equipModel as PreviewEquipmentModel).cardArea!.height;
+            y = (equipModel as PreviewEquipmentModel).cardArea!.y;
+          }
+
           const vb = cardSvgEl.getAttribute("viewBox");
           const parts = vb ? vb.split(/\s+/).map(Number) : [0, 0, 100, 20];
           const origW = parts[2] || 100; const origH = parts[3] || 20;

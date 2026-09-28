@@ -4,12 +4,13 @@
  * 장비 모델 선택 및 카드 삽입 기능을 위한 타입 정의
  */
 
-/** 카드 폭 타입: half = 1열, full = 2열, 또는 숫자 문자열로 N열 점유 */
-export type CardWidthType = "half" | "full" | string;
+/** 카드 폭 타입: half = 1열, full = 2열, vfull = 전체 높이 1열, 또는 숫자 문자열로 N열 점유 */
+export type CardWidthType = "half" | "full" | "vfull" | string;
 
 /** CardWidthType에서 실제 점유 열 수(colSpan) 반환 */
 export function getColSpan(widthType: CardWidthType, maxColumns: number = 2): number {
   if (widthType === "full") return maxColumns;
+  if (widthType === "vfull") return 1;
   if (widthType === "half") return Math.floor(maxColumns / 2) || 1;
   if (widthType === "sixth") return Math.floor(maxColumns / 6) || 1;
   const n = parseInt(widthType);

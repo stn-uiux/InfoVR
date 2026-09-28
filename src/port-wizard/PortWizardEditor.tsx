@@ -39,6 +39,7 @@ interface PortWizardEditorProps {
   onStateChange: (state: any) => void;
   onRetryAnalysis?: () => void;
   onMultiUpload?: (files: File[]) => void;
+  onDeleteSession?: () => void;
   leftSidebar?: React.ReactNode;
 }
 
@@ -98,6 +99,7 @@ export default function PortWizardEditor({
   onStateChange,
   onRetryAnalysis,
   onMultiUpload,
+  onDeleteSession,
   leftSidebar
 }: PortWizardEditorProps) {
   const navigate = useNavigate();
@@ -484,15 +486,19 @@ export default function PortWizardEditor({
   };
 
   const clearImage = () => {
-    setImage(null);
-    setAnalysis("");
-    setPorts([]);
-    setPast([]);
-    setFuture([]);
-    setError(null);
-    setEditMode(false);
-    setSelectedIndices([]);
-    setActivePort(null);
+    if (onDeleteSession) {
+      onDeleteSession();
+    } else {
+      setImage(null);
+      setAnalysis("");
+      setPorts([]);
+      setPast([]);
+      setFuture([]);
+      setError(null);
+      setEditMode(false);
+      setSelectedIndices([]);
+      setActivePort(null);
+    }
   };
 
   const analyzeImage = async () => { if (!image) return; if (onRetryAnalysis) onRetryAnalysis(); };

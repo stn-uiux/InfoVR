@@ -76,19 +76,20 @@ const baseEquipRawModules = import.meta.glob<{ default: string }>(
 );
 
 const baseEquipUrlModules = import.meta.glob<{ default: string }>(
-  "../assets/card/*.svg",
+  ["../assets/card/*.svg", "../assets/card/*.png", "../assets/card/*.jpg", "../assets/card/*.jpeg"],
   { eager: true },
 );
 
 /** 파일명에서 widthType 추출 */
 function parseWidthType(filename: string): CardWidthType {
+  if (filename.includes("-vfull")) return "vfull";
   if (filename.includes("-full")) return "full";
   return "half";
 }
 
 /** 파일명에서 cardType 추출 (e.g. "R-series-1-half.svg" → "R-series-1") */
 function parseCardType(filename: string): string {
-  return filename.replace(/\.svg$/i, "").replace(/-(half|full)$/, "");
+  return filename.replace(/\.(svg|png|jpe?g)$/i, "").replace(/-(half|full|vfull)$/, "");
 }
 
 /** SVG URL에서 width/height 추출 (SVG 컨텐츠에서) */
@@ -190,6 +191,52 @@ for (const [path, mod] of Object.entries(ixrUrlModules)) {
   });
 }
 
+// --- 1830 / 1850 / 7705 Cards ---
+for (const [path, mod] of Object.entries(baseEquipUrlModules)) {
+  const filename = path.split("/").pop() ?? "";
+  if (filename.startsWith("[")) continue; // Skip chassis backgrounds
+  if (!filename.startsWith("1830") && !filename.startsWith("1850") && !filename.startsWith("7705")) continue;
+
+  const cardType = filename.replace(/\.(svg|png|jpe?g)$/i, "");
+  let widthType: CardWidthType = "1";
+  let svgWidth = 430;
+  let svgHeight = 46;
+
+  if (filename.includes("-vfull")) {
+    widthType = "vfull";
+  } else if (filename.includes("full")) {
+    widthType = "full";
+    svgWidth = 860;
+  }
+
+  if (filename.includes("1830-PSS-12X-center")) {
+    svgWidth = 52;
+    svgHeight = 840;
+  } else if (filename.includes("1850-TSS-320-center")) {
+    svgWidth = 78;
+    svgHeight = 738;
+  } else if (filename.includes("1850-TSS-320H-center")) {
+    svgWidth = 101;
+    svgHeight = 738;
+  } else if (filename.includes("1830-PSS-32-10")) {
+    svgWidth = 52;
+    svgHeight = 369;
+  } else if (filename.includes("1850-TSS-side3_blank")) {
+    svgWidth = 46;
+    svgHeight = 218;
+  }
+
+  _cardDefinitions.push({
+    cardFileName: filename,
+    cardType,
+    svgUrl: mod.default,
+    widthType,
+    cardGroup: "standard",
+    svgWidth,
+    svgHeight,
+  });
+}
+
 // 정렬: half → full, 이름순
 _cardDefinitions.sort((a, b) => {
   if (a.widthType !== b.widthType) {
@@ -259,7 +306,7 @@ const _baseEquipRawModuleMap = new Map<string, () => Promise<{ default: string }
 const _baseEquipUrlModuleMap = new Map<string, string>();
 
 function initMaps() {
-  const allCardSources = { ...cardRawModules, ...cpiomRawModules, ...mdasRawModules, ...ixrRawModules };
+  const allCardSources = { ...cardRawModules, ...cpiomRawModules, ...mdasRawModules, ...ixrRawModules, ...baseEquipRawModules };
   for (const [path, importFn] of Object.entries(allCardSources)) {
     const fn = path.split("/").pop() ?? "";
     _cardRawModuleMap.set(fn, importFn);
@@ -298,6 +345,20 @@ export async function loadCardSvgRaw(
       console.error("Failed to load custom card SVG from store:", err);
     }
     return undefined;
+  }
+
+  if (cardFileName.toLowerCase().match(/\.(png|jpe?g)$/)) {
+    const pngUrl = _baseEquipUrlModuleMap.get(cardFileName);
+    if (pngUrl) {
+      const cd = _cardDefinitions.find(c => c.cardFileName === cardFileName);
+      const w = cd ? cd.svgWidth : 430;
+      const h = cd ? cd.svgHeight : 46;
+      const html = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
+  <image href="${pngUrl}" width="${w}" height="${h}" preserveAspectRatio="none" />
+</svg>`;
+      _cardSvgRawCache.set(cardFileName, html);
+      return html;
+    }
   }
 
   const importFn = _cardRawModuleMap.get(cardFileName);
@@ -339,6 +400,18 @@ export async function loadBaseEquipmentSvgRaw(
       console.error("Failed to load custom base equipment SVG from store:", err);
     }
     return undefined;
+  }
+
+  if (baseSvgUrl.toLowerCase().match(/\.(png|jpe?g)$/)) {
+    const pngUrl = _baseEquipUrlModuleMap.get(baseSvgUrl);
+    if (pngUrl) {
+      const eqModel = equipmentModels.find(m => m.baseSvgUrl === baseSvgUrl);
+      const w = eqModel?.equipmentSize?.width || 984;
+      const h = eqModel?.equipmentSize?.height || 200;
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
+  <image href="${pngUrl}" width="${w}" height="${h}" preserveAspectRatio="none" />
+</svg>`;
+    }
   }
 
   const importFn = _baseEquipRawModuleMap.get(baseSvgUrl);
@@ -527,5 +600,45 @@ export const equipmentModels: EquipmentModel[] = [
     },
     _rowHeights: [110.5, 110.5, 110.5, 110.5, 110.5, 110.5, 110.5, 110.5, 110.5, 110.5, 110.5],
     _rowGaps: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  },
+  {
+    modelId: "1850-tss-320h",
+    modelName: "1850 TSS-320H",
+    rackUnit: "14U",
+    baseSvgUrl: "[14U] 1850-TSS-320H-CARD.png",
+    equipmentSize: { width: 984, height: 1344 },
+    cardArea: { x: 0, y: 0, width: 984, height: 1344, columns: 1, columnWidth: 984 },
+  },
+  {
+    modelId: "1830-pss-12x",
+    modelName: "1830 PSS-12X",
+    rackUnit: "14U",
+    baseSvgUrl: "[14U] 1830-PSS-12X-CARD.png",
+    equipmentSize: { width: 984, height: 1344 },
+    cardArea: { x: 0, y: 0, width: 984, height: 1344, columns: 1, columnWidth: 984 },
+  },
+  {
+    modelId: "1850-tss-320",
+    modelName: "1850 TSS-320",
+    rackUnit: "12U",
+    baseSvgUrl: "[12U] 1850-TSS-320-CARD.png",
+    equipmentSize: { width: 984, height: 1152 },
+    cardArea: { x: 0, y: 0, width: 984, height: 1152, columns: 1, columnWidth: 984 },
+  },
+  {
+    modelId: "1830-pss-32",
+    modelName: "1830 PSS-32",
+    rackUnit: "12U",
+    baseSvgUrl: "[12U] 1830-PSS-32-CARD.png",
+    equipmentSize: { width: 984, height: 1152 },
+    cardArea: { x: 0, y: 0, width: 984, height: 1152, columns: 1, columnWidth: 984 },
+  },
+  {
+    modelId: "7705-sar-8",
+    modelName: "7705 SAR-8",
+    rackUnit: "2U",
+    baseSvgUrl: "[2U] 7705 SAR-8-CARD.png",
+    equipmentSize: { width: 984, height: 192 },
+    cardArea: { x: 0, y: 0, width: 984, height: 192, columns: 1, columnWidth: 984 },
   },
 ];

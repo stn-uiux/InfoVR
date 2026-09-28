@@ -24,7 +24,7 @@ const STYLES = `
 .eam-sidebar-title{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-tertiary);font-weight:700;padding:4px 8px;margin-bottom:4px}
 .eam-card-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;cursor:pointer;border:1px solid var(--border-weak);background:var(--bg-primary);transition:all .15s;position:relative}
 .eam-card-item:hover{border-color:var(--theme-primary);background:rgba(var(--theme-primary-rgb),.06);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.15)}
-.eam-card-item img{height:28px;flex-shrink:0;border-radius:4px;background:var(--bg-tertiary)}
+.eam-card-item img{height:28px;flex-shrink:0;border-radius:4px;background:var(--bg-tertiary);object-fit: contain;}
 .eam-card-item .info{flex:1;min-width:0}
 .eam-card-item .name{font-size:12px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .eam-card-item .tag{font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;display:inline-block;margin-top:2px}
@@ -176,7 +176,7 @@ function buildSlotGrid(
           slots.push({
             row: r,
             col: c,
-            positionIndex: getGridPositionIndex(r, c, cardArea.columns, customRowColumns),
+            positionIndex: getGridPositionIndex(r, c, gridColWidths.length, customRowColumns),
             x: currentX,
             y: currentY,
             width: slotW,
@@ -245,8 +245,13 @@ function getOccupiedPositions(cards: InsertedCard[], columns = 2, customRowColum
   for (const c of cards) {
     const { row, col, columns: rowColumns } = getGridPositionFromIndex(c.positionIndex, columns, customRowColumns);
     const span = getColSpan(c.widthType, rowColumns);
-    for (let offset = 0; offset < span; offset += 1) {
-      set.add(`${row}-${col + offset}`);
+    const maxRow = c.widthType === "vfull" ? 100 : 1; 
+
+    for (let r = 0; r < maxRow; r++) {
+      const targetRow = c.widthType === "vfull" ? r : row;
+      for (let offset = 0; offset < span; offset += 1) {
+        set.add(`${targetRow}-${col + offset}`);
+      }
     }
   }
   return set;
@@ -262,12 +267,15 @@ function canInsertAt(
   const occupied = getOccupiedPositions(cards, columns, customRowColumns);
   const { row, col, columns: rowColumns } = getGridPositionFromIndex(posIndex, columns, customRowColumns);
   const span = getColSpan(widthType, rowColumns);
+  const maxRow = widthType === "vfull" ? 100 : 1;
 
-  if (occupied.has(`${row}-${col}`)) return false;
   if (col + span > rowColumns) return false;
 
-  for (let offset = 1; offset < span; offset += 1) {
-    if (occupied.has(`${row}-${col + offset}`)) return false;
+  for (let r = 0; r < maxRow; r++) {
+    const targetRow = widthType === "vfull" ? r : row;
+    for (let offset = 0; offset < span; offset += 1) {
+      if (occupied.has(`${targetRow}-${col + offset}`)) return false;
+    }
   }
 
   return true;
@@ -297,11 +305,40 @@ const CardInlineSvg = ({ cardFileName }: { cardFileName: string }) => {
     let m = true;
     loadCardSvgRaw(cardFileName).then((raw) => {
       if (m && raw) {
-        // 내부 SVG가 슬롯에 꽉 차도록 속성 수정
-        const responsiveRaw = raw
-          .replace(/width="[^"]*"/, 'width="100%"')
-          .replace(/height="[^"]*"/, 'height="100%"')
-          .replace(/<svg/, '<svg preserveAspectRatio="none"');
+        // 1. viewBox가 없으면 기존 width/height를 기반으로 생성
+        let responsiveRaw = raw;
+        const viewBoxMatch = responsiveRaw.match(/<svg[^>]*viewBox="[^"]*"/);
+        let viewBoxToInject = "";
+        if (!viewBoxMatch) {
+          const widthMatch = responsiveRaw.match(/<svg[^>]*width="([^"]+)"/);
+          const heightMatch = responsiveRaw.match(/<svg[^>]*height="([^"]+)"/);
+          if (widthMatch && heightMatch) {
+            const w = parseFloat(widthMatch[1]);
+            const h = parseFloat(heightMatch[1]);
+            if (!isNaN(w) && !isNaN(h)) {
+              viewBoxToInject = ` viewBox="0 0 ${w} ${h}"`;
+            }
+          }
+        }
+
+        // 2. <svg> 태그 무조건 100% 꽉 채우도록 덮어쓰기
+        responsiveRaw = responsiveRaw.replace(/<svg([^>]*)>/, (match, inner) => {
+          let newInner = inner
+            .replace(/\bwidth="[^"]*"/g, '')
+            .replace(/\bheight="[^"]*"/g, '')
+            .replace(/\bpreserveAspectRatio="[^"]*"/g, '');
+          return `<svg width="100%" height="100%" preserveAspectRatio="none"${viewBoxToInject}${newInner}>`;
+        });
+
+        // 3. SVG 내의 <image> 태그들도 비율을 무시하고 100% 꽉 채우도록 덮어쓰기
+        responsiveRaw = responsiveRaw.replace(/<image([^>]*)>/g, (match, inner) => {
+          let newInner = inner
+            .replace(/\bwidth="[^"]*"/g, '')
+            .replace(/\bheight="[^"]*"/g, '')
+            .replace(/\bpreserveAspectRatio="[^"]*"/g, '');
+          return `<image width="100%" height="100%" preserveAspectRatio="none"${newInner}>`;
+        });
+
         setSvgHtml(responsiveRaw);
       }
     });
@@ -768,8 +805,9 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
       if (!selectedCard || !selectedModel || !selectedModel.cardArea) return;
 
       const posIndex = slot.positionIndex;
+      const effectiveCols = currentGridColWidths && currentGridColWidths.length > 0 ? currentGridColWidths.length : selectedModel.cardArea.columns;
 
-      if (!canInsertAt(insertedCards, posIndex, selectedCard.widthType, selectedModel.cardArea.columns, currentRowColumns)) {
+      if (!canInsertAt(insertedCards, posIndex, selectedCard.widthType, effectiveCols, currentRowColumns)) {
         setWarning(
           selectedCard.widthType === "full"
             ? "Full 카드는 빈 행의 첫 번째 열에서만 삽입할 수 있습니다."
@@ -792,7 +830,7 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
       setInsertedCards((prev) => [...prev, newCard]);
       setSlotNextId((n) => n + 1);
     },
-    [selectedCard, selectedModel, insertedCards, slotNextId, currentRowColumns],
+    [selectedCard, selectedModel, insertedCards, slotNextId, currentRowColumns, currentGridColWidths],
   );
 
   // 카드 제거
@@ -827,22 +865,26 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
     onClose();
   }, [selectedModel, insertedCards, onSave, onClose, currentRowHeights, currentRowGaps, currentRowColumns, slots]);
 
+  const effectiveColumns = useMemo(() => {
+    if (currentGridColWidths && currentGridColWidths.length > 0) return currentGridColWidths.length;
+    return selectedModel?.cardArea?.columns ?? 2;
+  }, [currentGridColWidths, selectedModel?.cardArea?.columns]);
+
   // 점유 맵
   const occupied = useMemo(
-    () => getOccupiedPositions(insertedCards, selectedModel?.cardArea?.columns, currentRowColumns),
-    [insertedCards, selectedModel?.cardArea?.columns, currentRowColumns],
+    () => getOccupiedPositions(insertedCards, effectiveColumns, currentRowColumns),
+    [insertedCards, effectiveColumns, currentRowColumns],
   );
 
   // 카드 인스턴스 → 슬롯 위치 매핑
   const cardAtSlot = useMemo(() => {
     const map = new Map<string, InsertedCard>();
-    const defaultColumns = selectedModel?.cardArea?.columns ?? 2;
     for (const c of insertedCards) {
-      const { row, col } = getGridPositionFromIndex(c.positionIndex, defaultColumns, currentRowColumns);
+      const { row, col } = getGridPositionFromIndex(c.positionIndex, effectiveColumns, currentRowColumns);
       map.set(`${row}-${col}`, c);
     }
     return map;
-  }, [insertedCards, selectedModel?.cardArea?.columns, currentRowColumns]);
+  }, [insertedCards, effectiveColumns, currentRowColumns]);
 
   if (!open) return null;
 
@@ -855,402 +897,418 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
       icon="fluent:board-24-regular"
     >
       <div className="eam-body">
-          {!selectedModel ? (
-            <div style={{ padding: 40, textAlign: "center", color: "var(--text-tertiary)" }}>
-              장비 모델이 선택되지 않았습니다.
-            </div>
-          ) : (
-            <>
-              {/* ─── 카드 라이브러리 사이드바 ─── */}
-              <div className="eam-sidebar">
-                <div className="eam-sidebar-title">카드 라이브러리</div>
-                {(() => {
-                  // 카드 그룹별로 분류하여 표시
-                  const hasGroups = filteredCards.some(cd => cd.cardGroup);
-                  if (!hasGroups) {
-                    // 기존 R4/R6: 그룹 없이 표시
-                    return filteredCards.map((cd) => (
-                      <div
-                        key={cd.cardFileName}
-                        className="eam-card-item"
-                        style={{
-                          borderColor: selectedCard?.cardFileName === cd.cardFileName ? "var(--theme-primary)" : undefined,
-                          background: selectedCard?.cardFileName === cd.cardFileName ? "rgba(var(--theme-primary-rgb),.1)" : undefined,
-                        }}
-                        onClick={() => setSelectedCard(cd)}
-                        onMouseMove={(e) => handleCardMouseMove(e, cd)}
-                        onMouseLeave={handleCardMouseLeave}
-                      >
-                        <CardThumbnail svgUrl={cd.svgUrl} alt={cd.cardType} style={{ width: cd.widthType === "full" ? 80 : 50 }} />
-                        <div className="info">
-                          <div className="name">{cd.cardType}</div>
-                                {cd.widthType === "full" && <span className={`tag ${cd.widthType}`}>FULL</span>}
-                        </div>
+        {!selectedModel ? (
+          <div style={{ padding: 40, textAlign: "center", color: "var(--text-tertiary)" }}>
+            장비 모델이 선택되지 않았습니다.
+          </div>
+        ) : (
+          <>
+            {/* ─── 카드 라이브러리 사이드바 ─── */}
+            <div className="eam-sidebar">
+              <div className="eam-sidebar-title">카드 라이브러리</div>
+              {(() => {
+                // 카드 그룹별로 분류하여 표시
+                const hasGroups = filteredCards.some(cd => cd.cardGroup);
+                if (!hasGroups) {
+                  // 기존 R4/R6: 그룹 없이 표시
+                  return filteredCards.map((cd) => (
+                    <div
+                      key={cd.cardFileName}
+                      className="eam-card-item"
+                      style={{
+                        borderColor: selectedCard?.cardFileName === cd.cardFileName ? "var(--theme-primary)" : undefined,
+                        background: selectedCard?.cardFileName === cd.cardFileName ? "rgba(var(--theme-primary-rgb),.1)" : undefined,
+                      }}
+                      onClick={() => setSelectedCard(cd)}
+                      onMouseMove={(e) => handleCardMouseMove(e, cd)}
+                      onMouseLeave={handleCardMouseLeave}
+                    >
+                      <CardThumbnail svgUrl={cd.svgUrl} alt={cd.cardType} style={{ width: cd.widthType === "full" ? 80 : 50 }} />
+                      <div className="info">
+                        <div className="name">{cd.cardType}</div>
+                        {cd.widthType === "full" && <span className={`tag ${cd.widthType}`}>FULL</span>}
                       </div>
-                    ));
-                  }
-                  // R6d/R6dl/IXR: 그룹 분리
-                  const cpiomCards = filteredCards.filter(cd => cd.cardGroup === "cpiom");
-                  const standardCards = filteredCards.filter(
-                    cd => cd.cardGroup === "standard" || (!cd.cardGroup && cd.cardGroup !== "ixr" && cd.cardGroup !== "custom")
-                  );
-                  const ixrCards = filteredCards.filter(cd => cd.cardGroup === "ixr");
-                  const customGroupCards = filteredCards.filter(cd => cd.cardGroup === "custom");
-                  return (
-                    <>
-                      {customGroupCards.length > 0 && (
-                        <>
-                          <div className="eam-sidebar-section">커스텀 카드</div>
-                          {customGroupCards.map((cd) => (
-                            <div
-                              key={cd.cardFileName}
-                              className="eam-card-item"
-                              style={{
-                                borderColor: selectedCard?.cardFileName === cd.cardFileName ? "var(--theme-primary)" : undefined,
-                                background: selectedCard?.cardFileName === cd.cardFileName ? "rgba(var(--theme-primary-rgb),.1)" : undefined,
-                              }}
-                              onClick={() => setSelectedCard(cd)}
-                              onMouseMove={(e) => handleCardMouseMove(e, cd)}
-                              onMouseLeave={handleCardMouseLeave}
-                            >
-                              <CardThumbnail svgUrl={cd.svgUrl} alt={cd.cardType} style={{ width: cd.widthType === "full" ? 80 : 50 }} />
-                              <div className="info">
-                                <div className="name">{cd.cardType}</div>
-                                {cd.widthType === "full" && <span className={`tag ${cd.widthType}`}>FULL</span>}
-                              </div>
+                    </div>
+                  ));
+                }
+                // R6d/R6dl/IXR: 그룹 분리
+                const cpiomCards = filteredCards.filter(cd => cd.cardGroup === "cpiom");
+                const standardCards = filteredCards.filter(
+                  cd => cd.cardGroup === "standard" || (!cd.cardGroup && cd.cardGroup !== "ixr" && cd.cardGroup !== "custom")
+                );
+                const ixrCards = filteredCards.filter(cd => cd.cardGroup === "ixr");
+                const customGroupCards = filteredCards.filter(cd => cd.cardGroup === "custom");
+                return (
+                  <>
+                    {customGroupCards.length > 0 && (
+                      <>
+                        <div className="eam-sidebar-section">커스텀 카드</div>
+                        {customGroupCards.map((cd) => (
+                          <div
+                            key={cd.cardFileName}
+                            className="eam-card-item"
+                            style={{
+                              borderColor: selectedCard?.cardFileName === cd.cardFileName ? "var(--theme-primary)" : undefined,
+                              background: selectedCard?.cardFileName === cd.cardFileName ? "rgba(var(--theme-primary-rgb),.1)" : undefined,
+                            }}
+                            onClick={() => setSelectedCard(cd)}
+                            onMouseMove={(e) => handleCardMouseMove(e, cd)}
+                            onMouseLeave={handleCardMouseLeave}
+                          >
+                            <CardThumbnail svgUrl={cd.svgUrl} alt={cd.cardType} style={{ width: cd.widthType === "full" ? 80 : 50 }} />
+                            <div className="info">
+                              <div className="name">{cd.cardType}</div>
+                              {cd.widthType === "full" && <span className={`tag ${cd.widthType}`}>FULL</span>}
                             </div>
-                          ))}
-                        </>
-                      )}
-                      {cpiomCards.length > 0 && (
-                        <>
-                          <div className="eam-sidebar-section">CPIOM 카드</div>
-                          {cpiomCards.map((cd) => (
-                            <div
-                              key={cd.cardFileName}
-                              className="eam-card-item"
-                              style={{
-                                borderColor: selectedCard?.cardFileName === cd.cardFileName ? "#a855f7" : undefined,
-                                background: selectedCard?.cardFileName === cd.cardFileName ? "rgba(168,85,247,.1)" : undefined,
-                              }}
-                              onClick={() => setSelectedCard(cd)}
-                              onMouseMove={(e) => handleCardMouseMove(e, cd)}
-                              onMouseLeave={handleCardMouseLeave}
-                            >
-                              <CardThumbnail svgUrl={cd.svgUrl} alt={cd.cardType} style={{ width: 80 }} />
-                              <div className="info">
-                                <div className="name">{cd.cardType}</div>
-                                <span className="tag cpiom">CPIOM</span>
-                              </div>
-                            </div>
-                          ))}
-                        </>
-                      )}
-                      {standardCards.length > 0 && (
-                        <>
-                          <div className="eam-sidebar-section">Standard 카드</div>
-                          {standardCards.map((cd) => (
-                            <div
-                              key={cd.cardFileName}
-                              className="eam-card-item"
-                              style={{
-                                borderColor: selectedCard?.cardFileName === cd.cardFileName ? "var(--theme-primary)" : undefined,
-                                background: selectedCard?.cardFileName === cd.cardFileName ? "rgba(var(--theme-primary-rgb),.1)" : undefined,
-                              }}
-                              onClick={() => setSelectedCard(cd)}
-                              onMouseMove={(e) => handleCardMouseMove(e, cd)}
-                              onMouseLeave={handleCardMouseLeave}
-                            >
-                              <CardThumbnail svgUrl={cd.svgUrl} alt={cd.cardType} style={{ width: cd.widthType === "full" ? 80 : 50 }} />
-                              <div className="info">
-                                <div className="name">{cd.cardType}</div>
-                                {cd.widthType === "full" && (
-                                  <span className="tag standard">FULL</span>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </>
-                      )}
-                      {ixrCards.length > 0 && (
-                        <>
-                          <div className="eam-sidebar-section">IXR 카드</div>
-                          {ixrCards.map((cd) => (
-                            <div
-                              key={cd.cardFileName}
-                              className="eam-card-item"
-                              style={{
-                                borderColor: selectedCard?.cardFileName === cd.cardFileName ? "var(--theme-primary)" : undefined,
-                                background: selectedCard?.cardFileName === cd.cardFileName ? "rgba(var(--theme-primary-rgb),.1)" : undefined,
-                              }}
-                              onClick={() => setSelectedCard(cd)}
-                              onMouseMove={(e) => handleCardMouseMove(e, cd)}
-                              onMouseLeave={handleCardMouseLeave}
-                            >
-                              <CardThumbnail svgUrl={cd.svgUrl} alt={cd.cardType} style={{ width: cd.widthType === "full" ? 80 : 50 }} />
-                              <div className="info">
-                                <div className="name">{cd.cardType}</div>
-                                {cd.widthType === "full" && (
-                                  <span className="tag standard">FULL</span>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </>
-                      )}
-                    </>
-                  );
-                })()}
-                {selectedCard && (
-                  <div style={{
-                    marginTop: 12, padding: "10px 12px", borderRadius: 8,
-                    background: selectedCard.cardGroup === "cpiom" ? "rgba(168,85,247,.08)" : "rgba(var(--theme-primary-rgb),.08)",
-                    border: `1px solid ${selectedCard.cardGroup === "cpiom" ? "rgba(168,85,247,.2)" : "rgba(var(--theme-primary-rgb),.2)"}`,
-                    fontSize: 11, color: "var(--text-secondary)", lineHeight: 1.5,
-                  }}>
-                    <strong style={{ color: "var(--text-primary)" }}>선택됨:</strong> {selectedCard.cardType}
-                    <br />빈 슬롯을 클릭하여 삽입하세요.
-                    {selectedCard.cardGroup === "cpiom" && (
-                      <div style={{ marginTop: 4, color: "#a855f7", fontSize: 10 }}>CPIOM 전용 슬롯만 삽입 가능</div>
+                          </div>
+                        ))}
+                      </>
                     )}
-                  </div>
-                )}
+                    {cpiomCards.length > 0 && (
+                      <>
+                        <div className="eam-sidebar-section">CPIOM 카드</div>
+                        {cpiomCards.map((cd) => (
+                          <div
+                            key={cd.cardFileName}
+                            className="eam-card-item"
+                            style={{
+                              borderColor: selectedCard?.cardFileName === cd.cardFileName ? "#a855f7" : undefined,
+                              background: selectedCard?.cardFileName === cd.cardFileName ? "rgba(168,85,247,.1)" : undefined,
+                            }}
+                            onClick={() => setSelectedCard(cd)}
+                            onMouseMove={(e) => handleCardMouseMove(e, cd)}
+                            onMouseLeave={handleCardMouseLeave}
+                          >
+                            <CardThumbnail svgUrl={cd.svgUrl} alt={cd.cardType} style={{ width: 80 }} />
+                            <div className="info">
+                              <div className="name">{cd.cardType}</div>
+                              <span className="tag cpiom">CPIOM</span>
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                    {standardCards.length > 0 && (
+                      <>
+                        <div className="eam-sidebar-section">Standard 카드</div>
+                        {standardCards.map((cd) => (
+                          <div
+                            key={cd.cardFileName}
+                            className="eam-card-item"
+                            style={{
+                              borderColor: selectedCard?.cardFileName === cd.cardFileName ? "var(--theme-primary)" : undefined,
+                              background: selectedCard?.cardFileName === cd.cardFileName ? "rgba(var(--theme-primary-rgb),.1)" : undefined,
+                            }}
+                            onClick={() => setSelectedCard(cd)}
+                            onMouseMove={(e) => handleCardMouseMove(e, cd)}
+                            onMouseLeave={handleCardMouseLeave}
+                          >
+                            <CardThumbnail svgUrl={cd.svgUrl} alt={cd.cardType} style={{ width: cd.widthType === "full" ? 80 : 50 }} />
+                            <div className="info">
+                              <div className="name">{cd.cardType}</div>
+                              {cd.widthType === "full" && (
+                                <span className="tag standard">FULL</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                    {ixrCards.length > 0 && (
+                      <>
+                        <div className="eam-sidebar-section">IXR 카드</div>
+                        {ixrCards.map((cd) => (
+                          <div
+                            key={cd.cardFileName}
+                            className="eam-card-item"
+                            style={{
+                              borderColor: selectedCard?.cardFileName === cd.cardFileName ? "var(--theme-primary)" : undefined,
+                              background: selectedCard?.cardFileName === cd.cardFileName ? "rgba(var(--theme-primary-rgb),.1)" : undefined,
+                            }}
+                            onClick={() => setSelectedCard(cd)}
+                            onMouseMove={(e) => handleCardMouseMove(e, cd)}
+                            onMouseLeave={handleCardMouseLeave}
+                          >
+                            <CardThumbnail svgUrl={cd.svgUrl} alt={cd.cardType} style={{ width: cd.widthType === "full" ? 80 : 50 }} />
+                            <div className="info">
+                              <div className="name">{cd.cardType}</div>
+                              {cd.widthType === "full" && (
+                                <span className="tag standard">FULL</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </>
+                );
+              })()}
+              {selectedCard && (
+                <div style={{
+                  marginTop: 12, padding: "10px 12px", borderRadius: 8,
+                  background: selectedCard.cardGroup === "cpiom" ? "rgba(168,85,247,.08)" : "rgba(var(--theme-primary-rgb),.08)",
+                  border: `1px solid ${selectedCard.cardGroup === "cpiom" ? "rgba(168,85,247,.2)" : "rgba(var(--theme-primary-rgb),.2)"}`,
+                  fontSize: 11, color: "var(--text-secondary)", lineHeight: 1.5,
+                }}>
+                  <strong style={{ color: "var(--text-primary)" }}>선택됨:</strong> {selectedCard.cardType}
+                  <br />빈 슬롯을 클릭하여 삽입하세요.
+                  {selectedCard.cardGroup === "cpiom" && (
+                    <div style={{ marginTop: 4, color: "#a855f7", fontSize: 10 }}>CPIOM 전용 슬롯만 삽입 가능</div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* ─── 메인 캔버스 ─── */}
+            <div className="eam-main">
+              <div className="eam-toolbar">
+                <div style={{ flex: 1 }} />
+                <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                  삽입된 카드: {insertedCards.length}
+                </span>
+                <button className="btn danger" onClick={handleClearAll}>
+                  전체 제거
+                </button>
+                <button className="btn primary" onClick={handleSave}>
+                  저장
+                </button>
               </div>
 
-              {/* ─── 메인 캔버스 ─── */}
-              <div className="eam-main">
-                <div className="eam-toolbar">
-                  <div style={{ flex: 1 }} />
-                  <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                    삽입된 카드: {insertedCards.length}
-                  </span>
-                  <button className="btn danger" onClick={handleClearAll}>
-                    전체 제거
-                  </button>
-                  <button className="btn primary" onClick={handleSave}>
-                    저장
-                  </button>
-                </div>
+              <div className="eam-canvas-area">
+                <div
+                  className="eam-equip-wrap"
+                  ref={equipRef}
+                  style={{
+                    width: selectedModel?.equipmentSize?.width,
+                    height: selectedModel?.equipmentSize?.height,
+                  }}
+                >
+                  {/* Base SVG */}
+                  {baseSvgHtml && (
+                    <div
+                      className="base-svg-container"
+                      dangerouslySetInnerHTML={{ __html: baseSvgHtml }}
+                    />
+                  )}
 
-                <div className="eam-canvas-area">
-                  <div 
-                    className="eam-equip-wrap" 
-                    ref={equipRef}
-                    style={{
-                      width: selectedModel?.equipmentSize?.width,
-                      height: selectedModel?.equipmentSize?.height,
-                    }}
-                  >
-                    {/* Base SVG */}
-                    {baseSvgHtml && (
-                      <div
-                        className="base-svg-container"
-                        dangerouslySetInnerHTML={{ __html: baseSvgHtml }}
-                      />
-                    )}
+                  {/* 카드 슬롯 오버레이 */}
+                  {selectedModel && (
+                    <div
+                      className="eam-card-area-overlay"
+                      style={{
+                        left: selectedModel.cardArea ? selectedModel.cardArea.x : 0,
+                        top: selectedModel.cardArea ? selectedModel.cardArea.y : 0,
+                        width: selectedModel.cardArea ? selectedModel.cardArea.width : (selectedModel.equipmentSize?.width || "100%"),
+                        height: selectedModel.cardArea ? selectedModel.cardArea.height : "100%",
+                      }}
+                    >
+                      {isMixedLayout && selectedModel.slots ? (
+                        /* ─── Mixed Layout (slots 기반) ─── */
+                        selectedModel.slots.map((slot) => {
+                          const card = slotOccupiedMap.get(slot.slotId);
+                          const isOccupied = !!card;
+                          const isBlocked = blockedSlotIds.has(slot.slotId);
 
-                    {/* 카드 슬롯 오버레이 */}
-                    {selectedModel && (
-                      <div
-                        className="eam-card-area-overlay"
-                        style={{
-                          left: selectedModel.cardArea ? selectedModel.cardArea.x : 0,
-                          top: selectedModel.cardArea ? selectedModel.cardArea.y : 0,
-                          width: selectedModel.cardArea ? selectedModel.cardArea.width : (selectedModel.equipmentSize?.width || "100%"),
-                          height: selectedModel.cardArea ? selectedModel.cardArea.height : "100%",
-                        }}
-                      >
-                        {isMixedLayout && selectedModel.slots ? (
-                          /* ─── Mixed Layout (slots 기반) ─── */
-                          selectedModel.slots.map((slot) => {
-                            const card = slotOccupiedMap.get(slot.slotId);
-                            const isOccupied = !!card;
-                            const isBlocked = blockedSlotIds.has(slot.slotId);
+                          // blocked 슬롯은 완전히 숨김 (같은 행의 다른 슬롯에 카드가 있을 때)
+                          if (isBlocked && !isOccupied) return null;
 
-                            // blocked 슬롯은 완전히 숨김 (같은 행의 다른 슬롯에 카드가 있을 때)
-                            if (isBlocked && !isOccupied) return null;
+                          // 하이라이팅 상태 결정
+                          const isAvailable = availableSlotIds.has(slot.slotId);
+                          const isDimmed = isHighlightActive && !isOccupied && !isAvailable;
+                          const isHighlight = isHighlightActive && !isOccupied && isAvailable;
 
-                            // 하이라이팅 상태 결정
-                            const isAvailable = availableSlotIds.has(slot.slotId);
-                            const isDimmed = isHighlightActive && !isOccupied && !isAvailable;
-                            const isHighlight = isHighlightActive && !isOccupied && isAvailable;
+                          // full/half 겹침: full 슬롯은 하이라이트될 때만 표시
+                          const hasSmallSiblings = selectedModel.slots!.some(
+                            s => s.slotId !== slot.slotId && s.row === slot.row && s.width < slot.width
+                          );
+                          if (hasSmallSiblings && !isOccupied && !isHighlight) return null;
 
-                            // full/half 겹침: full 슬롯은 하이라이트될 때만 표시
-                            const hasSmallSiblings = selectedModel.slots!.some(
-                              s => s.slotId !== slot.slotId && s.row === slot.row && s.width < slot.width
-                            );
-                            if (hasSmallSiblings && !isOccupied && !isHighlight) return null;
+                          // 슬롯 그룹 라벨
+                          const groupLabel = slot.allowedCardGroups?.includes("cpiom") ? "CPIOM" : "";
 
-                            // 슬롯 그룹 라벨
-                            const groupLabel = slot.allowedCardGroups?.includes("cpiom") ? "CPIOM" : "";
+                          let slotHeight = slot.height;
+                          let slotTop = slot.y;
+                          if (card && card.widthType === "vfull") {
+                            slotHeight = selectedModel.cardArea!.height;
+                            slotTop = 0;
+                          }
 
-                            return (
-                              <div
-                                key={slot.slotId}
-                                className={`eam-slot ${isOccupied ? "occupied" : ""} ${isHighlight ? "highlight" : ""} ${isDimmed ? "dimmed" : ""}`}
-                                style={{
-                                  left: slot.x,
-                                  top: slot.y,
-                                  width: slot.width,
-                                  height: slot.height,
-                                }}
-                                onClick={() => {
-                                  if (card || isDimmed) return;
-                                  handleSlotClickMixed(slot);
-                                }}
-                              >
-                                {card ? (
-                                  <>
-                                    <CardInlineSvg cardFileName={card.cardFileName} />
-                                    <button
-                                      className="remove-btn"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleRemoveCard(card.instanceId);
-                                      }}
-                                    >
-                                      ×
-                                    </button>
-                                  </>
-                                ) : (
-                                  <span className="slot-label">
-                                    {groupLabel ? `${groupLabel} · ${slot.slotId}` : slot.slotId}
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          })
-                        ) : isRowLayout && selectedModel.rows ? (
-                          /* ─── Row Layout (rows 기반) ─── */
-                          selectedModel.rows.map(row => (
-                            <div key={row.rowId} className="eam-row-container" style={{
-                              left: row.x,
-                              top: row.y,
-                              width: row.width,
-                              height: row.height,
-                            }}>
-                              <div className="row-label">R{row.row}</div>
-                              {row.subSlots.map(subSlot => {
-                                const card = slotOccupiedMap.get(subSlot.slotId);
-                                const isOccupied = !!card;
-                                const isBlocked = blockedSlotIds.has(subSlot.slotId);
-
-                                if (isBlocked && !isOccupied) return null;
-
-                                const isAvailable = availableSlotIds.has(subSlot.slotId);
-                                const isDimmed = isHighlightActive && !isOccupied && !isAvailable;
-                                const isHighlight = isHighlightActive && !isOccupied && isAvailable;
-
-                                // full/half 겹침 시 풀 슬롯은 하이라이트될 때만 렌더링
-                                const hasSmallSiblings = row.subSlots.some(s => s.slotId !== subSlot.slotId && s.width < subSlot.width);
-                                if (hasSmallSiblings && !isOccupied && !isHighlight) return null;
-
-                                return (
-                                  <div
-                                    key={subSlot.slotId}
-                                    className={`eam-slot ${isOccupied ? "occupied" : ""} ${isHighlight ? "highlight" : ""} ${isDimmed ? "dimmed" : ""}`}
-                                    style={{
-                                      left: subSlot.x,
-                                      top: subSlot.y,
-                                      width: subSlot.width,
-                                      height: subSlot.height,
-                                    }}
-                                    onClick={() => {
-                                      if (card || isDimmed) return;
-                                      handleSlotClickRow(row, subSlot);
+                          return (
+                            <div
+                              key={slot.slotId}
+                              className={`eam-slot ${isOccupied ? "occupied" : ""} ${isHighlight ? "highlight" : ""} ${isDimmed ? "dimmed" : ""}`}
+                              style={{
+                                left: slot.x,
+                                top: slotTop,
+                                width: slot.width,
+                                height: slotHeight,
+                              }}
+                              onClick={() => {
+                                if (card || isDimmed) return;
+                                handleSlotClickMixed(slot);
+                              }}
+                            >
+                              {card ? (
+                                <>
+                                  <CardInlineSvg cardFileName={card.cardFileName} />
+                                  <button
+                                    className="remove-btn"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRemoveCard(card.instanceId);
                                     }}
                                   >
-                                    {card ? (
-                                      <>
-                                        <CardInlineSvg cardFileName={card.cardFileName} />
-                                        <button
-                                          className="remove-btn"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleRemoveCard(card.instanceId);
-                                          }}
-                                        >
-                                          ×
-                                        </button>
-                                      </>
-                                    ) : (
-                                      <span className="slot-label">{subSlot.slotId}</span>
-                                    )}
-                                  </div>
-                                );
-                              })}
+                                    ×
+                                  </button>
+                                </>
+                              ) : (
+                                <span className="slot-label">
+                                  {groupLabel ? `${groupLabel} · ${slot.slotId}` : slot.slotId}
+                                </span>
+                              )}
                             </div>
-                          ))
-                        ) : selectedModel.cardArea ? (
-                          /* ─── Uniform Grid Layout ─── */
-                          slots.map((slot) => {
-                            const key = `${slot.row}-${slot.col}`;
-                            const card = cardAtSlot.get(key);
-                            const isOccupied = occupied.has(key);
+                          );
+                        })
+                      ) : isRowLayout && selectedModel.rows ? (
+                        /* ─── Row Layout (rows 기반) ─── */
+                        selectedModel.rows.map(row => (
+                          <div key={row.rowId} className="eam-row-container" style={{
+                            left: row.x,
+                            top: row.y,
+                            width: row.width,
+                            height: row.height,
+                          }}>
+                            <div className="row-label">R{row.row}</div>
+                            {row.subSlots.map(subSlot => {
+                              const card = slotOccupiedMap.get(subSlot.slotId);
+                              const isOccupied = !!card;
+                              const isBlocked = blockedSlotIds.has(subSlot.slotId);
 
-                            // full 카드의 두번째 칸은 렌더링 건너뜀
-                            if (isOccupied && !card) return null;
+                              if (isBlocked && !isOccupied) return null;
 
-                            let slotWidth = slot.width;
-                            if (card && (!currentGridColWidths || currentGridColWidths.length === 0)) {
+                              const isAvailable = availableSlotIds.has(subSlot.slotId);
+                              const isDimmed = isHighlightActive && !isOccupied && !isAvailable;
+                              const isHighlight = isHighlightActive && !isOccupied && isAvailable;
+
+                              // full/half 겹침 시 풀 슬롯은 하이라이트될 때만 렌더링
+                              const hasSmallSiblings = row.subSlots.some(s => s.slotId !== subSlot.slotId && s.width < subSlot.width);
+                              if (hasSmallSiblings && !isOccupied && !isHighlight) return null;
+
+                              return (
+                                <div
+                                  key={subSlot.slotId}
+                                  className={`eam-slot ${isOccupied ? "occupied" : ""} ${isHighlight ? "highlight" : ""} ${isDimmed ? "dimmed" : ""}`}
+                                  style={{
+                                    left: subSlot.x,
+                                    top: subSlot.y,
+                                    width: subSlot.width,
+                                    height: subSlot.height,
+                                  }}
+                                  onClick={() => {
+                                    if (card || isDimmed) return;
+                                    handleSlotClickRow(row, subSlot);
+                                  }}
+                                >
+                                  {card ? (
+                                    <>
+                                      <CardInlineSvg cardFileName={card.cardFileName} />
+                                      <button
+                                        className="remove-btn"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleRemoveCard(card.instanceId);
+                                        }}
+                                      >
+                                        ×
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <span className="slot-label">{subSlot.slotId}</span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ))
+                      ) : selectedModel.cardArea ? (
+                        /* ─── Uniform Grid Layout ─── */
+                        slots.map((slot) => {
+                          const key = `${slot.row}-${slot.col}`;
+                          const card = cardAtSlot.get(key);
+                          const isOccupied = occupied.has(key);
+
+                          // full 카드의 두번째 칸은 렌더링 건너뜀
+                          if (isOccupied && !card) return null;
+
+                          let slotWidth = slot.width;
+                          let slotHeight = slot.height;
+                          let slotTop = slot.y - selectedModel.cardArea!.y;
+                          if (card) {
+                            if (!currentGridColWidths || currentGridColWidths.length === 0) {
                               const colSpan = getColSpan(card.widthType, getRowColumnCount(slot.row, selectedModel.cardArea!.columns, currentRowColumns));
                               slotWidth = slot.width * colSpan;
                             }
+                            
+                            if (card.widthType === "vfull") {
+                              slotHeight = selectedModel.cardArea!.height;
+                              slotTop = 0;
+                            }
+                          }
 
-                            return (
-                              <div
-                                key={key}
-                                className={`eam-slot ${isOccupied ? "occupied" : ""}`}
-                                style={{
-                                  left: slot.x - selectedModel.cardArea!.x,
-                                  top: slot.y - selectedModel.cardArea!.y,
-                                  width: slotWidth,
-                                  height: slot.height,
-                                  zIndex: slot.row + 1,
-                                }}
-                                onClick={() => {
-                                  if (card) return;
-                                  handleSlotClick(slot);
-                                }}
-                              >
-                                {card ? (
-                                  <>
-                                    <CardInlineSvg cardFileName={card.cardFileName} />
-                                    <button
-                                      className="remove-btn"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleRemoveCard(card.instanceId);
-                                      }}
-                                    >
-                                      ×
-                                    </button>
-                                  </>
-                                ) : (
-                                  <span className="slot-label">
-                                    R{slot.row + 1}C{slot.col + 1}
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          })
-                        ) : null}
-                      </div>
-                    )}
-                  </div>
+                          return (
+                            <div
+                              key={key}
+                              className={`eam-slot ${isOccupied ? "occupied" : ""}`}
+                              style={{
+                                left: slot.x - selectedModel.cardArea!.x,
+                                top: slotTop,
+                                width: slotWidth,
+                                height: slotHeight,
+                                zIndex: slot.row + 1,
+                              }}
+                              onClick={() => {
+                                if (card) return;
+                                handleSlotClick(slot);
+                              }}
+                            >
+                              {card ? (
+                                <>
+                                  <CardInlineSvg cardFileName={card.cardFileName} />
+                                  <button
+                                    className="remove-btn"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleRemoveCard(card.instanceId);
+                                    }}
+                                  >
+                                    ×
+                                  </button>
+                                </>
+                              ) : (
+                                <span className="slot-label">
+                                  R{slot.row + 1}C{slot.col + 1}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })
+                      ) : null}
+                    </div>
+                  )}
                 </div>
               </div>
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
+      </div>
 
       {/* 툴팁 오버레이 */}
       {hoveredTooltipCard && (
         <div
           style={{
             position: "fixed",
-            left: hoveredTooltipPos.x + 15,
-            top: hoveredTooltipPos.y + 15,
+            left: hoveredTooltipPos.x + (hoveredTooltipCard.widthType === "full" ? 815 : 415) > window.innerWidth ? Math.max(15, hoveredTooltipPos.x - (hoveredTooltipCard.widthType === "full" ? 815 : 415)) : hoveredTooltipPos.x + 15,
+            top: hoveredTooltipPos.y + 270 > window.innerHeight ? Math.max(15, window.innerHeight - 270) : hoveredTooltipPos.y + 15,
             zIndex: 100000,
             background: "var(--bg-secondary)",
             padding: "8px",
@@ -1260,14 +1318,14 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            width: hoveredTooltipCard.widthType === "full" ? "800px" : "400px",
-            maxWidth: "80vw"
+            width: "max-content",
+            maxWidth: hoveredTooltipCard.widthType === "full" ? "800px" : "400px"
           }}
         >
           <CardThumbnail
             svgUrl={hoveredTooltipCard.svgUrl}
             alt={hoveredTooltipCard.cardType}
-            style={{ width: "100%", height: "auto", objectFit: "contain" }}
+            style={{ maxWidth: "100%", maxHeight: "240px", width: "auto", height: "auto", objectFit: "contain" }}
           />
         </div>
       )}

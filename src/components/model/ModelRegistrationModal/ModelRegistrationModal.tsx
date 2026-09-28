@@ -79,7 +79,15 @@ const DELETE_ICON_STYLE: React.CSSProperties = {
 /** SVG raw text에서 width/height 추출 */
 function parseSvgDimensions(svgRaw: string): { width: number; height: number } {
   const parser = new DOMParser();
-  const doc = parser.parseFromString(svgRaw, "image/svg+xml");
+  const doc = parser.parseFromString(svgRaw, "text/html");
+
+  const img = doc.querySelector("img");
+  if (img) {
+    const w = parseFloat(img.getAttribute("data-width") || img.getAttribute("width") || "0");
+    const h = parseFloat(img.getAttribute("data-height") || img.getAttribute("height") || "0");
+    if (w > 0 && h > 0) return { width: w, height: h };
+  }
+
   const svg = doc.querySelector("svg");
   if (!svg) return { width: 800, height: 200 };
 
@@ -2276,8 +2284,8 @@ export const ModelRegistrationModal: React.FC = () => {
           <div
             style={{
               position: "fixed",
-              left: hoveredTooltipPos.x + 15,
-              top: hoveredTooltipPos.y + 15,
+              left: hoveredTooltipPos.x + (hoveredTooltipCard.widthType === "full" ? 815 : 415) > window.innerWidth ? Math.max(15, hoveredTooltipPos.x - (hoveredTooltipCard.widthType === "full" ? 815 : 415)) : hoveredTooltipPos.x + 15,
+              top: hoveredTooltipPos.y + 270 > window.innerHeight ? Math.max(15, window.innerHeight - 270) : hoveredTooltipPos.y + 15,
               zIndex: 100000,
               background: "var(--bg-secondary)",
               padding: "8px",
@@ -2287,15 +2295,15 @@ export const ModelRegistrationModal: React.FC = () => {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              width: hoveredTooltipCard.widthType === "full" ? "800px" : "400px",
-              maxWidth: "80vw"
+              width: "max-content",
+              maxWidth: hoveredTooltipCard.widthType === "full" ? "800px" : "400px"
             }}
           >
             <CardThumbnail
               svgUrl={hoveredTooltipCard.isBuiltIn ? hoveredTooltipCard.svgUrl : undefined}
               svgRaw={!hoveredTooltipCard.isBuiltIn ? hoveredTooltipCard.svgRaw : undefined}
               alt={hoveredTooltipCard.name}
-              style={{ width: "100%", height: "auto", objectFit: "contain" }}
+              style={{ maxWidth: "100%", maxHeight: "240px", width: "auto", height: "auto", objectFit: "contain" }}
             />
           </div>
         )}
@@ -2488,8 +2496,8 @@ export const ModelRegistrationModal: React.FC = () => {
         <div
           style={{
             position: "fixed",
-            left: hoveredListThumbPos.x + 15,
-            top: hoveredListThumbPos.y + 15,
+            left: hoveredListThumbPos.x + 515 > window.innerWidth ? Math.max(15, hoveredListThumbPos.x - 515) : hoveredListThumbPos.x + 15,
+            top: hoveredListThumbPos.y + 270 > window.innerHeight ? Math.max(15, window.innerHeight - 270) : hoveredListThumbPos.y + 15,
             zIndex: 100000,
             background: "var(--bg-secondary)",
             padding: "8px",
@@ -2499,14 +2507,14 @@ export const ModelRegistrationModal: React.FC = () => {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            width: "500px",
-            maxWidth: "80vw"
+            width: "max-content",
+            maxWidth: "500px"
           }}
         >
           {hoveredListThumb.pngRaw ? (
-            <img src={hoveredListThumb.pngRaw} alt={hoveredListThumb.name} style={{ width: "100%", height: "auto", objectFit: "contain" }} />
+            <img src={hoveredListThumb.pngRaw} alt={hoveredListThumb.name} style={{ maxWidth: "100%", maxHeight: "240px", width: "auto", height: "auto", objectFit: "contain" }} />
           ) : hoveredListThumb.imgUrl ? (
-            <img src={hoveredListThumb.imgUrl} alt={hoveredListThumb.name} style={{ width: "100%", height: "auto", objectFit: "contain" }} />
+            <img src={hoveredListThumb.imgUrl} alt={hoveredListThumb.name} style={{ maxWidth: "100%", maxHeight: "240px", width: "auto", height: "auto", objectFit: "contain" }} />
           ) : (
             <span style={{ fontSize: 24, color: "var(--text-tertiary)" }}>🖥️</span>
           )}

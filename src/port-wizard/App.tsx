@@ -79,11 +79,80 @@ export default function App() {
 
     const newSessions: PortSession[] = [];
     for (const file of files) {
-      const base64 = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(file);
-      });
+      let isPreAnalyzed = false;
+      let preAnalyzedPorts: PortData[] = [];
+      let base64 = "";
+
+      if (file.type === "image/svg+xml" || file.name.toLowerCase().endsWith(".svg")) {
+        const svgText = await file.text();
+        if (svgText.includes('id="ports-layer"')) {
+          isPreAnalyzed = true;
+          
+          // Extract embedded image if present
+          const imageMatch = svgText.match(/<image[^>]+(?:href|xlink:href)="([^"]+)"/);
+          if (imageMatch && imageMatch[1].startsWith("data:")) {
+            base64 = imageMatch[1];
+          } else {
+            base64 = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svgText)))}`;
+          }
+
+          // Extract viewBox or width/height to normalize coordinates back to 0-1000
+          let exportWidth = 1000;
+          let exportHeight = 1000;
+          const viewBoxMatch = svgText.match(/<svg[^>]+viewBox="0 0 ([\d.]+) ([\d.]+)"/i);
+          if (viewBoxMatch) {
+            exportWidth = parseFloat(viewBoxMatch[1]);
+            exportHeight = parseFloat(viewBoxMatch[2]);
+          } else {
+            const widthMatch = svgText.match(/<svg[^>]+width="([\d.]+)"/i);
+            const heightMatch = svgText.match(/<svg[^>]+height="([\d.]+)"/i);
+            if (widthMatch && heightMatch) {
+              exportWidth = parseFloat(widthMatch[1]);
+              exportHeight = parseFloat(heightMatch[1]);
+            }
+          }
+
+          // Extract ports
+          const pathRegex = /<path[^>]+class="port-hitbox"[^>]*>/gi;
+          let match;
+          while ((match = pathRegex.exec(svgText)) !== null) {
+            const p = match[0];
+            const typeMatch = p.match(/data-port-type="([^"]+)"/);
+            const localMatch = p.match(/data-local-port="([^"]+)"/);
+            const dMatch = p.match(/d="([^"]+)"/);
+            
+            if (dMatch) {
+              const coords = dMatch[1].match(/M\s+([\d.]+)\s+([\d.]+)\s+H\s+([\d.]+)\s+V\s+([\d.]+)/);
+              if (coords) {
+                let x1 = parseFloat(coords[1]);
+                let y1 = parseFloat(coords[2]);
+                let x2 = parseFloat(coords[3]);
+                let y2 = parseFloat(coords[4]);
+                
+                // Normalize back to 0-1000 range based on export dimensions
+                x1 = (x1 / exportWidth) * 1000;
+                y1 = (y1 / exportHeight) * 1000;
+                x2 = (x2 / exportWidth) * 1000;
+                y2 = (y2 / exportHeight) * 1000;
+                
+                preAnalyzedPorts.push({
+                  box_2d: [y1, x1, y2, x2],
+                  portName: typeMatch ? typeMatch[1] : "",
+                  portNumber: localMatch ? localMatch[1] : ""
+                });
+              }
+            }
+          }
+        }
+      }
+
+      if (!isPreAnalyzed) {
+        base64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+      }
 
       const fileNameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
 
@@ -91,9 +160,9 @@ export default function App() {
         id: crypto.randomUUID(),
         originalFileName: file.name,
         image: base64,
-        status: "pending",
-        analysis: "",
-        ports: [],
+        status: isPreAnalyzed ? "completed" : "pending",
+        analysis: isPreAnalyzed ? "Loaded from existing SVG." : "",
+        ports: preAnalyzedPorts,
         past: [],
         future: [],
         error: null,
@@ -112,6 +181,7 @@ export default function App() {
     
     // Enqueue all analysis tasks in a strict global queue to prevent any parallel API calls
     newSessions.forEach((s, index) => {
+      if (s.status === "completed") return; // Skip pre-analyzed SVG sessions
       analysisQueue = analysisQueue.then(async () => {
         // 5초 대기 (분당 최대 12개만 요청되도록 제한하여 15 RPM 회피)
         if (index > 0) {
@@ -267,9 +337,7 @@ ${paths}
     URL.revokeObjectURL(url);
   };
 
-  const removeSession = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    
+  const removeSessionById = (id: string) => {
     // Abort if currently analyzing
     const controller = abortControllers.get(id);
     if (controller) {
@@ -286,6 +354,11 @@ ${paths}
     }
 
     setSessions(prev => prev.filter(s => s.id !== id));
+  };
+
+  const removeSession = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    removeSessionById(id);
   };
 
   // If there were ever >1 files, we keep showing the left sidebar until all are deleted.
@@ -422,6 +495,11 @@ ${paths}
           }
         }}
         onMultiUpload={(files) => handleUpload({ target: { files } } as any)}
+        onDeleteSession={() => {
+          if (activeSession) {
+            removeSessionById(activeSession.id);
+          }
+        }}
         leftSidebar={leftSidebar}
       />
     </>

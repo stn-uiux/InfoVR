@@ -21,7 +21,15 @@ interface Props {
 /** SVG raw text에서 width/height 추출 */
 function parseSvgDimensions(svgRaw: string): { width: number; height: number } {
   const parser = new DOMParser();
-  const doc = parser.parseFromString(svgRaw, "image/svg+xml");
+  const doc = parser.parseFromString(svgRaw, "text/html");
+
+  const img = doc.querySelector("img");
+  if (img) {
+    const w = parseFloat(img.getAttribute("data-width") || img.getAttribute("width") || "0");
+    const h = parseFloat(img.getAttribute("data-height") || img.getAttribute("height") || "0");
+    if (w > 0 && h > 0) return { width: w, height: h };
+  }
+
   const svg = doc.querySelector("svg");
   if (!svg) return { width: 430, height: 46 };
 
@@ -59,29 +67,57 @@ export const CardRegistrationForm: React.FC<Props> = ({
   const [isDragOver, setIsDragOver] = useState(false);
 
   const processFile = useCallback((file: File) => {
-    if (!file.name.toLowerCase().endsWith(".svg")) {
-      setErrors((prev) => ({ ...prev, file: "SVG 파일만 지원합니다." }));
+    const isSvg = file.name.toLowerCase().endsWith(".svg");
+    const isImage = /\.(png|jpe?g|gif)$/i.test(file.name);
+
+    if (!isSvg && !isImage) {
+      setErrors((prev) => ({ ...prev, file: "SVG, PNG, JPG, GIF 파일만 지원합니다." }));
       return;
     }
+
     const reader = new FileReader();
     reader.onload = () => {
-      const raw = reader.result as string;
-      setSvgRaw(raw);
-      setSvgFileName(file.name);
+      const result = reader.result as string;
       
-      const nameWithoutExt = file.name.replace(/\.svg$/i, "");
-      setCardName(nameWithoutExt);
-
-      const dims = parseSvgDimensions(raw);
-      setSvgDims(dims);
-      setErrors((prev) => {
-        const next = { ...prev };
-        delete next.file;
-        delete next.cardName;
-        return next;
-      });
+      if (isImage) {
+        const img = new Image();
+        img.onload = () => {
+          const raw = `<svg xmlns="http://www.w3.org/2000/svg" width="${img.width}" height="${img.height}"><image href="${result}" width="100%" height="100%" preserveAspectRatio="none" /></svg>`;
+          setSvgRaw(raw);
+          setSvgFileName(file.name);
+          const nameWithoutExt = file.name.replace(/\.(png|jpe?g|gif)$/i, "");
+          setCardName(nameWithoutExt);
+          setSvgDims({ width: img.width, height: img.height });
+          setErrors((prev) => {
+            const next = { ...prev };
+            delete next.file;
+            delete next.cardName;
+            return next;
+          });
+        };
+        img.src = result;
+      } else {
+        const raw = result;
+        setSvgRaw(raw);
+        setSvgFileName(file.name);
+        const nameWithoutExt = file.name.replace(/\.svg$/i, "");
+        setCardName(nameWithoutExt);
+        const dims = parseSvgDimensions(raw);
+        setSvgDims(dims);
+        setErrors((prev) => {
+          const next = { ...prev };
+          delete next.file;
+          delete next.cardName;
+          return next;
+        });
+      }
     };
-    reader.readAsText(file);
+    
+    if (isImage) {
+      reader.readAsDataURL(file);
+    } else {
+      reader.readAsText(file);
+    }
   }, []);
 
   const handleFileChange = useCallback(
@@ -161,23 +197,48 @@ export const CardRegistrationForm: React.FC<Props> = ({
           />
         </StnFormField>
 
-        <div className="stn-form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <input
-            type="checkbox"
-            id="full-type-checkbox"
-            checked={widthType === "full"}
-            onChange={(e) => setWidthType(e.target.checked ? "full" : "half")}
-            style={{ width: "auto" }}
-          />
-          <label htmlFor="full-type-checkbox" style={{ margin: 0, cursor: "pointer", display: "inline" }}>
-            FULL 타입 (체크 시 해당 슬롯의 모든 열 점유)
-          </label>
-        </div>
+        <StnFormField label="카드 크기" required>
+          <div style={{ display: "flex", gap: "1.5rem", alignItems: "center", padding: "0.25rem 0" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", color: "var(--s-text-base)" }}>
+              <input
+                type="radio"
+                name="cardWidthType"
+                value="half"
+                checked={widthType === "half"}
+                onChange={(e) => setWidthType(e.target.value as CardWidthType)}
+                style={{ cursor: "pointer", accentColor: "var(--s-primary)", width: "16px", height: "16px" }}
+              />
+              <span>1칸 차지 (기본)</span>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", color: "var(--s-text-base)" }}>
+              <input
+                type="radio"
+                name="cardWidthType"
+                value="full"
+                checked={widthType === "full"}
+                onChange={(e) => setWidthType(e.target.value as CardWidthType)}
+                style={{ cursor: "pointer", accentColor: "var(--s-primary)", width: "16px", height: "16px" }}
+              />
+              <span>가로 꽉 채우기 (Full)</span>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.875rem", color: "var(--s-text-base)" }}>
+              <input
+                type="radio"
+                name="cardWidthType"
+                value="vfull"
+                checked={widthType === "vfull"}
+                onChange={(e) => setWidthType(e.target.value as CardWidthType)}
+                style={{ cursor: "pointer", accentColor: "var(--s-primary)", width: "16px", height: "16px" }}
+              />
+              <span>세로 꽉 채우기 (V-Full)</span>
+            </label>
+          </div>
+        </StnFormField>
 
-        <StnFormField label="카드 SVG 파일" required fullWidth error={errors.file}>
+        <StnFormField label="카드 이미지 파일" required fullWidth error={errors.file}>
           <input
             type="file"
-            accept=".svg"
+            accept=".svg,.png,.jpg,.jpeg,.gif"
             ref={fileRef}
             style={{ display: "none" }}
             onChange={handleFileChange}
@@ -199,7 +260,7 @@ export const CardRegistrationForm: React.FC<Props> = ({
             ) : (
               <>
                 <div className="upload-icon">📄</div>
-                <div className="upload-text">SVG 파일을 선택하세요</div>
+                <div className="upload-text">SVG, PNG, JPG, GIF 파일을 선택하세요</div>
               </>
             )}
           </div>
