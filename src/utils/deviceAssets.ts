@@ -44,7 +44,7 @@ function findCustomModelByName(modelName: string) {
         if (m.modelName === modelName || m.modelName.toLowerCase() === modelName.toLowerCase()) return true;
         if (m.variants && m.variants.length > 0) {
           return m.variants.some((v) => {
-            const appendedName = v.variantName === "기본타입" ? m.modelName : `${m.modelName} ${v.variantName}`;
+            const appendedName = `${m.modelName} ${v.variantName}`;
             return appendedName.toLowerCase() === modelName.toLowerCase();
           });
         }
@@ -158,7 +158,7 @@ export const resolveDeviceImage = (
     // Check if it's a variant match and has variantPngRaw
     if (custom.variants && custom.variants.length > 0) {
       const variant = custom.variants.find((v) => {
-        const appendedName = v.variantName === "기본타입" ? custom.modelName : `${custom.modelName} ${v.variantName}`;
+        const appendedName = `${custom.modelName} ${v.variantName}`;
         return appendedName.toLowerCase() === modelName.toLowerCase();
       });
       if (variant && variant.variantPngRaw) {
@@ -267,6 +267,12 @@ export const hasDeviceSvgAsset = (
     if (
       side === "front" &&
       (deviceSvgPromiseMap.has(lookupName) || deviceSvgPromiseMap.has(lookupName.toLowerCase()))
+    ) return true;
+    
+    if (deviceImageSideMap.has(getAssetKey(lookupName, side))) return true;
+    if (
+      side === "front" &&
+      (deviceImageMap.has(lookupName) || deviceImageMap.has(lookupName.toLowerCase()))
     ) return true;
   }
   // Fallback: 사용자 등록 모델 체크

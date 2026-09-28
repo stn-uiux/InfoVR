@@ -58,6 +58,7 @@ export const DeviceRegistrationModal = () => {
   const deleteNode = useStore((s) => s.deleteNode);
   const renameNode = useStore((s) => s.renameNode);
   const reorderNode = useStore((s) => s.reorderNode);
+  const setActiveNode = useStore((s) => s.setActiveNode);
 
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -197,8 +198,10 @@ export const DeviceRegistrationModal = () => {
       });
 
       setRenamingId(newId);
+      setNodeFilter(newId);
+      setActiveNode(newId);
     },
-    [nodes, addNode],
+    [nodes, addNode, setActiveNode],
   );
 
   const handleAddRoom = useCallback(
@@ -219,8 +222,10 @@ export const DeviceRegistrationModal = () => {
       });
 
       setRenamingId(newId);
+      setNodeFilter(newId);
+      setActiveNode(newId);
     },
-    [nodes, addNode],
+    [nodes, addNode, setActiveNode],
   ); // setNodeExpandedIds is stable from useState, so it doesn't strictly need to be in deps but good for clarity
 
 

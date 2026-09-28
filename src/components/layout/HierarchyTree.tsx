@@ -242,7 +242,7 @@ export const HierarchyTree = React.memo(() => {
     const siblings = nodes.filter((n) => n.parentId === parentId);
     const newId = addNode({
       parentId,
-      name: "New Group",
+      name: "새 그룹",
       type: "group",
       order: siblings.length,
     });
@@ -250,7 +250,7 @@ export const HierarchyTree = React.memo(() => {
     expandNodePath(newId);
     setActiveNode(newId);
     setRenamingId(newId);
-    setRenameValue("New Group");
+    setRenameValue("새 그룹");
   }, [contextMenu, nodes, addNode, expandNodePath, setActiveNode]);
 
   const handleAddRoom = useCallback(() => {
@@ -259,7 +259,7 @@ export const HierarchyTree = React.memo(() => {
     const siblings = nodes.filter((n) => n.parentId === parentId);
     const newId = addNode({
       parentId,
-      name: "New Room",
+      name: "새 전산실",
       type: "room",
       order: siblings.length,
     });
@@ -267,7 +267,7 @@ export const HierarchyTree = React.memo(() => {
     expandNodePath(newId);
     setActiveNode(newId);
     setRenamingId(newId);
-    setRenameValue("New Room");
+    setRenameValue("새 전산실");
   }, [contextMenu, nodes, addNode, expandNodePath, setActiveNode]);
 
   const handleRenameStart = useCallback(() => {

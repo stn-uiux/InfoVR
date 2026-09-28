@@ -79,6 +79,15 @@ export const RegistrationFormModal = ({
   );
   const selectedViewSidesKey = selectedViewSides.join(",");
 
+  const isCardBasedModel = useMemo(() => {
+    if (!selectedTemplate) return false;
+    const builtin = equipmentModels.find(m => m.modelName === selectedTemplate.modelName);
+    if (builtin && ('cardArea' in builtin || 'slots' in builtin || 'rows' in builtin)) return true;
+    const custom = customModels.find(m => m.modelName === selectedTemplate.modelName || m.modelId === selectedTemplate.customModelId);
+    if (custom && custom.modelType === "card-based") return true;
+    return false;
+  }, [selectedTemplate, customModels]);
+
   useEffect(() => {
     if (!selectedTemplate) return;
     const custom = customModels.find((m) => m.modelName === selectedTemplate.modelName);
@@ -250,7 +259,7 @@ export const RegistrationFormModal = ({
                 >
                   {effectiveTemplates.map((t, i) => (
                     <option key={i} value={i}>
-                      {`[${t.uSize}U] ${t.modelName}${t.isCustom ? ' ★' : ''}`}
+                      {`[${t.uSize}U] ${t.modelName}${t.isCustom && !t.isBaseChassis ? ' ★' : ''}`}
                     </option>
                   ))}
                 </select>
@@ -310,9 +319,23 @@ export const RegistrationFormModal = ({
                   }}>모듈 {insertedModules.length}개</span>
                 )}
               </div>
-              <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
-                포트를 클릭하여 모듈을 설정하세요
-              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
+                  포트를 클릭하여 모듈을 설정하세요
+                </span>
+                {isCardBasedModel && (
+                  <button
+                    className="comm-btn comm-btn-secondary"
+                    style={{ fontSize: "11px", padding: "4px 8px", height: "auto", minHeight: "24px" }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setIsAssemblyOpen(true);
+                    }}
+                  >
+                    장비 구성 변경
+                  </button>
+                )}
+              </div>
             </div>
             {selectedViewSides.length > 1 && (
               <div style={{
@@ -435,6 +458,16 @@ export const RegistrationFormModal = ({
                 insertedCards: result.cards,
                 generatedPorts: result.generatedPorts || []
               });
+            }
+
+            // Switch to base chassis variant if it's currently a custom variant
+            if (selectedTemplate?.isCustom && !selectedTemplate.isBaseChassis && selectedTemplate.variant) {
+              const baseChassisIdx = effectiveTemplates.findIndex(
+                (t) => t.customModelId === selectedTemplate.customModelId && t.isBaseChassis
+              );
+              if (baseChassisIdx !== -1) {
+                setSelectedModelIdx(baseChassisIdx);
+              }
             }
           }}
         />

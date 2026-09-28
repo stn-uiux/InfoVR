@@ -12,6 +12,8 @@ export interface DeviceTemplate {
   customModelId?: string;
   /** Reference to a specific variant for chassis models */
   variant?: EquipmentVariant;
+  /** true if this is the bare chassis template without any variant attached */
+  isBaseChassis?: boolean;
 }
 
 /**
@@ -85,8 +87,18 @@ export function getEffectiveTemplates(
 
   for (const m of customModels) {
     if (m.modelType === "card-based" && m.variants && m.variants.length > 0) {
+      customTemplates.push({
+        modelName: m.modelName,
+        type: (m.type || "Router") as DeviceType,
+        uSize: m.unit,
+        vendor: (m.vendor || "Nokia") as VendorName,
+        isCustom: true,
+        customModelId: m.modelId,
+        isBaseChassis: true,
+      });
+
       for (const v of m.variants) {
-        const appendedName = v.variantName === "기본타입" ? m.modelName : `${m.modelName} ${v.variantName}`;
+        const appendedName = `${m.modelName} ${v.variantName}`;
         customTemplates.push({
           modelName: appendedName,
           type: (m.type || "Router") as DeviceType,

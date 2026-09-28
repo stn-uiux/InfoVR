@@ -398,6 +398,7 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
           _gridMerges: m.gridMerges,
           _gridColWidths: m.gridColWidths,
           _gridRowHeights: m.gridRowHeights,
+          assignedCardIds: m.assignedCardIds,
         };
 
         if (m.variants && m.variants.length > 0) {
@@ -895,6 +896,7 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
       title={selectedModel ? `장비 구성 – ${selectedModel.modelName}` : "새 장비 등록"}
       className="eam-stn-override"
       icon="fluent:board-24-regular"
+      overlayStyle={{ zIndex: 4000 }}
     >
       <div className="eam-body">
         {!selectedModel ? (

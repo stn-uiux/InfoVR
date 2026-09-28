@@ -7,7 +7,7 @@
 import { useEffect, useState, useMemo, useRef, useCallback, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { equipmentModels, loadCardSvgRaw, loadBaseEquipmentSvgRaw } from "../../utils/cardAssets";
-import { resolveDeviceSvgContent } from "../../utils/deviceAssets";
+import { resolveDeviceSvgContent, resolveDeviceImage } from "../../utils/deviceAssets";
 import { getColSpan, type InsertedCard, type InsertedModule, type EquipmentModel, type EquipmentViewSide } from "../../types/equipment";
 import { moduleDefinitions } from "../../utils/moduleAssets";
 import { getElementBBox, prefixSvgIds, isPortId, filterPortElements, PORT_SELECTOR, resolvePortId } from "../../utils/svgUtils";
@@ -130,8 +130,13 @@ export const DeviceSvgPreview = memo(({
         };
         
         if (m.variants && m.variants.length > 0) {
+          customMapped.push({
+            ...baseProps,
+            modelName: m.modelName,
+          });
+
           m.variants.forEach((v) => {
-            const appendedName = v.variantName === "기본타입" ? m.modelName : `${m.modelName} ${v.variantName}`;
+            const appendedName = `${m.modelName} ${v.variantName}`;
             customMapped.push({
               ...baseProps,
               modelName: appendedName,
@@ -236,13 +241,18 @@ export const DeviceSvgPreview = memo(({
         );
 
         let baseSvg: string | undefined;
-        if (isModularDevice && equipModel?.baseSvgUrl && equipModel.baseSvgUrl.startsWith("custom-model-base-")) {
+        if (isModularDevice && equipModel?.baseSvgUrl) {
           baseSvg = await loadBaseEquipmentSvgRaw(equipModel.baseSvgUrl);
         } else {
-          const targetModelName = isModularDevice && equipModel?.baseSvgUrl
-            ? equipModel.baseSvgUrl.replace(/\.svg$/i, "").replace(/^\[\d+U\]\s*/, "")
-            : modelName;
-          baseSvg = await resolveDeviceSvgContent(targetModelName, viewSide);
+          baseSvg = await resolveDeviceSvgContent(modelName, viewSide);
+          if (!baseSvg) {
+            const imgUrl = resolveDeviceImage(modelName, viewSide);
+            if (imgUrl) {
+              const w = equipModel?.equipmentSize?.width || 984;
+              const h = equipModel?.equipmentSize?.height || 200;
+              baseSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><image href="${imgUrl}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet" /></svg>`;
+            }
+          }
         }
         if (!isMounted) return;
         if (!baseSvg) {

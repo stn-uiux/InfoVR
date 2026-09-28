@@ -11,6 +11,7 @@ interface StnModalProps {
   className?: string;
   overlayClassName?: string;
   style?: React.CSSProperties;
+  overlayStyle?: React.CSSProperties;
 }
 
 export function StnModal({
@@ -21,12 +22,13 @@ export function StnModal({
   children,
   className = "",
   overlayClassName = "",
-  style
+  style,
+  overlayStyle
 }: StnModalProps) {
   if (!isOpen) return null;
 
   return createPortal(
-    <div className={`stn-modal-overlay ${overlayClassName}`} onClick={onClose}>
+    <div className={`stn-modal-overlay ${overlayClassName}`} style={overlayStyle} onClick={onClose}>
       <div className={`stn-modal ${className}`} style={style} onClick={(e) => e.stopPropagation()}>
         <div className="stn-modal-header">
           <h2>

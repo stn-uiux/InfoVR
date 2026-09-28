@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { useStore } from "../../store/useStore";
+import { useTheme } from "../../contexts/ThemeContext";
 import { U_HEIGHT, GRID_SPACING } from "../layout/constants";
 
 const RACK_D = 1.0;
@@ -10,6 +11,8 @@ export const GlobalFocusLights = () => {
   const racks = useStore((s) => s.racks);
   const isEditMode = useStore((s) => s.isEditMode);
   const cyberSpaceEnabled = useStore((s) => s.cyberSpaceEnabled);
+  const { theme } = useTheme();
+  const isDarkMode = theme === "dark";
 
   // Focus takes precedence over selection for lighting effects
   const activeRackId = focusedRackId || selectedRackId;
@@ -112,7 +115,7 @@ export const GlobalFocusLights = () => {
       <group position={[0, 0, depth / 2 - 0.07]}>
         <pointLight
           position={[0, 0, 1.5]}
-          intensity={isFocused ? 4.0 : 0}
+          intensity={isFocused ? (isDarkMode ? 2.0 : 0) : 0}
           distance={10}
           decay={1.5}
           color="#ffffff"

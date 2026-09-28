@@ -707,7 +707,7 @@ export const ModelRegistrationModal: React.FC = () => {
             if (!svg.hasAttribute("viewBox")) {
               svg.setAttribute("viewBox", `0 0 ${forceW} ${forceH}`);
             }
-            svg.setAttribute("preserveAspectRatio", "none");
+            svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
             svgRaw = new XMLSerializer().serializeToString(doc);
           }
         }
@@ -724,7 +724,7 @@ export const ModelRegistrationModal: React.FC = () => {
         img.onload = () => {
           const w = forceW || img.width || 800;
           const h = forceH || img.height || 200;
-          const svgRaw = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><image href="${dataUrl}" width="${w}" height="${h}" preserveAspectRatio="none" /></svg>`;
+          const svgRaw = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><image href="${dataUrl}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet" /></svg>`;
           setRaw(svgRaw);
           setFileName(file.name);
           setError(undefined);
@@ -2035,10 +2035,11 @@ export const ModelRegistrationModal: React.FC = () => {
                                   setRowGapsArr([]);
                                 }
 
-                                // 카드 할당: 카드 기반 모델이면 호환 카드를 자동 할당
+                                // 카드 할당: 섀시형 모델 템플릿 복사 시 기본 할당 초기화
                                 if (eqModel) {
-                                  const compatibleCards = getCardsForModel(eqModel);
-                                  setAssignedCardIds(compatibleCards.map((c) => c.cardFileName));
+                                  // 기존: const compatibleCards = getCardsForModel(eqModel); setAssignedCardIds(compatibleCards.map((c) => c.cardFileName));
+                                  // 수정: 빈 배열 할당
+                                  setAssignedCardIds([]);
                                 } else {
                                   setAssignedCardIds([]);
                                 }
@@ -2049,16 +2050,38 @@ export const ModelRegistrationModal: React.FC = () => {
                                   setModelSvgRaw(svgContent);
                                   setModelSvgFileName(`[${tmpl.uSize}U] ${tmpl.modelName}.svg`);
                                 } else {
-                                  setModelSvgRaw(null);
-                                  setModelSvgFileName("");
+                                  const imgUrl = resolveDeviceImage(tmpl.modelName, "front");
+                                  if (imgUrl) {
+                                    const w = eqModel?.equipmentSize?.width || 984;
+                                    const h = eqModel?.equipmentSize?.height || 200;
+                                    const dummySvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><image href="${imgUrl}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet" /></svg>`;
+                                    setModelSvgRaw(dummySvg);
+                                    setModelSvgFileName(`[${tmpl.uSize}U] ${tmpl.modelName}.png`);
+                                  } else {
+                                    setModelSvgRaw(null);
+                                    setModelSvgFileName("");
+                                  }
                                 }
 
-                                const sides = getDeviceViewSides(tmpl.modelName);
-                                if (sides.includes("rear")) {
-                                  const rearSvgContent = await resolveDeviceSvgContent(tmpl.modelName, "rear");
-                                  setUseDualView(!!rearSvgContent);
-                                  setRearSvgRaw(rearSvgContent || null);
-                                  setRearSvgFileName(rearSvgContent ? `[${tmpl.uSize}U] ${tmpl.modelName} back.svg` : "");
+                                const rearSvgContent = await resolveDeviceSvgContent(tmpl.modelName, "rear");
+                                if (rearSvgContent) {
+                                  setUseDualView(true);
+                                  setRearSvgRaw(rearSvgContent);
+                                  setRearSvgFileName(`[${tmpl.uSize}U] ${tmpl.modelName} back.svg`);
+                                } else {
+                                  const rearImgUrl = resolveDeviceImage(tmpl.modelName, "rear");
+                                  if (rearImgUrl) {
+                                    const w = eqModel?.equipmentSize?.width || 984;
+                                    const h = eqModel?.equipmentSize?.height || 200;
+                                    const dummySvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><image href="${rearImgUrl}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet" /></svg>`;
+                                    setUseDualView(true);
+                                    setRearSvgRaw(dummySvg);
+                                    setRearSvgFileName(`[${tmpl.uSize}U] ${tmpl.modelName} back.png`);
+                                  } else {
+                                    setUseDualView(false);
+                                    setRearSvgRaw(null);
+                                    setRearSvgFileName("");
+                                  }
                                 }
                                 setIsFormLoading(false);
                               }}

@@ -354,7 +354,7 @@ export async function loadCardSvgRaw(
       const w = cd ? cd.svgWidth : 430;
       const h = cd ? cd.svgHeight : 46;
       const html = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
-  <image href="${pngUrl}" width="${w}" height="${h}" preserveAspectRatio="none" />
+  <image href="${pngUrl}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet" />
 </svg>`;
       _cardSvgRawCache.set(cardFileName, html);
       return html;
@@ -409,7 +409,7 @@ export async function loadBaseEquipmentSvgRaw(
       const w = eqModel?.equipmentSize?.width || 984;
       const h = eqModel?.equipmentSize?.height || 200;
       return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
-  <image href="${pngUrl}" width="${w}" height="${h}" preserveAspectRatio="none" />
+  <image href="${pngUrl}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet" />
 </svg>`;
     }
   }
