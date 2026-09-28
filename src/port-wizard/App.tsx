@@ -15,7 +15,11 @@ export interface PortSession {
   future: PortData[][];
   error: string | null;
   downloadFileName: string;
+  progress?: number;
 }
+
+let analysisQueue = Promise.resolve();
+const abortControllers = new Map<string, AbortController>();
 
 export default function App() {
   const [sessions, setSessions] = useState<PortSession[]>([]);
@@ -55,10 +59,23 @@ export default function App() {
     }
   }, [sessions.length]);
 
+  const lastUploadTimeRef = useRef(0);
+
   // Handle files
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement> | { target: { files: FileList | File[] } }) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
+    const now = Date.now();
+    if (now - lastUploadTimeRef.current < 500) {
+      return; // Debounce duplicate events
+    }
+    lastUploadTimeRef.current = now;
+
+    const rawFiles = Array.from(e.target.files || []);
+    if (rawFiles.length === 0) return;
+
+    // Deduplicate files by name and size to prevent double-uploads from browser bugs
+    const files = rawFiles.filter((file, index, self) => 
+      index === self.findIndex(f => f.name === file.name && f.size === file.size)
+    );
 
     const newSessions: PortSession[] = [];
     for (const file of files) {
@@ -85,13 +102,23 @@ export default function App() {
     }
 
     setSessions(prev => [...prev, ...newSessions]);
-    if (!activeSessionId && newSessions.length > 0) {
-      setActiveSessionId(newSessions[0].id);
-    }
     
-    // Auto-start analysis for new pending sessions
-    newSessions.forEach(s => {
-      runAnalysisForSession(s.id, s.image, s.originalFileName);
+    // Set active session ID safely outside the reducer
+    setActiveSessionId(currentActive => {
+      // If we don't have an active session, or the current one is somehow invalid, use the first new one
+      if (!currentActive) return newSessions[0].id;
+      return currentActive;
+    });
+    
+    // Enqueue all analysis tasks in a strict global queue to prevent any parallel API calls
+    newSessions.forEach((s, index) => {
+      analysisQueue = analysisQueue.then(async () => {
+        // 5초 대기 (분당 최대 12개만 요청되도록 제한하여 15 RPM 회피)
+        if (index > 0) {
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        }
+        await runAnalysisForSession(s.id, s.image, s.originalFileName);
+      });
     });
     
     // reset input
@@ -99,22 +126,53 @@ export default function App() {
   };
 
   const runAnalysisForSession = async (id: string, imageBase64: string, originalName: string) => {
-    setSessions(prev => prev.map(s => s.id === id ? { ...s, status: "analyzing" } : s));
+    let sessionExists = false;
+    setSessions(prev => {
+      sessionExists = prev.some(s => s.id === id);
+      return sessionExists ? prev.map(s => s.id === id ? { ...s, status: "analyzing", progress: 0 } : s) : prev;
+    });
+
+    if (!sessionExists) return;
+
+    const controller = new AbortController();
+    abortControllers.set(id, controller);
+    
+    const progressInterval = setInterval(() => {
+      setSessions(prev => prev.map(s => {
+        if (s.id === id && s.status === "analyzing") {
+          const current = s.progress || 0;
+          const increment = current < 50 ? 5 : current < 80 ? 2 : current < 95 ? 1 : 0.2;
+          const next = Math.min(99, current + increment);
+          return { ...s, progress: next };
+        }
+        return s;
+      }));
+    }, 500);
+
     try {
-      const result = await analyzeHardwareImage(imageBase64);
+      const result = await analyzeHardwareImage(imageBase64, 5, controller.signal);
       let fileName = originalName.replace(/\.[^/.]+$/, "");
+      
+      clearInterval(progressInterval);
+      abortControllers.delete(id);
       
       setSessions(prev => prev.map(s => s.id === id ? {
         ...s,
         status: "completed",
+        progress: 100,
         analysis: result.analysis || "Mapping complete.",
         ports: result.ports || [],
         downloadFileName: fileName
       } : s));
     } catch (err: any) {
+      clearInterval(progressInterval);
+      abortControllers.delete(id);
+      if (err.message === "Analysis aborted by user") return;
+
       setSessions(prev => prev.map(s => s.id === id ? {
         ...s,
         status: "error",
+        progress: 0,
         error: err.message || "Failed to analyze"
       } : s));
     }
@@ -212,6 +270,13 @@ ${paths}
   const removeSession = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     
+    // Abort if currently analyzing
+    const controller = abortControllers.get(id);
+    if (controller) {
+      controller.abort();
+      abortControllers.delete(id);
+    }
+    
     // Determine the next active session *before* state update if needed
     let nextActiveId = activeSessionId;
     if (activeSessionId === id) {
@@ -228,8 +293,8 @@ ${paths}
   const showSidebar = hasMultiSessionMode && sessions.length > 0;
 
   const leftSidebar = showSidebar ? (
-    <div style={{ width: "260px", display: "flex", flexDirection: "column", gap: "8px", height: "100%", overflowY: "auto", borderRight: "1px solid var(--s-border)", paddingRight: "1rem" }}>
-      <div style={{ padding: "8px 0", display: "flex", gap: "8px" }}>
+    <div style={{ width: "260px", display: "flex", flexDirection: "column", height: "calc(100vh - 110px)", position: "sticky", top: "5.5rem", borderRight: "1px solid var(--s-border)", paddingRight: "1rem" }}>
+      <div style={{ padding: "8px 0", display: "flex", gap: "8px", flexShrink: 0 }}>
         <button 
           className="comm-btn comm-btn-primary" 
           style={{ flex: 1, borderRadius: "var(--radius-md)", padding: "8px 0", justifyContent: "center" }}
@@ -242,6 +307,8 @@ ${paths}
           style={{ flex: 1, borderRadius: "var(--radius-md)", padding: "8px 0", justifyContent: "center" }}
           onClick={() => {
             if (confirm("업로드된 모든 이미지를 삭제하시겠습니까?")) {
+              abortControllers.forEach(controller => controller.abort());
+              abortControllers.clear();
               setSessions([]);
               setActiveSessionId(null);
             }
@@ -251,7 +318,7 @@ ${paths}
         </button>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px", flex: 1, overflowY: "auto", paddingBottom: "8px" }}>
         {sessions.map(s => (
           <div 
             key={s.id}
@@ -270,9 +337,16 @@ ${paths}
               </div>
               <div style={{ fontSize: "11px", color: "var(--s-text-muted)", marginTop: "4px", display: "flex", alignItems: "center", gap: "4px" }}>
                 {s.status === "pending" && <><Icon icon="fluent:clock-24-regular" /> 대기중</>}
-                {s.status === "analyzing" && <><Icon icon="line-md:loading-twotone-loop" style={{ color: "var(--s-primary)" }} /> 분석중...</>}
+                {s.status === "analyzing" && <><Icon icon="line-md:loading-twotone-loop" style={{ color: "var(--s-primary)" }} /> 분석중... {Math.floor(s.progress || 0)}%</>}
                 {s.status === "completed" && <><Icon icon="fluent:checkmark-circle-24-filled" style={{ color: "var(--severity-success)" }} /> 완료 ({s.ports.length})</>}
-                {s.status === "error" && <><Icon icon="fluent:error-circle-24-filled" style={{ color: "var(--severity-critical)" }} /> 에러</>}
+                {s.status === "error" && (
+                  <div style={{ color: "var(--severity-critical)", display: "flex", alignItems: "center", gap: "4px" }} title={s.error || ""}>
+                    <Icon icon="fluent:error-circle-24-filled" /> 
+                    <span style={{ maxWidth: "120px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      에러: {s.error}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
             <button 
@@ -286,7 +360,7 @@ ${paths}
         ))}
       </div>
 
-      <div style={{ marginTop: "auto", paddingTop: "16px", paddingBottom: "16px" }}>
+      <div style={{ paddingTop: "16px", paddingBottom: "16px", flexShrink: 0 }}>
         <button 
           className="comm-btn comm-btn-primary" 
           style={{ width: "100%", background: "var(--severity-success)", borderRadius: "var(--radius-md)" }}
@@ -320,8 +394,32 @@ ${paths}
         initialFuture={activeSession?.future || []}
         initialDownloadFileName={activeSession?.downloadFileName || "hardware-ports"}
         originalFileName={activeSession?.originalFileName || ""}
+        sessionStatus={activeSession?.status}
+        sessionError={activeSession?.error}
         onStateChange={(s) => {
           if (activeSession) handleStateChange(activeSession.id, s);
+        }}
+        onRetryAnalysis={() => {
+          if (activeSession) {
+            const currentIndex = sessions.findIndex(s => s.id === activeSession.id);
+            if (currentIndex === -1) return;
+            
+            // 현재 항목을 포함하여, 이후에 있는 실패한(error) 항목들을 모두 찾습니다.
+            const sessionsToRetry = sessions.slice(currentIndex).filter(s => s.id === activeSession.id || s.status === "error");
+            
+            // 큐에 넣기 전에 미리 상태를 대기중(pending)으로 변경하여 UI에 즉각 반영합니다.
+            const retryIds = new Set(sessionsToRetry.map(s => s.id));
+            setSessions(prev => prev.map(s => retryIds.has(s.id) ? { ...s, status: "pending", error: null, progress: 0 } : s));
+
+            sessionsToRetry.forEach((s, idx) => {
+              analysisQueue = analysisQueue.then(async () => {
+                if (idx > 0) {
+                  await new Promise(resolve => setTimeout(resolve, 5000));
+                }
+                await runAnalysisForSession(s.id, s.image, s.originalFileName);
+              });
+            });
+          }
         }}
         onMultiUpload={(files) => handleUpload({ target: { files } } as any)}
         leftSidebar={leftSidebar}

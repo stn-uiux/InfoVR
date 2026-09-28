@@ -33,7 +33,7 @@ export default async function handler(req, res) {
 
     // Call Gemini API server-side
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3.8-flash",
       contents: [
         {
           parts: [

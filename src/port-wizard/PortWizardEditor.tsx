@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, memo } from "react";
 import { GoogleGenAI, Type } from "@google/genai";
 import localforage from "localforage";
 import { useNavigate } from "react-router-dom";
@@ -34,10 +34,55 @@ interface PortWizardEditorProps {
   initialFuture: PortData[][];
   initialDownloadFileName: string;
   originalFileName: string;
+  sessionStatus?: "pending" | "analyzing" | "completed" | "error";
+  sessionError?: string | null;
   onStateChange: (state: any) => void;
+  onRetryAnalysis?: () => void;
   onMultiUpload?: (files: File[]) => void;
   leftSidebar?: React.ReactNode;
 }
+
+const SidebarItem = memo(({
+  port,
+  originalIdx,
+  isActive,
+  isSelected,
+  setActivePort,
+  setSelectedIndices
+}: {
+  port: PortData;
+  originalIdx: number;
+  isActive: boolean;
+  isSelected: boolean;
+  setActivePort: (idx: number | null) => void;
+  setSelectedIndices: React.Dispatch<React.SetStateAction<number[]>>;
+}) => (
+  <div
+    id={`port-list-item-${originalIdx}`}
+    className={`wizard-reg-item ${isActive || isSelected ? "wizard-reg-item--active" : ""}`}
+    onMouseEnter={() => setActivePort(originalIdx)}
+    onMouseLeave={() => setActivePort(null)}
+    onClick={() => {
+      if (isSelected) {
+        setSelectedIndices((prev) => prev.filter((i) => i !== originalIdx));
+      } else {
+        setSelectedIndices((prev) => [...prev, originalIdx]);
+      }
+    }}
+  >
+    <div className="wizard-reg-item__content">
+      <div className="wizard-reg-item__badge">{port.portNumber}</div>
+      <div className="wizard-reg-item__details">
+        <span className="wizard-reg-item__name">{port.portName || "UNNAMED"}</span>
+        <div className="wizard-reg-item__coords">
+          <span className="wizard-reg-item__coord">X{Math.round(port.box_2d[1])}</span>
+          <span className="wizard-reg-item__coord">Y{Math.round(port.box_2d[0])}</span>
+        </div>
+      </div>
+    </div>
+    <div className="wizard-reg-item__actions"></div>
+  </div>
+));
 
 // 포트맵핑 마법사 에디터 뷰
 export default function PortWizardEditor({
@@ -48,15 +93,18 @@ export default function PortWizardEditor({
   initialFuture,
   initialDownloadFileName,
   originalFileName,
+  sessionStatus,
+  sessionError,
   onStateChange,
+  onRetryAnalysis,
   onMultiUpload,
   leftSidebar
 }: PortWizardEditorProps) {
   const navigate = useNavigate();
-  const [image, setImage] = useState<string | null>(initialImage);
+  const [image, _setImage] = useState<string | null>(initialImage);
   const [isCropping, setIsCropping] = useState(false);
-  const [analysis, setAnalysis] = useState<string>(initialAnalysis);
-  const [ports, setPorts] = useState<PortData[]>(initialPorts);
+  const [analysis, _setAnalysis] = useState<string>(initialAnalysis);
+  const [ports, _setPorts] = useState<PortData[]>(initialPorts);
   const [loading, setLoading] = useState(false);
   const [loadingLogs, setLoadingLogs] = useState<string[]>([]);
   const [loadingStep, setLoadingStep] = useState(0);
@@ -77,11 +125,37 @@ export default function PortWizardEditor({
 
   // Download Modal State
   const [showDownloadModal, setShowDownloadModal] = useState(false);
-  const [downloadFileName, setDownloadFileName] = useState(initialDownloadFileName);
+  const [downloadFileName, _setDownloadFileName] = useState(initialDownloadFileName);
+
+  // Wrappers for setters to flag internal updates
+  const setPorts = (val: React.SetStateAction<PortData[]>) => {
+    isInternalUpdate.current = true;
+    _setPorts(val);
+  };
+  const setImage = (val: React.SetStateAction<string | null>) => {
+    isInternalUpdate.current = true;
+    _setImage(val);
+  };
+  const setAnalysis = (val: React.SetStateAction<string>) => {
+    isInternalUpdate.current = true;
+    _setAnalysis(val);
+  };
+  const setDownloadFileName = (val: React.SetStateAction<string>) => {
+    isInternalUpdate.current = true;
+    _setDownloadFileName(val);
+  };
 
   // History management for Undo/Redo
-  const [past, setPast] = useState<PortData[][]>(initialPast);
-  const [future, setFuture] = useState<PortData[][]>(initialFuture);
+  const [past, _setPast] = useState<PortData[][]>(initialPast);
+  const [future, _setFuture] = useState<PortData[][]>(initialFuture);
+  const setPast = (val: React.SetStateAction<PortData[][]>) => {
+    isInternalUpdate.current = true;
+    _setPast(val);
+  };
+  const setFuture = (val: React.SetStateAction<PortData[][]>) => {
+    isInternalUpdate.current = true;
+    _setFuture(val);
+  };
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
     new Set(),
   );
@@ -125,16 +199,32 @@ export default function PortWizardEditor({
     imageSizeRef.current = imageSize;
   }, [imageSize]);
 
-  // Auto-sync state to parent
+  // Auto-sync state from parent (e.g. background analysis completion)
   useEffect(() => {
-    onStateChange({
-      image,
-      ports,
-      analysis,
-      past,
-      future,
-      downloadFileName
-    });
+    if (initialImage && initialImage !== image) _setImage(initialImage);
+    if (initialPorts !== ports) _setPorts(initialPorts);
+    if (initialAnalysis !== analysis) _setAnalysis(initialAnalysis);
+    if (initialDownloadFileName !== downloadFileName) _setDownloadFileName(initialDownloadFileName);
+    if (initialPast !== past) _setPast(initialPast);
+    if (initialFuture !== future) _setFuture(initialFuture);
+  }, [initialImage, initialPorts, initialAnalysis, initialDownloadFileName, initialPast, initialFuture]);
+
+  // Auto-sync state to parent
+  // We use a ref to prevent infinite loops when syncing back and forth
+  const isInternalUpdate = useRef(false);
+
+  useEffect(() => {
+    if (isInternalUpdate.current) {
+      onStateChange({
+        image,
+        ports,
+        analysis,
+        past,
+        future,
+        downloadFileName
+      });
+      isInternalUpdate.current = false;
+    }
   }, [image, ports, analysis, past, future, downloadFileName]);
 
   const saveHistory = useCallback(() => {
@@ -227,6 +317,18 @@ export default function PortWizardEditor({
       clearInterval(progressInterval);
     };
   }, [loading]);
+
+  useEffect(() => {
+    if (sessionStatus === "analyzing" || sessionStatus === "pending") {
+      setLoading(true);
+      setError(null);
+    } else {
+      setLoading(false);
+      if (sessionStatus === "error") {
+        setError(sessionError || "Failed to analyze");
+      }
+    }
+  }, [sessionStatus, sessionError]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -393,168 +495,7 @@ export default function PortWizardEditor({
     setActivePort(null);
   };
 
-  const analyzeImage = async () => {
-    if (!image) return;
-
-    setLoading(true);
-    setError(null);
-    setAnalysis("Establishing connection to neural engine...");
-
-    try {
-      const base64Data = image.split(",")[1];
-
-      // Save history before setting new ports from AI
-      saveHistory();
-
-      let result: {
-        analysis?: string;
-        modelName?: string;
-        ports?: {
-          portName?: string;
-          portNumber?: string | number;
-          box_2d: [number, number, number, number];
-          cropUrl?: string;
-          svgPath?: string;
-          svgType?: "ethernet" | "sfp";
-        }[];
-      };
-
-      // 1. 만약 로컬/빌드 환경에 API 키가 설정되어 있으면 브라우저에서 바로 호출합니데이
-      if (import.meta.env.VITE_GEMINI_API_KEY) {
-        // Use gemini-3-flash-preview for superior spatial reasoning and precision
-        const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
-          contents: [
-            {
-              parts: [
-                {
-                  text: `System: You are an expert hardware engineer specializing in network device mapping.
-              
-Task: Analyze the attached image and identify EVERY physical port (Ethernet/RJ45, SFP, SFP+, Console, USB, Management, etc.).
-
-Precision Requirements:
-1. Systematic Scanning: Scan the device systematically from LEFT to RIGHT, taking note of vertical columns. Do not skip any functional ports.
-2. Bounding Boxes: Provide the tightest possible [ymin, xmin, ymax, xmax] coordinates (0-1000 scale). The box must strictly encompass the physical rectangular/square opening of the port itself, NOT the space between ports and NOT the printed label.
-3. Label Matching: Look for numbers printed directly above, below, or between ports. Separate the port into a "portName" and a "portNumber". The "portName" MUST ALWAYS be in lowercase (e.g., "ethernet", "sfp", "mgmt", "console"). If a port only has a number, use "port" as the name.
-4. Grid & Stack Logic: Network ports are almost always arranged in stacked blocks (e.g., 2 rows of 12 ports). Commonly, the TOP port in a column is an ODD number (1, 3, 5) and the BOTTOM port is an EVEN number (2, 4, 6). Carefully follow this logical numerical progression to avoid mislabeling.
-5. Verification: Double-check that boxes do not heavily overlap unless they are stacked. Ensure the total number of ports matches standard configurations (e.g., 8, 16, 24, 48 ports).
-
-Return the data in this JSON format:
-{
-  "analysis": "Brief technical description of the device (MUST be written in natural Korean language. Do NOT add spaces between every letter. Use standard word spacing 띄어쓰기.)",
-  "modelName": "Identified device model name (e.g. Cisco Catalyst 9300)",
-  "ports": [
-    { "portName": "string", "portNumber": "string", "box_2d": [ymin, xmin, ymax, xmax] }
-  ]
-}`,
-                },
-                {
-                  inlineData: {
-                    mimeType: "image/png",
-                    data: base64Data,
-                  },
-                },
-              ],
-            },
-          ],
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                analysis: {
-                  type: Type.STRING,
-                  description: "Brief technical summary of detected hardware. MUST be written in natural Korean language. Use standard Korean word spacing (띄어쓰기) and do NOT insert spaces between every single character.",
-                },
-                modelName: {
-                  type: Type.STRING,
-                  description: "The specific hardware model name (e.g. Cisco Catalyst 9300)",
-                },
-                ports: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      portName: { type: Type.STRING },
-                      portNumber: { type: Type.STRING },
-                      box_2d: { type: Type.ARRAY, items: { type: Type.NUMBER } },
-                    },
-                    required: ["portName", "portNumber", "box_2d"],
-                  },
-                },
-              },
-              required: ["analysis", "modelName", "ports"],
-            },
-          },
-        });
-
-        if (!response.text) {
-          throw new Error(
-            "The model did not return a response. Please check your connection or try a different image.",
-          );
-        }
-
-        // Robust JSON parsing: strip potential markdown blocks
-        const cleanJson = response.text.replace(/```json\n?|```/g, "").trim();
-        result = JSON.parse(cleanJson);
-      } else {
-        // 2. 만약 API 키가 노출되지 않아야 하는 배포 빌드본이면 Vercel 백엔드 프록시로 요청합니데이
-        const response = await fetch("/api/analyze", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ image }),
-        });
-
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(
-            errData.error || `Server returned error (${response.status}). Please check server configuration.`
-          );
-        }
-
-        result = await response.json();
-      }
-
-      let finalAnalysis = result.analysis || "Mapping complete. Hardware identified.";
-      setAnalysis(finalAnalysis);
-      if (result.modelName) {
-        setDownloadFileName(result.modelName.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase());
-      }
-      if (result.ports && Array.isArray(result.ports)) {
-        if (result.ports.length === 0) {
-          throw new Error(
-            "No ports detected. Ensure the device is clearly visible in the image.",
-          );
-        }
-        setPorts(
-          result.ports.map((p) => ({
-            box_2d: p.box_2d,
-            portNumber: p.portNumber ?? "",
-            portName: p.portName ? String(p.portName).toLowerCase() : "port",
-            cropUrl: p.cropUrl,
-            svgPath: p.svgPath,
-            svgType: p.svgType,
-          })),
-        );
-      } else {
-        throw new Error("Failed to parse port data structure.");
-      }
-    } catch (err) {
-      console.error("Analysis Error:", err);
-      let msg = "An unexpected error occurred during analysis.";
-      if (err instanceof Error) {
-        if (err.message.includes("Unexpected token"))
-          msg = "The AI returned malformed data. Please try again.";
-        else msg = err.message;
-      }
-      setError(msg);
-      setAnalysis(`Error: ${msg}`);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const analyzeImage = async () => { if (!image) return; if (onRetryAnalysis) onRetryAnalysis(); };
 
   const executeDownload = async () => {
     if (!image || ports.length === 0) return;
@@ -735,6 +676,7 @@ ${paths}
       const originalBoxes = targetIndices.map((i) => ({
         index: i,
         box: [...currentPorts[i].box_2d] as [number, number, number, number],
+        element: document.getElementById(`port-box-${i}`)
       }));
 
       let hasMoved = false;
@@ -746,34 +688,56 @@ ${paths}
         const dy =
           ((moveEvent.clientY - startY) / currentImageSize.height) * 1000;
 
-        setPorts((prev) => {
-          const next = [...prev];
-          originalBoxes.forEach(({ index, box }) => {
-            next[index] = {
-              ...next[index],
-              box_2d: [
-                Math.max(0, Math.min(1000, box[0] + dy)),
-                Math.max(0, Math.min(1000, box[1] + dx)),
-                Math.max(0, Math.min(1000, box[2] + dy)),
-                Math.max(0, Math.min(1000, box[3] + dx)),
-              ],
-            };
-          });
-          return next;
+        originalBoxes.forEach(({ box, element }) => {
+          if (element) {
+            const newYmin = Math.max(0, Math.min(1000, box[0] + dy));
+            const newXmin = Math.max(0, Math.min(1000, box[1] + dx));
+            const newYmax = Math.max(0, Math.min(1000, box[2] + dy));
+            const newXmax = Math.max(0, Math.min(1000, box[3] + dx));
+
+            const left = (newXmin / 1000) * currentImageSize.width;
+            const top = (newYmin / 1000) * currentImageSize.height;
+            const width = ((newXmax - newXmin) / 1000) * currentImageSize.width;
+            const height = ((newYmax - newYmin) / 1000) * currentImageSize.height;
+            
+            element.style.left = `${left}px`;
+            element.style.top = `${top}px`;
+            element.style.width = `${width}px`;
+            element.style.height = `${height}px`;
+          }
         });
       };
 
-      const onMouseUp = () => {
+      const onMouseUp = (moveEvent: MouseEvent) => {
         document.removeEventListener("mousemove", onMouseMove);
         document.removeEventListener("mouseup", onMouseUp);
 
-        setTimeout(() => {
-          if (!hasMoved) {
+        if (hasMoved) {
+          const dx = ((moveEvent.clientX - startX) / currentImageSize.width) * 1000;
+          const dy = ((moveEvent.clientY - startY) / currentImageSize.height) * 1000;
+          
+          setPorts((prev) => {
+            const next = [...prev];
+            originalBoxes.forEach(({ index, box }) => {
+              next[index] = {
+                ...next[index],
+                box_2d: [
+                  Math.max(0, Math.min(1000, box[0] + dy)),
+                  Math.max(0, Math.min(1000, box[1] + dx)),
+                  Math.max(0, Math.min(1000, box[2] + dy)),
+                  Math.max(0, Math.min(1000, box[3] + dx)),
+                ],
+              };
+            });
+            return next;
+          });
+        } else {
+          setTimeout(() => {
             if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
               setSelectedIndices([idx]);
             }
-          }
-        }, 0);
+          }, 0);
+        }
       };
 
       document.addEventListener("mousemove", onMouseMove);
@@ -801,37 +765,52 @@ ${paths}
         number,
         number,
       ];
+      const element = document.getElementById(`port-box-${idx}`);
+      let hasMoved = false;
 
       const onMouseMove = (moveEvent: MouseEvent) => {
+        hasMoved = true;
         const dx =
           ((moveEvent.clientX - startX) / currentImageSize.width) * 1000;
         const dy =
           ((moveEvent.clientY - startY) / currentImageSize.height) * 1000;
 
-        setPorts((prev) => {
-          const next = [...prev];
-          next[idx] = {
-            ...next[idx],
-            box_2d: [
-              originalBox[0],
-              originalBox[1],
-              Math.max(
-                originalBox[0] + 10,
-                Math.min(1000, originalBox[2] + dy),
-              ),
-              Math.max(
-                originalBox[1] + 10,
-                Math.min(1000, originalBox[3] + dx),
-              ),
-            ],
-          };
-          return next;
-        });
+        if (element) {
+          const newYmin = originalBox[0];
+          const newXmin = originalBox[1];
+          const newYmax = Math.max(originalBox[0] + 10, Math.min(1000, originalBox[2] + dy));
+          const newXmax = Math.max(originalBox[1] + 10, Math.min(1000, originalBox[3] + dx));
+
+          const width = ((newXmax - newXmin) / 1000) * currentImageSize.width;
+          const height = ((newYmax - newYmin) / 1000) * currentImageSize.height;
+          
+          element.style.width = `${width}px`;
+          element.style.height = `${height}px`;
+        }
       };
 
-      const onMouseUp = () => {
+      const onMouseUp = (moveEvent: MouseEvent) => {
         document.removeEventListener("mousemove", onMouseMove);
         document.removeEventListener("mouseup", onMouseUp);
+
+        if (hasMoved) {
+          const dx = ((moveEvent.clientX - startX) / currentImageSize.width) * 1000;
+          const dy = ((moveEvent.clientY - startY) / currentImageSize.height) * 1000;
+
+          setPorts((prev) => {
+            const next = [...prev];
+            next[idx] = {
+              ...next[idx],
+              box_2d: [
+                originalBox[0],
+                originalBox[1],
+                Math.max(originalBox[0] + 10, Math.min(1000, originalBox[2] + dy)),
+                Math.max(originalBox[1] + 10, Math.min(1000, originalBox[3] + dx)),
+              ],
+            };
+            return next;
+          });
+        }
       };
 
       document.addEventListener("mousemove", onMouseMove);
@@ -1022,44 +1001,13 @@ ${paths}
     setPorts((prev) => {
       const newPorts = [...prev];
       const addedIndices: number[] = [];
-      const usedNumbersMap: Record<string, Set<number>> = {};
-
-      prev.forEach((p) => {
-        const key = p.portName || "port";
-        const m = String(p.portNumber).match(/^([^\d]*)(\d+)/);
-        if (m) {
-          const catKey = `${key}::${m[1]}`;
-          if (!usedNumbersMap[catKey]) usedNumbersMap[catKey] = new Set();
-          usedNumbersMap[catKey].add(parseInt(m[2], 10));
-        }
-      });
 
       [...selectedIndices]
         .sort((a, b) => a - b)
         .forEach((idx) => {
           const source = prev[idx];
-          const key = source.portName || "port";
 
-          const sourceStr = String(source.portNumber);
-          const match = sourceStr.match(/^([^\d]*)(\d+)(.*)$/);
-
-          let newPortNumber: string | number;
-          if (match) {
-            const catKey = `${key}::${match[1]}`;
-            if (!usedNumbersMap[catKey]) usedNumbersMap[catKey] = new Set();
-
-            let targetNum = 1;
-            while (usedNumbersMap[catKey].has(targetNum)) {
-              targetNum++;
-            }
-
-            usedNumbersMap[catKey].add(targetNum);
-            newPortNumber = `${match[1]}${targetNum}${match[3]}`;
-          } else if (sourceStr.trim() === "") {
-            newPortNumber = 1;
-          } else {
-            newPortNumber = `${sourceStr} (1)`;
-          }
+          let newPortNumber = source.portNumber;
 
           const duplicated: PortData = {
             ...source,
@@ -2422,54 +2370,15 @@ ${paths}
                           {!isCollapsed && (
                             <div className="wizard-category__items">
                               {items.map(({ port, originalIdx }) => (
-                                <div
+                                <SidebarItem
                                   key={`reg-${originalIdx}`}
-                                  id={`port-list-item-${originalIdx}`}
-                                  className={`wizard-reg-item ${activePort === originalIdx ||
-                                    selectedIndices.includes(originalIdx)
-                                    ? "wizard-reg-item--active"
-                                    : ""
-                                    }`}
-                                  onMouseEnter={() =>
-                                    setActivePort(originalIdx)
-                                  }
-                                  onMouseLeave={() => setActivePort(null)}
-                                  onClick={() => {
-                                    if (selectedIndices.includes(originalIdx)) {
-                                      setSelectedIndices((prev) =>
-                                        prev.filter((i) => i !== originalIdx),
-                                      );
-                                    } else {
-                                      setSelectedIndices((prev) => [
-                                        ...prev,
-                                        originalIdx,
-                                      ]);
-                                    }
-                                  }}
-                                >
-                                  <div className="wizard-reg-item__content">
-                                    <div
-                                      className="wizard-reg-item__badge"
-                                    >
-                                      {port.portNumber}
-                                    </div>
-                                    <div className="wizard-reg-item__details">
-                                      <span className="wizard-reg-item__name">
-                                        {port.portName || "UNNAMED"}
-                                      </span>
-                                      <div className="wizard-reg-item__coords">
-                                        <span className="wizard-reg-item__coord">
-                                          X{Math.round(port.box_2d[1])}
-                                        </span>
-                                        <span className="wizard-reg-item__coord">
-                                          Y{Math.round(port.box_2d[0])}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <div className="wizard-reg-item__actions"></div>
-                                </div>
+                                  port={port}
+                                  originalIdx={originalIdx}
+                                  isActive={activePort === originalIdx}
+                                  isSelected={selectedIndices.includes(originalIdx)}
+                                  setActivePort={setActivePort}
+                                  setSelectedIndices={setSelectedIndices}
+                                />
                               ))}
                             </div>
                           )}
@@ -2503,7 +2412,7 @@ ${paths}
               Neural Core
             </p>
             <p className="wizard-footer__value">
-              Gemini 1.5 Flash Core
+              Gemini 3.8 Flash Core
             </p>
           </div>
           <div>
@@ -2604,3 +2513,5 @@ ${paths}
     </div>
   );
 }
+
+
