@@ -149,7 +149,34 @@ export default function App() {
       if (!isPreAnalyzed) {
         base64 = await new Promise<string>((resolve) => {
           const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
+          reader.onloadend = () => {
+            const img = new Image();
+            img.onload = () => {
+              const canvas = document.createElement("canvas");
+              let width = img.width;
+              let height = img.height;
+              const maxDim = 1500;
+              if (width > maxDim || height > maxDim) {
+                if (width > height) {
+                  height = Math.round((height * maxDim) / width);
+                  width = maxDim;
+                } else {
+                  width = Math.round((width * maxDim) / height);
+                  height = maxDim;
+                }
+              }
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext("2d");
+              if (ctx) {
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL("image/jpeg", 0.85));
+              } else {
+                resolve(reader.result as string);
+              }
+            };
+            img.src = reader.result as string;
+          };
           reader.readAsDataURL(file);
         });
       }
@@ -180,39 +207,44 @@ export default function App() {
     });
     
     // Enqueue all analysis tasks in a strict global queue to prevent any parallel API calls
-    newSessions.forEach((s, index) => {
-      if (s.status === "completed") return; // Skip pre-analyzed SVG sessions
-      analysisQueue = analysisQueue.then(async () => {
-        // 5초 대기 (분당 최대 12개만 요청되도록 제한하여 15 RPM 회피)
-        if (index > 0) {
-          await new Promise(resolve => setTimeout(resolve, 5000));
-        }
-        await runAnalysisForSession(s.id, s.image, s.originalFileName);
+    // 단일 파일 업로드 시 자동 분석 건너뜀 (크롭 편집 등 수동 조작을 위해)
+    if (files.length > 1) {
+      newSessions.forEach((s, index) => {
+        if (s.status === "completed") return; // Skip pre-analyzed SVG sessions
+        analysisQueue = analysisQueue.then(async () => {
+          // 5초 대기 (분당 최대 12개만 요청되도록 제한하여 15 RPM 회피)
+          if (index > 0) {
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          }
+          await runAnalysisForSession(s.id, s.image, s.originalFileName);
+        });
       });
-    });
+    }
     
     // reset input
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const runAnalysisForSession = async (id: string, imageBase64: string, originalName: string) => {
-    let sessionExists = false;
-    setSessions(prev => {
-      sessionExists = prev.some(s => s.id === id);
-      return sessionExists ? prev.map(s => s.id === id ? { ...s, status: "analyzing", progress: 0 } : s) : prev;
-    });
-
-    if (!sessionExists) return;
-
     const controller = new AbortController();
     abortControllers.set(id, controller);
-    
+
+    setSessions(prev => {
+      const exists = prev.some(s => s.id === id);
+      if (!exists) {
+        // If the session was deleted before this updater runs, abort the API call
+        controller.abort();
+        return prev;
+      }
+      return prev.map(s => s.id === id ? { ...s, status: "analyzing", progress: 0 } : s);
+    });
+
     const progressInterval = setInterval(() => {
       setSessions(prev => prev.map(s => {
         if (s.id === id && s.status === "analyzing") {
           const current = s.progress || 0;
-          const increment = current < 50 ? 5 : current < 80 ? 2 : current < 95 ? 1 : 0.2;
-          const next = Math.min(99, current + increment);
+          const increment = current < 50 ? 5 : current < 80 ? 2 : current < 95 ? 1 : current < 98 ? 0.2 : 0.01;
+          const next = Math.min(99.9, current + increment);
           return { ...s, progress: next };
         }
         return s;

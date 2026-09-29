@@ -8,6 +8,7 @@ import { useEffect, useState, useMemo, useRef, useCallback, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { equipmentModels, loadCardSvgRaw, loadBaseEquipmentSvgRaw } from "../../utils/cardAssets";
 import { resolveDeviceSvgContent, resolveDeviceImage } from "../../utils/deviceAssets";
+import { inlineImagesInSvg } from "../../utils/imageUtils";
 import { getColSpan, type InsertedCard, type InsertedModule, type EquipmentModel, type EquipmentViewSide } from "../../types/equipment";
 import { moduleDefinitions } from "../../utils/moduleAssets";
 import { getElementBBox, prefixSvgIds, isPortId, filterPortElements, PORT_SELECTOR, resolvePortId } from "../../utils/svgUtils";
@@ -87,6 +88,7 @@ export interface DeviceSvgPreviewProps {
   editable?: boolean;
   maxWidth?: string;
   viewSide?: EquipmentViewSide;
+  onCompose?: (svgRaw: string) => void;
 }
 
 export const DeviceSvgPreview = memo(({
@@ -97,6 +99,7 @@ export const DeviceSvgPreview = memo(({
   editable = true,
   maxWidth = "100%",
   viewSide = "front",
+  onCompose,
 }: DeviceSvgPreviewProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const cardsKey = insertedCards.map(c => c.instanceId).join(',');
@@ -184,8 +187,12 @@ export const DeviceSvgPreview = memo(({
 
   // 모델/면/구성 변경 시 현재 캐시 키 기준으로 HTML 상태를 동기화합니다.
   useEffect(() => {
-    setComposedHtml(_previewCache.get(cacheKey) || "");
-  }, [cacheKey]);
+    const cached = _previewCache.get(cacheKey);
+    setComposedHtml(cached || "");
+    if (cached && onCompose) {
+      onCompose(cached);
+    }
+  }, [cacheKey, onCompose]);
 
   const [cardSvgMap, setCardSvgMap] = useState<Map<string, string>>(new Map());
 
@@ -228,7 +235,12 @@ export const DeviceSvgPreview = memo(({
     // 모듈이 없고 모든 카드가 로드된 상태에서 유효한 캐시 히트일 때만 캐시 사용
     if (allCardsLoaded && insertedModules.length === 0 && _previewCache.has(cacheKey)) {
       const cached = _previewCache.get(cacheKey)!;
-      if (composedHtml !== cached) setComposedHtml(cached);
+      if (composedHtml !== cached) {
+        setComposedHtml(cached);
+      }
+      if (onCompose) {
+        onCompose(cached);
+      }
       return;
     }
     let isMounted = true;
@@ -254,6 +266,15 @@ export const DeviceSvgPreview = memo(({
             }
           }
         }
+
+        if (baseSvg) {
+          try {
+            baseSvg = await inlineImagesInSvg(baseSvg);
+          } catch (e) {
+            console.error("Failed to inline base chassis image", e);
+          }
+        }
+
         if (!isMounted) return;
         if (!baseSvg) {
           setComposedHtml("");
@@ -498,6 +519,10 @@ export const DeviceSvgPreview = memo(({
         // 모든 카드가 정상적으로 로드된 경우에만 캐시 저장
         if (allCardsLoaded && insertedModules.length === 0) {
           _previewCache.set(cacheKey, finalHtml);
+        }
+
+        if (onCompose) {
+          onCompose(finalHtml);
         }
 
         if (isMounted) setComposedHtml(finalHtml);

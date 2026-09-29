@@ -221,6 +221,9 @@ for (const [path, mod] of Object.entries(baseEquipUrlModules)) {
   } else if (filename.includes("1830-PSS-32-10")) {
     svgWidth = 52;
     svgHeight = 369;
+  } else if (filename.includes("1830-PSS-32-11-vfull")) {
+    svgWidth = 52;
+    svgHeight = 738;
   } else if (filename.includes("1850-TSS-side3_blank")) {
     svgWidth = 46;
     svgHeight = 218;

@@ -321,7 +321,7 @@ export default function PortWizardEditor({
   }, [loading]);
 
   useEffect(() => {
-    if (sessionStatus === "analyzing" || sessionStatus === "pending") {
+    if (sessionStatus === "analyzing") {
       setLoading(true);
       setError(null);
     } else {
@@ -576,9 +576,8 @@ ${paths}
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     let finalFileName = downloadFileName.trim() || "hardware-ports";
-    if (!finalFileName.toLowerCase().endsWith(".svg")) {
-      finalFileName += ".svg";
-    }
+    finalFileName = finalFileName.replace(/\.[^/.]+$/, "");
+    finalFileName += ".svg";
     link.download = finalFileName;
     link.href = url;
     link.click();
@@ -1357,7 +1356,7 @@ ${paths}
               포트맵핑 마법사 <Icon icon="mdi:magic" className="comm-icon-magic-lg" />
             </h1>
             <p className="wizard-header__subtitle">
-              Systems Visual Mapper / Core 3.1
+              Systems Visual Mapper / Core 3.8
             </p>
           </div>
         </div>

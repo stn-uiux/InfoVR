@@ -46,10 +46,14 @@ export const DEVICE_TEMPLATES: DeviceTemplate[] = [
   { modelName: "AS-4125GS-TNRT2", type: "Server", uSize: 4, vendor: "Supermicro" },
   
   // Gwacheon Assets
+  { modelName: "2600XM", type: "Router", uSize: 1, vendor: "Cisco" },
   { modelName: "3C16985B", type: "Switch", uSize: 1, vendor: "3Com" },
   { modelName: "7210SAS-S-24", type: "Switch", uSize: 1, vendor: "Nokia" },
   { modelName: "7220_IXR-D3L", type: "Router", uSize: 1, vendor: "Nokia" },
   { modelName: "7220_IXR_D2L", type: "Router", uSize: 1, vendor: "Nokia" },
+  { modelName: "C3300-24TS", type: "Switch", uSize: 1, vendor: "Cisco" },
+  { modelName: "1850-TSS-5C", type: "MSPP", uSize: 1, vendor: "Nokia" },
+  { modelName: "1830-PSS-16", type: "MSPP", uSize: 2, vendor: "Nokia" },
   { modelName: "AXGATE-2300S", type: "Router", uSize: 1, vendor: "AXGATE" },
   { modelName: "CSE 512L-260B", type: "Server", uSize: 1, vendor: "Supermicro" },
   { modelName: "CX6300M-24", type: "Switch", uSize: 1, vendor: "Aruba" },

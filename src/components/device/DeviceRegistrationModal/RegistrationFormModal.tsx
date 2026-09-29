@@ -12,6 +12,7 @@ import { getEffectiveTemplates } from "../../../utils/deviceTemplates";
 import { getDeviceViewSides, hasDeviceSvgAsset } from "../../../utils/deviceAssets";
 import type { VendorName, HierarchyNode, RegisteredDevice } from "../../../types";
 import { getEffectiveCards } from "../../../utils/sampleUtils";
+import { convertSvgToPngAsync } from "../../../utils/imageUtils";
 
 
 
@@ -71,6 +72,9 @@ export const RegistrationFormModal = ({
   // Module State
   const [insertedModules, setInsertedModules] = useState<InsertedModule[]>([]);
   const [defaultViewSide, setDefaultViewSide] = useState<EquipmentViewSide>("front");
+
+  const [composedSvgFront, setComposedSvgFront] = useState<string | null>(null);
+  const [composedSvgRear, setComposedSvgRear] = useState<string | null>(null);
 
   const selectedTemplate = effectiveTemplates[selectedModelIdx];
   const selectedViewSides = useMemo(
@@ -156,10 +160,8 @@ export const RegistrationFormModal = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validate()) return;
-
-
 
     const payload: Omit<RegisteredDevice, "deviceId"> = {
       title: title.trim(),
@@ -173,11 +175,28 @@ export const RegistrationFormModal = ({
       payload.type = selectedTemplate.type;
       payload.size = selectedTemplate.uSize;
       
+      const builtinModel = equipmentModels.find(m => m.modelName === selectedTemplate.modelName);
       const customModel = customModels.find(m => m.modelName === selectedTemplate.modelName);
-      if (selectedTemplate.variant?.variantPngRaw) {
-        payload.devicePngRaw = selectedTemplate.variant.variantPngRaw;
-      } else if (customModel?.modelPngRaw) {
-        payload.devicePngRaw = customModel.modelPngRaw;
+      const equipModel = builtinModel || customModel;
+      
+      // If we have cards, use the dynamically composed SVG to ensure the thumbnail matches the actual configuration
+      if (insertedCards.length > 0 && ((defaultViewSide === "front" && composedSvgFront) || (defaultViewSide === "rear" && composedSvgRear))) {
+        const targetSvg = defaultViewSide === "front" ? composedSvgFront : composedSvgRear;
+        
+        try {
+          const w = equipModel?.equipmentSize?.width || 984;
+          const h = equipModel?.equipmentSize?.height || 200;
+          payload.devicePngRaw = await convertSvgToPngAsync(targetSvg!, w, h) || undefined;
+        } catch (err) {
+          console.error("Failed to convert SVG to WEBP", err);
+          payload.devicePngRaw = `data:image/svg+xml;utf8,${encodeURIComponent(targetSvg!)}`;
+        }
+      } else {
+        if (selectedTemplate.variant?.variantPngRaw) {
+          payload.devicePngRaw = selectedTemplate.variant.variantPngRaw;
+        } else if (customModel?.modelPngRaw) {
+          payload.devicePngRaw = customModel.modelPngRaw;
+        }
       }
     }
     payload.defaultViewSide = defaultViewSide;
@@ -415,6 +434,10 @@ export const RegistrationFormModal = ({
                     editable={true}
                     maxWidth="100%"
                     viewSide={side}
+                    onCompose={(svg) => {
+                      if (side === "front") setComposedSvgFront(svg);
+                      else setComposedSvgRear(svg);
+                    }}
                   />
                 </div>
               ))}

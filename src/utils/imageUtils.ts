@@ -1,4 +1,4 @@
-async function inlineImagesInSvg(svgRaw: string): Promise<string> {
+export async function inlineImagesInSvg(svgRaw: string): Promise<string> {
   // If there are no images in the SVG, skip DOM parsing entirely to save CPU
   if (!svgRaw.includes('<image')) return svgRaw;
 

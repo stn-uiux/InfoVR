@@ -1459,6 +1459,7 @@ export const useStore = create<AppState>()(
                     insertedCards: updates.insertedCards !== undefined ? updates.insertedCards : device.insertedCards,
                     insertedModules: updates.insertedModules !== undefined ? updates.insertedModules : device.insertedModules,
                     defaultViewSide: updates.defaultViewSide !== undefined ? updates.defaultViewSide : device.defaultViewSide,
+                    devicePngRaw: updates.devicePngRaw !== undefined ? updates.devicePngRaw : device.devicePngRaw,
                     portStates: updates.generatedPorts
                       ? updates.generatedPorts.map(gp => {
                         const ex = device.portStates.find(p => p.portId === gp.realPortNumber);

@@ -63,7 +63,8 @@ export const DevicePanel = () => {
     staticImageSrc, 
     isChassis,
     insertedCards,
-    insertedModules
+    insertedModules,
+    devicePngRaw
   }: { 
     modelName: string; 
     viewSide: string; 
@@ -72,11 +73,14 @@ export const DevicePanel = () => {
     isChassis: boolean;
     insertedCards: any[];
     insertedModules: any[];
+    devicePngRaw?: string;
   }) => {
     const customModels = useStore((s) => s.customModels);
     
     let finalSrc = staticImageSrc;
-    if (isChassis) {
+    if (devicePngRaw) {
+      finalSrc = devicePngRaw;
+    } else if (isChassis) {
       const customModel = customModels.find(m => m.modelName === modelName);
       if (customModel && customModel.modelPngRaw) {
         finalSrc = customModel.modelPngRaw;
@@ -275,6 +279,7 @@ export const DevicePanel = () => {
       insertedCards: regDevice.insertedCards,
       insertedModules: regDevice.insertedModules,
       defaultViewSide: regDevice.defaultViewSide,
+      devicePngRaw: regDevice.devicePngRaw,
     } satisfies Omit<Device, "itemId">;
 
     const success = addDevice(rack.rackId, device);
@@ -461,6 +466,7 @@ export const DevicePanel = () => {
               isChassis={isChassisModel(regDev?.modelName ?? device.modelName ?? "")} 
               insertedCards={regDev?.insertedCards ?? device.insertedCards ?? []}
               insertedModules={regDev?.insertedModules ?? device.insertedModules ?? []} 
+              devicePngRaw={regDev?.devicePngRaw ?? device.devicePngRaw}
             />
 
             <div

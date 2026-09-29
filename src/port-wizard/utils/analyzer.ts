@@ -17,13 +17,20 @@ export async function analyzeHardwareImage(image: string, maxRetries = 5, abortS
     }
     try {
       if (import.meta.env.VITE_GEMINI_API_KEY) {
-        const response = await ai.models.generateContent({
-          model: "gemini-3.8-flash",
-          contents: [
-            {
-              parts: [
-                {
-                  text: `System: You are an expert hardware engineer specializing in network device mapping.
+        const apiKey = (import.meta.env.VITE_GEMINI_API_KEY || "").trim().replace(/[^\x20-\x7E]/g, "");
+        const mimeType = image.split(";")[0].split(":")[1] || "image/png";
+        
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: `System: You are an expert hardware engineer specializing in network device mapping.
           
 Task: Analyze the attached image and identify EVERY physical port (Ethernet/RJ45, SFP, SFP+, Console, USB, Management, etc.).
 
@@ -42,57 +49,65 @@ Return the data in this JSON format:
   "ports": [
     { "portName": "string", "portNumber": "string", "box_2d": [ymin, xmin, ymax, xmax] }
   ]
-}`,
-                },
-                {
-                  inlineData: {
-                    mimeType: "image/png",
-                    data: base64Data,
+}`
                   },
-                },
-              ],
-            },
-          ],
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                analysis: {
-                  type: Type.STRING,
-                  description: "Brief technical summary of detected hardware. MUST be written in natural Korean language. Use standard Korean word spacing (띄어쓰기) and do NOT insert spaces between every single character.",
-                },
-                modelName: {
-                  type: Type.STRING,
-                  description: "The specific hardware model name (e.g. Cisco Catalyst 9300)",
-                },
-                ports: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      portName: { type: Type.STRING },
-                      portNumber: { type: Type.STRING },
-                      box_2d: { type: Type.ARRAY, items: { type: Type.NUMBER } },
+                  {
+                    inlineData: {
+                      mimeType: mimeType,
+                      data: base64Data,
                     },
-                    required: ["portName", "portNumber", "box_2d"],
                   },
-                },
+                ],
               },
-              required: ["analysis", "modelName", "ports"],
-            },
-          },
+            ],
+            generationConfig: {
+              maxOutputTokens: 8192,
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: "OBJECT",
+                properties: {
+                  analysis: { type: "STRING" },
+                  modelName: { type: "STRING" },
+                  ports: {
+                    type: "ARRAY",
+                    items: {
+                      type: "OBJECT",
+                      properties: {
+                        portName: { type: "STRING" },
+                        portNumber: { type: "STRING" },
+                        box_2d: { type: "ARRAY", items: { type: "NUMBER" } }
+                      },
+                      required: ["portName", "portNumber", "box_2d"]
+                    }
+                  }
+                },
+                required: ["analysis", "modelName", "ports"]
+              }
+            }
+          }),
+          signal: abortSignal
         });
 
-        if (!response.text) {
-          throw new Error(
-            "The model did not return a response. Please check your connection or try a different image.",
-          );
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error?.message || `API Error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
+          throw new Error("No text response from model");
         }
 
         if (abortSignal?.aborted) throw new Error("Analysis aborted by user");
-        const cleanJson = response.text.replace(/```json\n?|```/g, "").trim();
-        result = JSON.parse(cleanJson);
+        let cleanJson = data.candidates[0].content.parts[0].text;
+        const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
+        if (jsonMatch) cleanJson = jsonMatch[0];
+        try {
+          result = JSON.parse(cleanJson);
+        } catch (e) {
+          console.error("Failed to parse JSON:", cleanJson);
+          throw new Error("Invalid JSON format from model");
+        }
       } else {
         const response = await fetch("/api/analyze", {
           method: "POST",
