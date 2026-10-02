@@ -476,29 +476,28 @@ function App() {
             <div className="comm-toolbar-divider" />
 
             {/* Unified Room Operations */}
-            <div className="comm-toolbar-group">
+            <div className="comm-toolbar-group" style={{ gap: "4px" }}>
+              <span className="comm-toolbar-label" style={{ fontSize: "11px", opacity: 0.8 }}>Excel:</span>
               <button
-                className="comm-btn comm-btn-md comm-btn-secondary"
+                className="comm-btn comm-btn-md comm-btn-secondary comm-btn-icon"
                 onClick={() => {
                   setDeviceRegistrationModalOpen(false);
                   setImportExportModalRackId("all");
                 }}
                 disabled={!isRoomNode}
                 style={{ opacity: isRoomNode ? 1 : 0.5, cursor: isRoomNode ? "pointer" : "not-allowed" }}
-                title="Export Room Data (Excel)"
+                title="Excel 내보내기"
               >
-                <Icon icon="material-symbols:upload" className="icon" />
-                Excel 내보내기
+                <Icon icon="material-symbols:upload" style={{ fontSize: "18px" }} />
               </button>
               <button
-                className="comm-btn comm-btn-md comm-btn-secondary"
-                title="Import Room Data (Excel)"
+                className="comm-btn comm-btn-md comm-btn-secondary comm-btn-icon"
+                title="Excel 가져오기"
                 onClick={handleToolbarImportClick}
                 disabled={!isRoomNode}
                 style={{ opacity: isRoomNode ? 1 : 0.5, cursor: isRoomNode ? "pointer" : "not-allowed" }}
               >
-                <Icon icon="material-symbols:download" className="icon" />
-                Excel 가져오기
+                <Icon icon="material-symbols:download" style={{ fontSize: "18px" }} />
               </button>
               <input
                 type="file"
@@ -507,14 +506,12 @@ function App() {
                 accept=".xlsx"
                 onChange={handleToolbarImportFile}
               />
-            </div>
 
-            <div className="comm-toolbar-divider" style={{ margin: "0 4px" }} />
+              <div className="comm-toolbar-divider" style={{ height: "16px", margin: "0 6px" }} />
 
-            <div className="comm-toolbar-group">
-
+              <span className="comm-toolbar-label" style={{ fontSize: "11px", opacity: 0.8 }}>JSON:</span>
               <button
-                className="comm-btn comm-btn-md comm-btn-secondary"
+                className="comm-btn comm-btn-md comm-btn-secondary comm-btn-icon"
                 onClick={(e) => {
                   e.stopPropagation();
                   const activeNodeId = useStore.getState().activeNodeId;
@@ -524,20 +521,18 @@ function App() {
                 }}
                 disabled={!isRoomNode}
                 style={{ opacity: isRoomNode ? 1 : 0.5, cursor: isRoomNode ? "pointer" : "not-allowed" }}
-                title="Export Layout Template (JSON)"
+                title="JSON 내보내기"
               >
-                <Icon icon="mdi:code-json" className="icon" />
-                통합 내보내기
+                <Icon icon="material-symbols:upload" style={{ fontSize: "18px" }} />
               </button>
               <button
-                className="comm-btn comm-btn-md comm-btn-secondary"
-                title="Import Layout Template (JSON)"
+                className="comm-btn comm-btn-md comm-btn-secondary comm-btn-icon"
+                title="JSON 가져오기"
                 onClick={handleLayoutImportClick}
                 disabled={!isRoomNode}
                 style={{ opacity: isRoomNode ? 1 : 0.5, cursor: isRoomNode ? "pointer" : "not-allowed" }}
               >
-                <Icon icon="mdi:file-upload-outline" className="icon" />
-                통합 가져오기
+                <Icon icon="material-symbols:download" style={{ fontSize: "18px" }} />
               </button>
               <input
                 type="file"
@@ -602,6 +597,31 @@ function App() {
 
         {/* Right Controls */}
         <div className="comm-toolbar-right">
+          {isEditMode && !nodes.some(n => n.type === "room") && (
+            <button
+              className="comm-btn comm-btn-md comm-btn-primary"
+              onClick={() => {
+                const state = useStore.getState();
+                const rootNode = state.nodes.find(n => n.parentId === null);
+                if (rootNode) {
+                  const siblings = state.nodes.filter(n => n.parentId === rootNode.nodeId);
+                  const newId = state.addNode({
+                    parentId: rootNode.nodeId,
+                    name: "새 전산실",
+                    type: "room",
+                    order: siblings.length
+                  });
+                  state.setActiveNode(newId);
+                  state.expandNodePath(newId);
+                }
+              }}
+              title="새 전산실 만들기"
+            >
+              <Icon icon="mdi:plus" />
+              새 전산실
+            </button>
+          )}
+
           {/* Edit Mode Toggle */}
           <div
             className={`stn-mode-indicator ${isEditMode ? "active" : ""}`}
