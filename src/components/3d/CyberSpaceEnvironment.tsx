@@ -279,8 +279,11 @@ export function CyberSpaceEnvironment() {
     isEditMode,
   } = useStore();
 
+  const nodes = useStore((state) => state.nodes);
   const activeNodeId = useStore((state) => state.activeNodeId);
   const importedModels = useStore((state) => state.importedModels);
+  
+  const isRoomNode = activeNodeId ? nodes.find(n => n.nodeId === activeNodeId)?.type === "room" : false;
 
   const { scene, invalidate } = useThree();
 
@@ -376,7 +379,7 @@ export function CyberSpaceEnvironment() {
           </>
         )}
 
-        {cyberSpaceEnabled && csIsVisible && (
+        {cyberSpaceEnabled && csIsVisible && isRoomNode && (
           <group position={[csCustomSpaceSize ? csOffsetXCm / 100 : 0, 0, csCustomSpaceSize ? csOffsetZCm / 100 : 0]}>
             <EnvCleaner />
             

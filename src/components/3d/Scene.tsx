@@ -254,6 +254,9 @@ export const Scene = () => {
   const selectedDeviceId = useStore((state) => state.selectedDeviceId);
   const selectedModelId = useStore((state) => state.selectedModelId);
   const { theme } = useTheme();
+  
+  const activeNode = nodes.find(n => n.nodeId === activeNodeId);
+  const isRoomNode = activeNode?.type === "room";
 
   const [isRoomSelected, setIsRoomSelected] = React.useState(false);
 
@@ -469,7 +472,7 @@ export const Scene = () => {
         {isEditMode && (
           <group>
             {/* Server Room Bounds Wireframe */}
-            {cyberSpaceEnabled && (
+            {cyberSpaceEnabled && isRoomNode && (
               <group userData={{ isGizmo: true }}>
                 <PivotControls
                   visible={csCustomSpaceSize && isRoomSelected}
