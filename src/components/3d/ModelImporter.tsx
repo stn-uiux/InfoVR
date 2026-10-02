@@ -691,13 +691,13 @@ export const ModelImporter = () => {
                 disabled={importedModels.length === 0}
                 onClick={handleExportModels}
               >
-                <Icon icon="material-symbols:download" className="icon" /> 내보내기
+                <Icon icon="material-symbols:upload" className="icon" /> 내보내기
               </button>
               <button
                 className="comm-btn comm-btn-md comm-btn-secondary comm-flex-1"
                 onClick={() => modelImportRef.current?.click()}
               >
-                <Icon icon="material-symbols:upload" className="icon" /> 불러오기
+                <Icon icon="material-symbols:download" className="icon" /> 가져오기
               </button>
             </div>
             {(successMsg || error || importError) && (
@@ -836,13 +836,15 @@ export const ModelImporter = () => {
                   pointerEvents: "none"
                 })
               }}>
-                <button
-                  className={`sidebar-tab-btn ${floatingPanel === "serverRoomEnv" ? "active" : ""}`}
-                  onClick={(e) => toggleFloatingPanel("serverRoomEnv", e)}
-                  title="가상 공간"
-                >
-                  <Icon icon="ri:box-3-fill" className="icon" />
-                </button>
+                {activeNodeId && nodes.find(n => n.nodeId === activeNodeId)?.type === "room" && (
+                  <button
+                    className={`sidebar-tab-btn ${floatingPanel === "serverRoomEnv" ? "active" : ""}`}
+                    onClick={(e) => toggleFloatingPanel("serverRoomEnv", e)}
+                    title="가상 공간"
+                  >
+                    <Icon icon="ri:box-3-fill" className="icon" />
+                  </button>
+                )}
                 <button
                   className={`sidebar-tab-btn ${floatingPanel === "builtin" ? "active" : ""}`}
                   onClick={(e) => toggleFloatingPanel("builtin", e)}
@@ -933,7 +935,7 @@ export const ModelImporter = () => {
                 })
               }}
             >
-              {isEditMode && renderServerRoomEnvPanel()}
+              {isEditMode && activeNodeId && nodes.find(n => n.nodeId === activeNodeId)?.type === "room" && renderServerRoomEnvPanel()}
               {isEditMode && renderBuiltinPanel()}
               {isEditMode && renderProjectPanel()}
               {isEditMode && renderImportedPanel()}
@@ -1369,12 +1371,12 @@ const ModelProperties = ({
           }),
         15,
       )}
-      {model.builtinType !== "Wall" && 
+      {model.builtinType !== "Wall" &&
         vec3Block("Scale", model.scale, (v) => onUpdate({ scale: v }), 0.1)}
       {(() => {
         const isWall = model.builtinType === "Wall";
         const wp = model.wallParams ?? DEFAULT_WALL_PARAMS;
-        
+
         const baseSizeX = isWall ? wp.length : (model.baseSize?.[0] ?? 1);
         const baseSizeY = isWall ? wp.height : (model.baseSize?.[1] ?? 1);
         const baseSizeZ = isWall ? wp.thickness : (model.baseSize?.[2] ?? 1);
