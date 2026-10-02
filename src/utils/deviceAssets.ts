@@ -12,6 +12,7 @@
 import { useStore } from "../store/useStore";
 import type { EquipmentViewSide } from "../types/equipment";
 import { equipmentModels } from "./cardAssets";
+import { DEVICE_TEMPLATES } from "./deviceTemplates";
 
 interface ModelCheck {
   cardArea?: any;
@@ -239,16 +240,40 @@ export const resolveDeviceSvgContent = async (
       return mod.default;
     } catch (err) {
       console.error("Failed to load SVG for model:", modelName, err);
-      return undefined;
+      // Do not return undefined yet, let it fall through to PNG fallback
     }
   }
 
-  // Fallback: 사용자 등록 모델 SVG raw text
+  // Fallback 1: 사용자 등록 모델 SVG raw text
   const custom = findCustomModelByName(modelName);
   const svgRaw = side === "rear" ? custom?.rearSvgRaw : (custom?.modelSvgRaw || custom?.baseEquipmentViewSvgRaw);
   if (svgRaw) {
     svgContentCache.set(cacheKey, svgRaw);
     return svgRaw;
+  }
+
+  // Fallback 2: SVG가 없고 PNG 이미지만 존재하는 경우 (예: [1U] TS-432XU-RP-2G_front.png)
+  // PNG URL을 resolve한 후 간단한 SVG 래퍼로 감싸서 반환
+  const pngUrl = resolveDeviceImage(modelName, side);
+  if (pngUrl) {
+    try {
+      const { width, height } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+        img.onerror = reject;
+        img.src = pngUrl;
+      });
+      // Use the actual image dimensions for the viewBox to maintain perfect aspect ratio
+      const wrapperSvg = `<svg viewBox="0 0 ${width} ${height}" width="984" height="${(height / width) * 984}" xmlns="http://www.w3.org/2000/svg"><image href="${pngUrl}" width="100%" height="100%" preserveAspectRatio="none" /></svg>`;
+      svgContentCache.set(cacheKey, wrapperSvg);
+      return wrapperSvg;
+    } catch (err) {
+      console.error("Failed to load PNG dimensions for fallback SVG wrapper:", err);
+      // Fallback to a generic 984x200 viewBox with 'meet' to avoid distortion if loading fails
+      const wrapperSvg = `<svg viewBox="0 0 984 200" width="984" height="200" xmlns="http://www.w3.org/2000/svg"><image href="${pngUrl}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" /></svg>`;
+      svgContentCache.set(cacheKey, wrapperSvg);
+      return wrapperSvg;
+    }
   }
 
   return undefined;
