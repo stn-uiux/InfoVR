@@ -741,6 +741,22 @@ body {
   width: var(--btn-h-lg);
 }
 
+/* Icon-only padding modifier */
+.comm-btn-md.comm-btn-icon {
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
+.comm-btn-lg.comm-btn-icon {
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+}
+
+.comm-btn-sm.comm-btn-icon {
+  padding-left: 4px !important;
+  padding-right: 4px !important;
+}
+
 /* Primary - arcVRoom Style (Teal bg, black text) */
 .comm-btn-primary {
   background: var(--theme-primary);
