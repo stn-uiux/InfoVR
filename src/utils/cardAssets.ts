@@ -17,7 +17,7 @@ import { useStore } from "../store/useStore";
 
 // ── 카드 SVG: img 태그용 URL 가져오기 (라이브러리 미리보기) ────────────────
 const cardUrlModules = import.meta.glob<{ default: string }>(
-  "../assets/card/R-series-*.svg",
+  ["../assets/card/R-series-*.svg", "../assets/card/R-series-*.png", "../assets/card/R-series-*.jpg", "../assets/card/R-series-*.jpeg"],
   { eager: true },
 );
 const cpiomUrlModules = import.meta.glob<{ default: string }>(
@@ -84,12 +84,12 @@ const baseEquipUrlModules = import.meta.glob<{ default: string }>(
 function parseWidthType(filename: string): CardWidthType {
   if (filename.includes("-vfull")) return "vfull";
   if (filename.includes("-full")) return "full";
-  return "half";
+  return "single";
 }
 
-/** 파일명에서 cardType 추출 (e.g. "R-series-1-half.svg" → "R-series-1") */
+/** 파일명에서 cardType 추출 (e.g. "R-series-1.svg" → "R-series-1") */
 function parseCardType(filename: string): string {
-  return filename.replace(/\.(svg|png|jpe?g)$/i, "").replace(/-(half|full|vfull)$/, "");
+  return filename.replace(/\.(svg|png|jpe?g)$/i, "").replace(/-(full|vfull)$/, "");
 }
 
 /** SVG URL에서 width/height 추출 (SVG 컨텐츠에서) */
@@ -155,15 +155,15 @@ for (const [path, mod] of Object.entries(mdasUrlModules)) {
   const widthType = parseWidthType(filename);
   const cardType = parseCardType(filename); // e.g. "MDAs-1"
 
-  const isHalf = widthType === "half";
+  const isSingle = widthType === "single";
   _cardDefinitions.push({
     cardFileName: filename,
     cardType,
     svgUrl: mod.default,
     widthType,
     cardGroup: "standard",
-    cardSizeType: isHalf ? "half-414x77" : "full-828x80",
-    svgWidth: isHalf ? 414 : 828,
+    cardSizeType: isSingle ? "half-414x77" : "full-828x80",
+    svgWidth: isSingle ? 414 : 828,
     svgHeight: 77,
   });
 }
@@ -172,13 +172,7 @@ for (const [path, mod] of Object.entries(mdasUrlModules)) {
 for (const [path, mod] of Object.entries(ixrUrlModules)) {
   const filename = path.split("/").pop() ?? "";
   const cardType = filename.replace(/\.svg$/i, "");
-  let widthType: CardWidthType = "half";
-
-  if (filename.includes("-full")) {
-    widthType = "full";
-  } else if (filename.includes("-sixth")) {
-    widthType = "sixth";
-  }
+  const widthType = parseWidthType(filename);
 
   _cardDefinitions.push({
     cardFileName: filename,
@@ -243,7 +237,7 @@ for (const [path, mod] of Object.entries(baseEquipUrlModules)) {
 // 정렬: half → full, 이름순
 _cardDefinitions.sort((a, b) => {
   if (a.widthType !== b.widthType) {
-    return a.widthType === "half" ? -1 : 1;
+    return a.widthType === "single" ? -1 : 1;
   }
   return a.cardFileName.localeCompare(b.cardFileName, undefined, {
     numeric: true,
@@ -445,8 +439,8 @@ function createR6FullSlot(row: number, y: number) {
 }
 function createR6HalfSlots(row: number, y: number) {
   return [
-    { slotId: `row-${row}-left`, row, col: 1, x: 0, y, width: 430, height: 46, slotType: "half-430x46", accepts: ["half"] },
-    { slotId: `row-${row}-right`, row, col: 2, x: 430, y, width: 430, height: 46, slotType: "half-430x46", accepts: ["half"] },
+    { slotId: `row-${row}-left`, row, col: 1, x: 0, y, width: 430, height: 46, slotType: "half-430x46", accepts: ["single"] },
+    { slotId: `row-${row}-right`, row, col: 2, x: 430, y, width: 430, height: 46, slotType: "half-430x46", accepts: ["single"] },
   ];
 }
 

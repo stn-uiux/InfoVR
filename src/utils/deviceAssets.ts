@@ -138,20 +138,7 @@ export const resolveDeviceImage = (
 ): string | undefined => {
   if (!modelName) return undefined;
   
-  // 1. Try to find PNG URL from static assets
-  const sideMap = deviceImageSideMap;
-  const generalMap = deviceImageMap;
-
-  for (const lookupName of getLookupNames(modelName)) {
-    const sideUrl = sideMap.get(getAssetKey(lookupName, side));
-    if (sideUrl) return sideUrl;
-    if (side === "front") {
-      const staticUrl = generalMap.get(lookupName) ?? generalMap.get(lookupName.toLowerCase());
-      if (staticUrl) return staticUrl;
-    }
-  }
-
-  // 2. Fallback: custom 모델 PNG -> SVG data URL
+  // 1. Fallback: custom 모델 PNG -> SVG data URL (우선순위 높음)
   const custom = findCustomModelByName(modelName);
   const isChassis = isChassisModel(modelName);
   
@@ -169,6 +156,19 @@ export const resolveDeviceImage = (
     
     if (custom.modelPngRaw) {
       return custom.modelPngRaw;
+    }
+  }
+
+  // 2. Try to find PNG URL from static assets
+  const sideMap = deviceImageSideMap;
+  const generalMap = deviceImageMap;
+
+  for (const lookupName of getLookupNames(modelName)) {
+    const sideUrl = sideMap.get(getAssetKey(lookupName, side));
+    if (sideUrl) return sideUrl;
+    if (side === "front") {
+      const staticUrl = generalMap.get(lookupName) ?? generalMap.get(lookupName.toLowerCase());
+      if (staticUrl) return staticUrl;
     }
   }
   

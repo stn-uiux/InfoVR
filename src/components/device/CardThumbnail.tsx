@@ -10,7 +10,7 @@ const fetchPromises = new Map<string, Promise<string>>();
 
 export const preloadThumbnail = (svgUrl: string) => {
   if (!svgUrl || cache.has(svgUrl) || fetchPromises.has(svgUrl)) return;
-  if (svgUrl.match(/\.(png|jpe?g|webp)$/i)) {
+  if (svgUrl.match(/\.(png|jpe?g|webp)(\?.*)?$/i)) {
     cache.set(svgUrl, svgUrl);
     return;
   }
@@ -44,7 +44,7 @@ export const CardThumbnail: React.FC<CardThumbnailProps> = ({ svgUrl, svgRaw, ..
 
     if (!svgUrl) return;
 
-    if (svgUrl.match(/\.(png|jpe?g|webp)$/i)) {
+    if (svgUrl.match(/\.(png|jpe?g|webp)(\?.*)?$/i)) {
       setDataUrl(svgUrl);
       return;
     }

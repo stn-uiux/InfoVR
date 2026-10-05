@@ -14,24 +14,23 @@ export function getEffectiveCards(
   customModels: CustomEquipmentModel[]
 ): InsertedCard[] {
   const dCards = device.insertedCards || [];
-  const sCards = sampleCards[device.modelName || ""];
-
-  if (!sCards) {
-    if (dCards.length > 0) return dCards;
-    
-    // Fallback to custom model's default variant if it exists
-    const overrideModel = customModels.find((m) => m.modelName === device.modelName);
-    if (overrideModel?.variants?.length) {
-      const defaultVariant = overrideModel.variants.find((v: any) => v.variantName === "기본타입");
-      if (defaultVariant?.insertedCards) return defaultVariant.insertedCards;
-      if (overrideModel.variants[0]?.insertedCards) return overrideModel.variants[0].insertedCards;
+  
+  // 1. Find matching custom model and variant name
+  let overrideModel = customModels.find((m) => m.modelName === device.modelName);
+  let targetVariantName = "기본타입";
+  
+  if (!overrideModel) {
+    overrideModel = customModels.find((m) => device.modelName?.startsWith(m.modelName + " "));
+    if (overrideModel && device.modelName) {
+      targetVariantName = device.modelName.substring(overrideModel.modelName.length + 1);
     }
-    return [];
   }
 
-  // Check if device's cards exactly match the sample cards
+  const sCards = sampleCards[device.modelName || ""] || sampleCards[overrideModel?.modelName || ""];
+
+  // 2. Check if dCards exactly match sCards (unmodified sample)
   let isUnmodifiedSample = false;
-  if (dCards.length === sCards.length) {
+  if (sCards && dCards.length === sCards.length) {
     if (dCards.length === 0) {
       isUnmodifiedSample = true;
     } else {
@@ -41,18 +40,20 @@ export function getEffectiveCards(
     }
   }
 
-  if (isUnmodifiedSample) {
-    // Prioritize custom model's default variant
-    const overrideModel = customModels.find((m) => m.modelName === device.modelName);
-    if (overrideModel?.variants?.length) {
-      const defaultVariant = overrideModel.variants.find((v: any) => v.variantName === "기본타입");
-      if (defaultVariant?.insertedCards) return defaultVariant.insertedCards;
-      if (overrideModel.variants[0]?.insertedCards) return overrideModel.variants[0].insertedCards;
-    }
-    
-    // Fallback to sample cards
-    return sCards as InsertedCard[];
+  // 3. If device has customized cards (and not just an unmodified sample), use them.
+  if (dCards.length > 0 && !isUnmodifiedSample) {
+    return dCards;
   }
 
-  return dCards;
+  // 4. Fallback to custom model's variant
+  if (overrideModel?.variants?.length) {
+    const targetVariant = overrideModel.variants.find((v: any) => v.variantName === targetVariantName);
+    if (targetVariant?.insertedCards) return targetVariant.insertedCards;
+    if (overrideModel.variants[0]?.insertedCards) return overrideModel.variants[0].insertedCards;
+  }
+
+  // 5. Fallback to sampleCards
+  if (sCards) return sCards as InsertedCard[];
+
+  return [];
 }

@@ -57,7 +57,7 @@ export const CardRegistrationForm: React.FC<Props> = ({
   maxColumns = 2,
 }) => {
   const [cardName, setCardName] = useState("");
-  const [widthType, setWidthType] = useState<CardWidthType>("half");
+  const [widthType, setWidthType] = useState<CardWidthType>("single");
   const [svgRaw, setSvgRaw] = useState<string | null>(null);
   const [svgFileName, setSvgFileName] = useState("");
   const [svgDims, setSvgDims] = useState({ width: 0, height: 0 });
@@ -170,7 +170,7 @@ export const CardRegistrationForm: React.FC<Props> = ({
 
     // Reset
     setCardName("");
-    setWidthType("half");
+    setWidthType("single");
     setSvgRaw(null);
     setSvgFileName("");
     setSvgDims({ width: 0, height: 0 });
@@ -203,8 +203,8 @@ export const CardRegistrationForm: React.FC<Props> = ({
               <input
                 type="radio"
                 name="cardWidthType"
-                value="half"
-                checked={widthType === "half"}
+                value="single"
+                checked={widthType === "single"}
                 onChange={(e) => setWidthType(e.target.value as CardWidthType)}
                 style={{ cursor: "pointer", accentColor: "var(--s-primary)", width: "16px", height: "16px" }}
               />

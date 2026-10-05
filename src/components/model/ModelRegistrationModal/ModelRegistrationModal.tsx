@@ -1083,7 +1083,17 @@ export const ModelRegistrationModal: React.FC = () => {
     <>
       <StnModal
         isOpen={isOpen}
-        onClose={() => setOpen(false)}
+        onClose={() => {
+          if (activeTab === "register") {
+            if (isDirty) {
+              if (!window.confirm("저장되지 않은 변경사항이 모두 사라집니다. 목록으로 돌아가시겠습니까?")) return;
+            }
+            resetForm();
+            setActiveTab("list");
+          } else {
+            setOpen(false);
+          }
+        }}
         title="장비 모델 관리"
         icon="material-symbols:build-circle"
       >
@@ -1496,7 +1506,29 @@ export const ModelRegistrationModal: React.FC = () => {
                       </p>
 
                       <div className="mrm-models-list" style={{ marginBottom: "16px", marginTop: "4px" }}>
-                        {variants.map((v, i) => (
+                        {variants.map((v, i) => {
+                          let usageCount = 0;
+                          const originalModel = editingModelId ? customModels.find(m => m.modelId === editingModelId) : null;
+                          const originalVariant = originalModel?.variants?.find(ov => ov.variantId === v.variantId);
+                          
+                          if (originalVariant) {
+                            const oldExpected = `${originalModel!.modelName} ${originalVariant.variantName}`;
+                            usageCount = registeredDevices.filter(d => d.modelName === oldExpected).length;
+                          } else {
+                            const expectedModelName = `${modelName} ${v.variantName}`;
+                            usageCount = registeredDevices.filter(d => d.modelName === expectedModelName).length;
+                          }
+                          
+                          const handleDelete = () => {
+                            if (usageCount > 0) {
+                              if (!window.confirm(`현재 이 타입을 ${usageCount}개의 장비에서 사용 중입니다.\n타입을 삭제하면 해당 장비들은 타입 연결이 끊기고 개별 장비로 변경됩니다.\n\n정말 삭제하시겠습니까?`)) {
+                                return;
+                              }
+                            }
+                            setVariants(prev => prev.filter((_, idx) => idx !== i));
+                          };
+
+                          return (
                           <div key={v.variantId || i} className="mrm-model-row">
                             <span className="model-type-tag card-based">
                               {v.isDefault ? "기본" : "추가"}
@@ -1526,6 +1558,14 @@ export const ModelRegistrationModal: React.FC = () => {
                                   </div>
                                   <div className="model-meta">
                                     <span>{v.insertedCards?.length || 0}개 카드 장착됨</span>
+                                    {usageCount > 0 && (
+                                      <>
+                                        <span>·</span>
+                                        <span style={{ color: "var(--theme-primary)", fontWeight: 600 }}>
+                                          {usageCount}개 장비 사용 중
+                                        </span>
+                                      </>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -1542,7 +1582,7 @@ export const ModelRegistrationModal: React.FC = () => {
                                 <button
                                   type="button"
                                   className="action-icon-btn delete-btn"
-                                  onClick={() => setVariants(prev => prev.filter((_, idx) => idx !== i))}
+                                  onClick={handleDelete}
                                   title="타입 삭제"
                                   aria-label="타입 삭제"
                                 >
@@ -1551,7 +1591,7 @@ export const ModelRegistrationModal: React.FC = () => {
                               </div>
                             </div>
                           </div>
-                        ))}
+                        )})}
                       </div>
 
                       {variants.length === 0 && (
@@ -1724,12 +1764,13 @@ export const ModelRegistrationModal: React.FC = () => {
                   style={{ marginRight: 'auto', backgroundColor: '#e74c3c', color: 'white' }}
                   onClick={() => {
                     let isUsed = false;
-                    if (registeredDevices.some((d) => d.modelName === modelName)) {
+                    const modelNamePrefix = modelName + " ";
+                    if (registeredDevices.some((d) => d.modelName === modelName || d.modelName.startsWith(modelNamePrefix))) {
                       isUsed = true;
                     } else {
                       const allLayouts = Object.values(layouts);
                       for (const layout of allLayouts) {
-                        if (layout.racks.some((r) => r.devices.some((d) => d.modelName === modelName))) {
+                        if (layout.racks.some((r) => r.devices.some((d) => d.modelName === modelName || d.modelName.startsWith(modelNamePrefix)))) {
                           isUsed = true;
                           break;
                         }
@@ -2496,8 +2537,30 @@ export const ModelRegistrationModal: React.FC = () => {
             };
 
             if (editingModelId) {
+              const originalModel = customModels.find(m => m.modelId === editingModelId);
+              if (originalModel && originalModel.variants) {
+                originalModel.variants.forEach(ov => {
+                   const oldExpected = `${originalModel.modelName} ${ov.variantName}`;
+                   const newVariant = next.find(nv => nv.variantId === ov.variantId);
+                   
+                   if (!newVariant) {
+                      registeredDevices.forEach(d => {
+                         if (d.modelName === oldExpected) {
+                            updateRegisteredDevice(d.deviceId, { modelName: modelName.trim() });
+                         }
+                      });
+                   } else if (originalModel.modelName !== modelName.trim() || ov.variantName !== newVariant.variantName) {
+                      const newExpected = `${modelName.trim()} ${newVariant.variantName}`;
+                      registeredDevices.forEach(d => {
+                         if (d.modelName === oldExpected) {
+                            updateRegisteredDevice(d.deviceId, { modelName: newExpected });
+                         }
+                      });
+                   }
+                });
+              }
               updateCustomModel(editingModelId, payload);
-              showToastMsg(`타입 "${variantName}" 저장 및 모델 적용 완료!`, "success");
+              showToastMsg(`타입 저장 및 모델 적용 완료!`, "success");
             } else {
               const existing = customModels.find(m => m.modelName === payload.modelName);
               if (existing) {

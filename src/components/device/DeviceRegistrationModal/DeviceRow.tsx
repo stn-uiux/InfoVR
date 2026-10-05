@@ -1,5 +1,6 @@
 import { Icon } from "@iconify/react";
-import React from "react";
+import React, { useMemo } from "react";
+import { useStore } from "../../../store/useStore";
 
 import type { RegisteredDevice } from "../../../types";
 import { StnBadge } from "../../ui/StnBadge";
@@ -25,6 +26,32 @@ export const DeviceRow = React.memo(({
   onEdit,
   onDelete
 }: DeviceRowProps) => {
+  const { baseModelName, variantLabel } = useMemo(() => {
+    const customModels = useStore.getState().customModels;
+    let overrideModel = customModels.find((m) => m.modelName === device.modelName);
+    let bName = device.modelName || "";
+    let vName = "기본타입";
+
+    if (!overrideModel) {
+      overrideModel = customModels.find((m) => device.modelName?.startsWith(m.modelName + " "));
+      if (overrideModel && device.modelName) {
+        bName = overrideModel.modelName;
+        vName = device.modelName.substring(overrideModel.modelName.length + 1);
+      }
+    }
+
+    const isCustomized = device.insertedCards && device.insertedCards.length > 0;
+    
+    let vLabel = "고정형";
+    if (isCustomized) {
+      vLabel = "개별구성";
+    } else if (overrideModel) {
+      vLabel = vName;
+    }
+
+    return { baseModelName: bName, variantLabel: vLabel };
+  }, [device.modelName, device.insertedCards]);
+
   return (
     <tr onClick={() => onLocate(device)}>
       <td className="col-check" onClick={(e) => e.stopPropagation()}>
@@ -51,7 +78,18 @@ export const DeviceRow = React.memo(({
           {device.title || device.modelName}
         </div>
       </td>
-      <td>{device.modelName}</td>
+      <td>{baseModelName}</td>
+      <td>
+        {variantLabel === "고정형" ? (
+          <StnBadge variant="fixed">
+            {variantLabel}
+          </StnBadge>
+        ) : (
+          <StnBadge variant="chassis">
+            {variantLabel}
+          </StnBadge>
+        )}
+      </td>
       <td
         style={{
           fontFamily: "var(--font-family-mono)",
@@ -66,7 +104,7 @@ export const DeviceRow = React.memo(({
           fontSize: "12px",
         }}
       >
-        {device.macAddr}
+        {device.type}
       </td>
       <td>
         <span className="drm-vendor-tag">{device.vendor}</span>
@@ -77,7 +115,7 @@ export const DeviceRow = React.memo(({
             미실장
           </StnBadge>
         ) : (
-          <StnBadge variant="primary" style={{ color: "#38bdf8", borderColor: "rgba(56, 189, 248, 0.3)", background: "rgba(56, 189, 248, 0.1)" }}>
+          <StnBadge variant="primary">
             실장
           </StnBadge>
         )}

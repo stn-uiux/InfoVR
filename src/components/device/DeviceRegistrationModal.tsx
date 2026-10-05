@@ -991,8 +991,9 @@ export const DeviceRegistrationModal = () => {
                               </th>
                               <th className="col-name">장비명</th>
                               <th className="col-model">모델명</th>
+                              <th className="col-variant">카드유형</th>
                               <th className="col-IPAddr">IP 주소</th>
-                              <th className="col-macAddr">MAC 주소</th>
+                              <th className="col-macAddr">장비 타입</th>
                               <th className="col-vendor">제조사</th>
                               <th className="col-status">상태</th>
                               <th className="col-actions">관리</th>

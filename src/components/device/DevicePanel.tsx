@@ -10,6 +10,7 @@ import { getEffectiveCards } from "../../utils/sampleUtils";
 import { DEFAULT_CHASSIS_CARDS } from "../../utils/defaultChassisCards";
 import { generatePortMap } from "../../utils/portUtils";
 import { getNodeName } from "../../utils/nodeUtils";
+import { RegistrationFormModal } from "./DeviceRegistrationModal/RegistrationFormModal";
 
 /* ---------- Device Tile Image with loading / fallback ---------- */
 const DeviceTileImage = ({ src, alt }: { src: string; alt: string }) => {
@@ -133,6 +134,8 @@ export const DevicePanel = () => {
     null,
   );
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [editingDeviceId, setEditingDeviceId] = useState<string | null>(null);
+  const activeNodeId = useStore((s) => s.activeNodeId);
   const [isDeleteRackModalOpen, setIsDeleteRackModalOpen] = useState(false);
   const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
   const [draggedDeviceId, setDraggedDeviceId] = useState<string | null>(null);
@@ -448,12 +451,14 @@ export const DevicePanel = () => {
                 : `1px solid ${isDragOver ? "var(--theme-primary)" : borderColor}`,
             }}
             onClick={() => {
-              selectDevice(device.itemId);
-              if (selectedRackId) {
-                const state = useStore.getState();
-                if (!state.isEditMode) {
+              const state = useStore.getState();
+              if (!state.isEditMode) {
+                selectDevice(device.itemId);
+                if (selectedRackId) {
                   focusRack(selectedRackId);
                 }
+              } else {
+                setEditingDeviceId(device.deviceId);
               }
               setHighlightedDevice(device.itemId, 2500);
             }}
@@ -1506,6 +1511,18 @@ export const DevicePanel = () => {
       </div>
 
       {renderAddDeviceModal()}
+
+      {editingDeviceId && (
+        <RegistrationFormModal
+          isOpen={true}
+          onClose={() => setEditingDeviceId(null)}
+          editingDeviceId={editingDeviceId}
+          activeNodeId={activeNodeId!}
+          nodes={nodes}
+          registeredDevices={registeredDevices}
+          onSuccess={() => setEditingDeviceId(null)}
+        />
+      )}
 
       {/* Rack Deletion Confirm Modal */}
       {isDeleteRackModalOpen &&

@@ -1975,7 +1975,6 @@ button:focus {
 
 .wizard-port__input--seq {
   width: 3rem;
-  font-family: ui-monospace, SFMono-Regular, monospace;
   color: var(--s-primary);
   text-align: center;
 }

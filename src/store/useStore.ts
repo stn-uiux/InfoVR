@@ -1207,19 +1207,42 @@ export const useStore = create<AppState>()(
               }
 
               if (matchedVariant || dev.modelName === oldModel.modelName) {
-                const newVariant = updatedModel.variants?.find(v => v.variantId === matchedVariant?.variantId)
-                  || updatedModel.variants?.find(v => v.variantName === matchedVariant?.variantName)
-                  || updatedModel.variants?.[0];
+                const matchedVariantId = matchedVariant?.variantId;
+                const exactNewVariant = updatedModel.variants?.find(v => v.variantId === matchedVariantId || v.variantName === matchedVariant?.variantName);
+                const isVariantDeleted = matchedVariant && !exactNewVariant;
 
-                const newDevModelName = newVariant
-                  ? (newVariant.variantName === "기본타입" ? updatedModel.modelName : `${updatedModel.modelName} ${newVariant.variantName}`)
-                  : updatedModel.modelName;
+                const newVariant = exactNewVariant || updatedModel.variants?.[0];
+
+                const newDevModelName = isVariantDeleted
+                  ? updatedModel.modelName
+                  : (newVariant
+                    ? (newVariant.variantName === "기본타입" ? updatedModel.modelName : `${updatedModel.modelName} ${newVariant.variantName}`)
+                    : updatedModel.modelName);
+
+                const oldVariantCards = matchedVariant?.insertedCards || [];
+                let currentDevCards = dev.insertedCards || [];
+                
+                let isUnmodified = false;
+                if (currentDevCards.length === 0) {
+                  isUnmodified = true;
+                } else if (currentDevCards.length === oldVariantCards.length) {
+                  isUnmodified = currentDevCards.every((c, i) => 
+                    c.cardType === oldVariantCards[i].cardType && 
+                    c.positionIndex === oldVariantCards[i].positionIndex
+                  );
+                }
+
+                if (isVariantDeleted && isUnmodified) {
+                  currentDevCards = oldVariantCards;
+                  isUnmodified = false;
+                }
 
                 return {
                   ...dev,
                   modelName: newDevModelName,
                   size: updatedModel.unit ?? dev.size,
-                  insertedCards: newVariant?.insertedCards || [],
+                  insertedCards: isUnmodified ? [] : currentDevCards,
+                  devicePngRaw: isUnmodified ? "" : (isVariantDeleted && !dev.devicePngRaw && matchedVariant?.variantPngRaw ? matchedVariant.variantPngRaw : dev.devicePngRaw),
                 };
               }
               return dev;
@@ -1241,18 +1264,42 @@ export const useStore = create<AppState>()(
 
                 if (matchedVariant || dev.modelName === oldModel.modelName) {
                   changed = true;
-                  const newVariant = updatedModel.variants?.find(v => v.variantId === matchedVariant?.variantId)
-                    || updatedModel.variants?.find(v => v.variantName === matchedVariant?.variantName)
-                    || updatedModel.variants?.[0];
-                  const newDevModelName = newVariant
-                    ? (newVariant.variantName === "기본타입" ? updatedModel.modelName : `${updatedModel.modelName} ${newVariant.variantName}`)
-                    : updatedModel.modelName;
+                  const matchedVariantId = matchedVariant?.variantId;
+                  const exactNewVariant = updatedModel.variants?.find(v => v.variantId === matchedVariantId || v.variantName === matchedVariant?.variantName);
+                  const isVariantDeleted = matchedVariant && !exactNewVariant;
+
+                  const newVariant = exactNewVariant || updatedModel.variants?.[0];
+
+                  const newDevModelName = isVariantDeleted
+                    ? updatedModel.modelName
+                    : (newVariant
+                      ? (newVariant.variantName === "기본타입" ? updatedModel.modelName : `${updatedModel.modelName} ${newVariant.variantName}`)
+                      : updatedModel.modelName);
+
+                  const oldVariantCards = matchedVariant?.insertedCards || [];
+                  let currentDevCards = dev.insertedCards || [];
+                  
+                  let isUnmodified = false;
+                  if (currentDevCards.length === 0) {
+                    isUnmodified = true;
+                  } else if (currentDevCards.length === oldVariantCards.length) {
+                    isUnmodified = currentDevCards.every((c, i) => 
+                      c.cardType === oldVariantCards[i].cardType && 
+                      c.positionIndex === oldVariantCards[i].positionIndex
+                    );
+                  }
+
+                  if (isVariantDeleted && isUnmodified) {
+                    currentDevCards = oldVariantCards;
+                    isUnmodified = false;
+                  }
 
                   return {
                     ...dev,
                     modelName: newDevModelName,
                     size: updatedModel.unit ?? dev.size,
-                    insertedCards: newVariant?.insertedCards || [],
+                    insertedCards: isUnmodified ? [] : currentDevCards,
+                    devicePngRaw: isUnmodified ? "" : (isVariantDeleted && !dev.devicePngRaw && matchedVariant?.variantPngRaw ? matchedVariant.variantPngRaw : dev.devicePngRaw),
                   };
                 }
                 return dev;
@@ -3143,6 +3190,8 @@ export const useStore = create<AppState>()(
           isCanvasReady: false,
           isSyncingPorts: false,
           pendingImportFile: null,
+          activeNodeId: null,
+          activeSceneNodeId: null,
           customModels: cleanedCustomModels,
           racks: persistedState.baselineRacks ? structuredClone(persistedState.baselineRacks) : (persistedState.racks ? structuredClone(persistedState.racks) : []),
           importedModels: persistedState.baselineModels ? structuredClone(persistedState.baselineModels) : (persistedState.importedModels ? structuredClone(persistedState.importedModels) : []),

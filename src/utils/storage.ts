@@ -1,4 +1,5 @@
 import type { Device, DeviceType, ErrorLevel, HierarchyNode, NodeType, Orientation, Rack, RegisteredDevice, VendorName } from "../types";
+import { useStore } from "../store/useStore";
 import { DEVICE_TEMPLATES } from "./deviceTemplates";
 import { RACK_WIDTH_STANDARD } from "../components/layout/constants";
 import {
@@ -39,6 +40,33 @@ const getValue = (row: SheetRow | undefined, ...syns: string[]) => {
   return undefined;
 };
 
+const getExportModelData = (dModelName: string | undefined, dInsertedCards: unknown[] | undefined) => {
+  if (!dModelName) return { baseModelName: "", finalInsertedCards: dInsertedCards ? JSON.stringify(dInsertedCards) : "" };
+  const customModels = useStore.getState().customModels;
+  let overrideModel = customModels.find((m) => m.modelName === dModelName);
+  let baseModelName = dModelName;
+  let variantName = "기본타입";
+
+  if (!overrideModel) {
+    overrideModel = customModels.find((m) => dModelName.startsWith(m.modelName + " "));
+    if (overrideModel) {
+      baseModelName = overrideModel.modelName;
+      variantName = dModelName.substring(overrideModel.modelName.length + 1);
+    }
+  }
+
+  const isCustomized = dInsertedCards && dInsertedCards.length > 0;
+
+  let finalInsertedCards = "";
+  if (isCustomized) {
+    finalInsertedCards = JSON.stringify(dInsertedCards);
+  } else if (overrideModel) {
+    finalInsertedCards = variantName;
+  }
+
+  return { baseModelName, finalInsertedCards };
+};
+
 /** Data Flattening Helpers (Unified) */
 
 const flattenRacks = (racks: Rack[], nodes?: HierarchyNode[]) =>
@@ -64,6 +92,8 @@ const flattenDevices = (racks: Rack[], nodes?: HierarchyNode[], registeredDevice
   for (const r of racks) {
     for (const d of r.devices) {
       const regDev = registeredDevices?.find((rd) => rd.deviceId === d.deviceId);
+      const { baseModelName, finalInsertedCards } = getExportModelData(d.modelName, d.insertedCards);
+      
       rows.push({
         itemId: d.itemId,
         deviceId: d.deviceId,
@@ -81,13 +111,12 @@ const flattenDevices = (racks: Rack[], nodes?: HierarchyNode[], registeredDevice
         size: d.size,
         position: d.position,
         
-        modelName: d.modelName || "",
+        modelName: baseModelName,
         IPAddr: d.IPAddr || "",
         macAddr: d.macAddr || "",
         vendor: d.vendor || "",
-        // [MODULAR] 카드 및 모듈 정보 추가 (JSON 직렬화)
-        insertedCards: d.insertedCards ? JSON.stringify(d.insertedCards) : "",
-        insertedModules: d.insertedModules ? JSON.stringify(d.insertedModules) : "",
+        insertedCards: finalInsertedCards,
+        insertedModules: d.insertedModules && d.insertedModules.length > 0 ? JSON.stringify(d.insertedModules) : "",
       });
     }
   }
@@ -466,24 +495,27 @@ const flattenRegisteredDevices = (
   nodes: HierarchyNode[],
 ) => {
   const nodeMap = new Map(nodes.map(n => [n.nodeId, n]));
-  return devices.map((d) => ({
-    id: d.deviceId,
-    deviceGroupId: d.deviceGroupId,
-    groupName: getNodeName(nodes, d.deviceGroupId || ''),
-    nodePath: getFullPath(nodes, d.deviceGroupId || ''),
-    nodeType: nodeMap.get(d.deviceGroupId || '')?.type || 'group',
-    depth: getNodeDepth(nodes, d.deviceGroupId || ''),
-    title: d.title,
-    modelName: d.modelName,
-    type: d.type,
-    size: d.size,
-    IPAddr: d.IPAddr,
-    macAddr: d.macAddr,
-    vendor: d.vendor,
-    // [MODULAR] 마스터 장착 정보도 포함
-    insertedCards: d.insertedCards ? JSON.stringify(d.insertedCards) : "",
-    insertedModules: d.insertedModules ? JSON.stringify(d.insertedModules) : "",
-  }));
+  return devices.map((d) => {
+    const { baseModelName, finalInsertedCards } = getExportModelData(d.modelName, d.insertedCards);
+    
+    return {
+      id: d.deviceId,
+      deviceGroupId: d.deviceGroupId,
+      groupName: getNodeName(nodes, d.deviceGroupId || ''),
+      nodePath: getFullPath(nodes, d.deviceGroupId || ''),
+      nodeType: nodeMap.get(d.deviceGroupId || '')?.type || 'group',
+      depth: getNodeDepth(nodes, d.deviceGroupId || ''),
+      title: d.title,
+      modelName: baseModelName,
+      type: d.type,
+      size: d.size,
+      IPAddr: d.IPAddr,
+      macAddr: d.macAddr,
+      vendor: d.vendor,
+      insertedCards: finalInsertedCards,
+      insertedModules: d.insertedModules && d.insertedModules.length > 0 ? JSON.stringify(d.insertedModules) : "",
+    };
+  });
 };
 
 // ─── Master Sheet Builders ──────────────────────────────────────────────────

@@ -4,15 +4,14 @@
  * 장비 모델 선택 및 카드 삽입 기능을 위한 타입 정의
  */
 
-/** 카드 폭 타입: half = 1열, full = 2열, vfull = 전체 높이 1열, 또는 숫자 문자열로 N열 점유 */
-export type CardWidthType = "half" | "full" | "vfull" | string;
+/** 카드 폭 타입: single = 1칸(열) 차지, full = 전체 너비(maxColumns) 차지, vfull = 전체 높이 1칸 차지, 그 외 = 기본 1칸 차지 */
+export type CardWidthType = "single" | "full" | "vfull" | string;
 
 /** CardWidthType에서 실제 점유 열 수(colSpan) 반환 */
 export function getColSpan(widthType: CardWidthType, maxColumns: number = 2): number {
   if (widthType === "full") return maxColumns;
   if (widthType === "vfull") return 1;
-  if (widthType === "half") return Math.floor(maxColumns / 2) || 1;
-  if (widthType === "sixth") return Math.floor(maxColumns / 6) || 1;
+
   const n = parseInt(widthType);
   return n > 0 ? n : 1;
 }
@@ -20,7 +19,7 @@ export function getColSpan(widthType: CardWidthType, maxColumns: number = 2): nu
 /** 점유 열 수를 CardWidthType 문자열로 변환 (호환 매핑 포함) */
 export function colSpanToWidthType(colSpan: number, maxColumns: number = 2): CardWidthType {
   if (colSpan === maxColumns) return "full";
-  if (maxColumns > 1 && colSpan === Math.floor(maxColumns / 2)) return "half";
+  if (colSpan === 1) return "single";
   return String(colSpan);
 }
 
@@ -102,7 +101,7 @@ export interface EquipmentModel {
 
 /** 카드 정의 (카드 라이브러리에 표시) */
 export interface CardDefinition {
-  cardFileName: string; // e.g. "R-series-1-half.svg"
+  cardFileName: string; // e.g. "R-series-1.svg"
   cardType: string; // e.g. "R-series-1"
   svgUrl: string; // glob-resolved import path
   widthType: CardWidthType;

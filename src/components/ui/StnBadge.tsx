@@ -8,7 +8,9 @@ export type StnBadgeVariant =
   | "warning" 
   | "info"
   | "outline"
-  | "ghost";
+  | "ghost"
+  | "fixed"
+  | "chassis";
 
 export interface StnBadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   variant?: StnBadgeVariant;
