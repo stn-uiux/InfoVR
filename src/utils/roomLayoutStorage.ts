@@ -4,6 +4,7 @@ import type { Rack, RegisteredDevice, ImportedModel } from "../types";
 export interface RoomLayoutJson {
   version: string;
   roomId: string;
+  roomName?: string;
   cyberSpaceConfig?: any;
   racks: Rack[];
   importedModels: ImportedModel[];
@@ -26,9 +27,13 @@ export const exportRoomLayoutJson = (roomId: string, storeState: AppState) => {
     (d) => d.deviceGroupId === roomId
   );
 
+  const roomNode = storeState.nodes.find(n => n.nodeId === roomId);
+  const roomName = roomNode ? roomNode.name : "Room";
+
   const exportData: RoomLayoutJson = {
     version: "1.0",
     roomId,
+    roomName,
     cyberSpaceConfig,
     racks,
     importedModels,
@@ -39,10 +44,6 @@ export const exportRoomLayoutJson = (roomId: string, storeState: AppState) => {
   const blob = new Blob([jsonStr], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  
-  // Find room name for the file name
-  const roomNode = storeState.nodes.find(n => n.nodeId === roomId);
-  const roomName = roomNode ? roomNode.name : "Room";
   
   a.href = url;
   a.download = `layout_${roomName.replace(/\s+/g, '_')}_${new Date().getTime()}.json`;
@@ -93,7 +94,7 @@ export const importRoomLayoutJson = async (
     }));
 
     // Call a store action to replace the layout for the room.
-    storeState.replaceRoomLayout(roomId, newRacks, newModels, newDevices);
+    storeState.replaceRoomLayout(roomId, newRacks, newModels, newDevices, data.roomName);
 
     storeState.showToast("레이아웃을 성공적으로 불러왔습니다.", "success");
   } catch (error) {

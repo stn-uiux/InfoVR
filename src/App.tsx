@@ -51,6 +51,7 @@ import { usePreloadThumbnails } from "./hooks/usePreloadThumbnails";
 import logoLightFull from "./assets/logo/InfoVR_light_full.svg";
 import logoDarkFull from "./assets/logo/InfoVR_dark_full.svg";
 import { exportRoomLayoutJson, importRoomLayoutJson } from "./utils/roomLayoutStorage";
+import layoutSTN from "./assets/layout_STN.json";
 
 /* ---------- Device Delete Confirmation Modal (top-level, z=99999) ---------- */
 const DeviceDeleteConfirmModal = () => {
@@ -598,28 +599,79 @@ function App() {
         {/* Right Controls */}
         <div className="comm-toolbar-right">
           {isEditMode && !nodes.some(n => n.type === "room") && (
-            <button
-              className="comm-btn comm-btn-md comm-btn-primary"
-              onClick={() => {
-                const state = useStore.getState();
-                const rootNode = state.nodes.find(n => n.parentId === null);
-                if (rootNode) {
-                  const siblings = state.nodes.filter(n => n.parentId === rootNode.nodeId);
-                  const newId = state.addNode({
-                    parentId: rootNode.nodeId,
-                    name: "새 전산실",
-                    type: "room",
-                    order: siblings.length
-                  });
-                  state.setActiveNode(newId);
-                  state.expandNodePath(newId);
-                }
-              }}
-              title="새 전산실 만들기"
-            >
-              <Icon icon="mdi:plus" />
-              새 전산실
-            </button>
+            <>
+              <button
+                className="comm-btn comm-btn-md comm-btn-secondary"
+                onClick={() => {
+                  const state = useStore.getState();
+                  const rootNode = state.nodes.find(n => n.parentId === null);
+                  if (rootNode) {
+                    const siblings = state.nodes.filter(n => n.parentId === rootNode.nodeId);
+                    const newId = state.addNode({
+                      parentId: rootNode.nodeId,
+                      name: layoutSTN.roomName || "STN테스트베드",
+                      type: "room",
+                      order: siblings.length
+                    });
+
+                    // Replace room layout with layoutSTN
+                    const newRacks = (layoutSTN.racks || []).map((r: any) => {
+                      const newRackId = crypto.randomUUID();
+                      return {
+                        ...r,
+                        rackId: newRackId,
+                        mapId: newId,
+                        devices: (r.devices || []).map((d: any) => ({ ...d, itemId: crypto.randomUUID(), rackId: newRackId }))
+                      };
+                    });
+                    const newModels = (layoutSTN.importedModels || []).map((m: any) => ({
+                      ...m,
+                      id: crypto.randomUUID()
+                    }));
+                    const newDevices = (layoutSTN.registeredDevices || []).map((d: any) => ({
+                      ...d,
+                      deviceGroupId: newId
+                    }));
+
+                    state.setActiveNode(newId);
+                    state.expandNodePath(newId);
+
+                    state.replaceRoomLayout(newId, newRacks, newModels, newDevices, layoutSTN.roomName);
+                    
+                    if (layoutSTN.cyberSpaceConfig) {
+                      state.setCyberSpaceConfig(layoutSTN.cyberSpaceConfig);
+                    }
+                  }
+                }}
+                title="STN테스트베드 전산실 만들기"
+              >
+                <Icon icon="mdi:folder-download" />
+                STN테스트베드
+              </button>
+
+              <button
+                className="comm-btn comm-btn-md comm-btn-primary"
+                onClick={() => {
+                  const state = useStore.getState();
+                  const rootNode = state.nodes.find(n => n.parentId === null);
+                  if (rootNode) {
+                    const siblings = state.nodes.filter(n => n.parentId === rootNode.nodeId);
+                    const newId = state.addNode({
+                      parentId: rootNode.nodeId,
+                      name: "새 전산실",
+                      type: "room",
+                      order: siblings.length
+                    });
+                    state.setActiveNode(newId);
+                    state.expandNodePath(newId);
+                  }
+                }}
+                title="새 전산실 만들기"
+              >
+                <Icon icon="mdi:plus" />
+                새 전산실
+              </button>
+            </>
           )}
 
           {/* Edit Mode Toggle */}

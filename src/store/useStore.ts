@@ -394,7 +394,8 @@ export interface AppState {
     roomId: string,
     newRacks: Rack[],
     newModels: ImportedModel[],
-    newDevices: RegisteredDevice[]
+    newDevices: RegisteredDevice[],
+    roomName?: string
   ) => void;
   updateDevicePortStates: (
     deviceId: string,
@@ -2496,7 +2497,7 @@ export const useStore = create<AppState>()(
         });
       },
 
-      replaceRoomLayout: (roomId, newRacks, newModels, newDevices) => {
+      replaceRoomLayout: (roomId, newRacks, newModels, newDevices, roomName) => {
         set((state) => {
           // Remove old devices for racks in this room, then add new devices
           const rackIdsToReplace = new Set(state.layouts[roomId]?.racks?.map(r => r.rackId) || []);
@@ -2515,7 +2516,15 @@ export const useStore = create<AppState>()(
 
           const isCurrentNode = state.activeNodeId === roomId;
 
+          const updatedNodes = state.nodes.map(n => {
+            if (n.nodeId === roomId && roomName) {
+              return { ...n, name: roomName };
+            }
+            return n;
+          });
+
           return {
+            nodes: updatedNodes,
             layouts: updatedLayouts,
             racks: isCurrentNode ? newRacks : state.racks,
             importedModels: isCurrentNode ? newModels : state.importedModels,
