@@ -458,7 +458,7 @@ export const DevicePanel = () => {
                   focusRack(selectedRackId);
                 }
               } else {
-                setEditingDeviceId(device.deviceId);
+                setEditingDeviceId(device.deviceId ?? null);
               }
               setHighlightedDevice(device.itemId, 2500);
             }}

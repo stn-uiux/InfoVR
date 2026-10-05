@@ -347,6 +347,7 @@ export const ModelRegistrationModal: React.FC = () => {
   const restoreDefaultTemplate = useStore((s) => s.restoreDefaultTemplate);
   const layouts = useStore((s) => s.layouts);
   const registeredDevices = useStore((s) => s.registeredDevices);
+  const updateRegisteredDevice = useStore((s) => s.updateRegisteredDevice);
 
   // Tabs: "register" | "list"
   const [activeTab, setActiveTab] = useState<"register" | "list">("list");
@@ -1765,12 +1766,12 @@ export const ModelRegistrationModal: React.FC = () => {
                   onClick={() => {
                     let isUsed = false;
                     const modelNamePrefix = modelName + " ";
-                    if (registeredDevices.some((d) => d.modelName === modelName || d.modelName.startsWith(modelNamePrefix))) {
+                    if (registeredDevices.some((d) => d.modelName && (d.modelName === modelName || d.modelName.startsWith(modelNamePrefix)))) {
                       isUsed = true;
                     } else {
                       const allLayouts = Object.values(layouts);
                       for (const layout of allLayouts) {
-                        if (layout.racks.some((r) => r.devices.some((d) => d.modelName === modelName || d.modelName.startsWith(modelNamePrefix)))) {
+                        if (layout.racks.some((r) => r.devices.some((d) => d.modelName && (d.modelName === modelName || d.modelName.startsWith(modelNamePrefix))))) {
                           isUsed = true;
                           break;
                         }
