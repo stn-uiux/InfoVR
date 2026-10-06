@@ -34,12 +34,13 @@ export const getFrontDirection = (
  */
 export const getEffectiveDimensions = (
   width: number,
+  depth: number,
   orientation: Orientation,
 ): { effectiveWidth: number; effectiveDepth: number } => {
   const isRotated = orientation === 90 || orientation === 270;
   return {
-    effectiveWidth: isRotated ? RACK_DEPTH : width,
-    effectiveDepth: isRotated ? width : RACK_DEPTH,
+    effectiveWidth: isRotated ? depth : width,
+    effectiveDepth: isRotated ? width : depth,
   };
 };
 

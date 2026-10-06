@@ -231,6 +231,10 @@ function App() {
   const activeNode = nodes.find(n => n.nodeId === activeNodeId);
   const isRoomNode = activeNode?.type === "room";
 
+  // Rack creation state
+  const [selectedRackSize, setSelectedRackSize] = useState<string>("24-100");
+  const [isRackBidirectional, setIsRackBidirectional] = useState<boolean>(false);
+
   const isDirty = useMemo(() => {
     // Keep these store slices as render triggers for getIsDirty().
     void racks;
@@ -378,63 +382,55 @@ function App() {
             <div className="comm-toolbar-divider" />
 
             {/* Add Rack Consolidated */}
-            <div className="comm-toolbar-group" style={{ gap: "4px" }}>
-              <span
-                className="comm-toolbar-label"
-                style={{ fontSize: "11px", opacity: 0.8 }}
-              >
-                Std:
+            <div className="comm-toolbar-group" style={{ gap: "4px", display: "flex", alignItems: "center" }}>
+              <span className="comm-toolbar-label" style={{ fontSize: "11px", opacity: 0.8, marginRight: "4px" }}>
+                랙 추가:
               </span>
-              <button
-                className="comm-btn comm-btn-md comm-btn-secondary comm-btn-compact"
-                onClick={() => addRack(24)}
+              <select
+                className="stn-input stn-input-md"
+                style={{ width: "90px" }}
+                value={selectedRackSize}
+                onChange={(e) => setSelectedRackSize(e.target.value)}
               >
-                24
-              </button>
-              <button
-                className="comm-btn comm-btn-md comm-btn-secondary comm-btn-compact"
-                onClick={() => addRack(32)}
-              >
-                32
-              </button>
-              <button
-                className="comm-btn comm-btn-md comm-btn-secondary comm-btn-compact"
-                onClick={() => addRack(48)}
-              >
-                48
-              </button>
+                <option value="24-30">24U 30</option>
+                <option value="24-60">24U 60</option>
+                <option value="24-75">24U 75</option>
+                <option value="24-100">24U 100</option>
+                <option value="24-120">24U 120</option>
+                <option value="32-30">32U 30</option>
+                <option value="32-60">32U 60</option>
+                <option value="32-75">32U 75</option>
+                <option value="32-100">32U 100</option>
+                <option value="32-120">32U 120</option>
+                <option value="48-30">48U 30</option>
+                <option value="48-60">48U 60</option>
+                <option value="48-75">48U 75</option>
+                <option value="48-100">48U 100</option>
+                <option value="48-120">48U 120</option>
+              </select>
 
               {/*
-              <div
-                className="comm-toolbar-divider"
-                style={{ height: "16px", margin: "0 6px" }}
-              />
-
-              <span
-                className="comm-toolbar-label"
-                style={{ fontSize: "11px", opacity: 0.8 }}
+              <select
+                className="stn-input stn-input-md"
+                style={{ width: "90px" }}
+                value={isRackBidirectional ? "bidirectional" : "unidirectional"}
+                onChange={(e) => setIsRackBidirectional(e.target.value === "bidirectional")}
               >
-                Wide:
-              </span>
-              <button
-                className="comm-btn comm-btn-md comm-btn-secondary comm-btn-compact"
-                onClick={() => addRack(24, undefined, 1.0)}
-              >
-                24
-              </button>
-              <button
-                className="comm-btn comm-btn-md comm-btn-secondary comm-btn-compact"
-                onClick={() => addRack(32, undefined, 1.0)}
-              >
-                32
-              </button>
-              <button
-                className="comm-btn comm-btn-md comm-btn-secondary comm-btn-compact"
-                onClick={() => addRack(48, undefined, 1.0)}
-              >
-                48
-              </button>
+                <option value="unidirectional">단일방향</option>
+                <option value="bidirectional">양방향</option>
+              </select>
               */}
+
+              <button
+                className="comm-btn comm-btn-md comm-btn-primary comm-btn-compact"
+                onClick={() => {
+                  const [u, d] = selectedRackSize.split("-").map(Number);
+                  addRack(u as 24 | 32 | 48, undefined, undefined, d as 60 | 80 | 100, isRackBidirectional);
+                }}
+              >
+                추가
+              </button>
+
             </div>
 
             <div className="comm-toolbar-divider" />
@@ -637,7 +633,7 @@ function App() {
                     state.expandNodePath(newId);
 
                     state.replaceRoomLayout(newId, newRacks, newModels, newDevices, layoutSTN.roomName);
-                    
+
                     if (layoutSTN.cyberSpaceConfig) {
                       state.setCyberSpaceConfig(layoutSTN.cyberSpaceConfig);
                     }

@@ -261,6 +261,8 @@ export interface AppState {
   setActiveNode: (nodeId: string | null) => void;
   setImportExportModalRackId: (id: string | null) => void;
 
+  selectedRackSide: "front" | "rear" | null;
+
   // Hovered Device Tooltip
   hoveredDevice: { device: Device; x: number; y: number; rackTitle?: string; rackId?: string } | null;
   setHoveredDevice: (payload: { device: Device; x: number; y: number; rackTitle?: string; rackId?: string } | null) => void;
@@ -269,10 +271,12 @@ export interface AppState {
     rackSize: 24 | 32 | 48,
     position?: [number, number],
     width?: number,
+    rackDepth?: number,
+    isBidirectional?: boolean,
   ) => void;
   moveRack: (id: string, newPosition: [number, number]) => boolean;
   deleteRack: (id: string) => void;
-  selectRack: (id: string | null) => void;
+  selectRack: (id: string | null, side?: "front" | "rear" | null) => void;
   selectDevice: (id: string | null, portId?: string | null) => void;
   focusRack: (id: string | null) => void;
   setObstructingRackIds: (ids: string[]) => void;
@@ -421,9 +425,11 @@ const checkCollision = (
   pos: [number, number],
   width: number,
   orientation: 0 | 90 | 180 | 270 = 180,
+  depth: number = 1.0,
 ): boolean => {
   const { effectiveWidth: w1, effectiveDepth: d1 } = getEffectiveDimensions(
     width,
+    depth,
     orientation,
   );
   const x1 = pos[0] * GRID_SPACING;
@@ -434,6 +440,7 @@ const checkCollision = (
 
     const { effectiveWidth: w2, effectiveDepth: d2 } = getEffectiveDimensions(
       r.width,
+      (r.rackDepth || 100) / 100,
       r.orientation ?? 180,
     );
     const x2 = r.position[0] * GRID_SPACING;
@@ -454,6 +461,7 @@ export const checkFrontClearanceViolation = (
   newPos: [number, number],
   movedRackOrientation?: 0 | 90 | 180 | 270,
   movedRackWidth?: number,
+  movedRackDepth: number = 1.0,
 ): boolean => {
   const CLEARANCE = 1.74;
 
@@ -463,7 +471,7 @@ export const checkFrontClearanceViolation = (
   const placedWidth = movedRackWidth ?? movedRack?.width ?? RACK_WIDTH_STANDARD;
 
   const placedFrontDir = getFrontDirection(placedOrientation);
-  const placedDims = getEffectiveDimensions(placedWidth, placedOrientation);
+  const placedDims = getEffectiveDimensions(placedWidth, movedRackDepth, placedOrientation);
 
   const isInFront = (
     frontDir: { x: number; z: number },
@@ -495,7 +503,8 @@ export const checkFrontClearanceViolation = (
     if (otherRack.rackId === movedRackId) continue;
 
     const otherOrientation = otherRack.orientation ?? 180;
-    const otherDims = getEffectiveDimensions(otherRack.width, otherOrientation);
+    const otherDepth = (otherRack.rackDepth || 100) / 100;
+    const otherDims = getEffectiveDimensions(otherRack.width, otherDepth, otherOrientation);
     const deltaToOtherX = (otherRack.position[0] - newPos[0]) * GRID_SPACING;
     const deltaToOtherZ = (otherRack.position[1] - newPos[1]) * GRID_SPACING;
 
@@ -1412,6 +1421,7 @@ export const useStore = create<AppState>()(
           layouts,
           setActiveNode,
           selectRack,
+          selectedRackSide,
           focusRack,
           setHighlightedDevice,
         } = get();
@@ -1625,7 +1635,7 @@ export const useStore = create<AppState>()(
       hoveredDevice: null,
       setHoveredDevice: (payload) => set({ hoveredDevice: payload }),
 
-      addRack: (rackSize, position = [0, 0], width = RACK_WIDTH_STANDARD) => {
+      addRack: (rackSize, position = [0, 0], width = RACK_WIDTH_STANDARD, rackDepth = 80, isBidirectional = false) => {
         const { racks, isEditMode, _cameraRef, pushUndoState } = get();
 
         if (isEditMode) {
@@ -1666,14 +1676,16 @@ export const useStore = create<AppState>()(
         const nodeRacks = racks.filter((r) => r.mapId === activeNodeId);
 
         let finalPos = spawnPos;
-        if (checkCollision(nodeRacks, null, spawnPos, width)) {
+        const rDepth = (rackDepth || 100) / 100;
+        if (checkCollision(nodeRacks, null, spawnPos, width, 180, rDepth)) {
           // 기존 랙들의 실제 크기를 기반으로 정확히 옆에 붙는 후보 위치를 생성
-          const newDims = getEffectiveDimensions(width, 180);
+          const newDims = getEffectiveDimensions(width, rDepth, 180);
           const candidates: [number, number][] = [];
 
           for (const other of nodeRacks) {
             const otherDims = getEffectiveDimensions(
               other.width,
+              (other.rackDepth || 100) / 100,
               other.orientation ?? 180,
             );
             const ox = other.position[0] * GRID_SPACING;
@@ -1703,7 +1715,7 @@ export const useStore = create<AppState>()(
 
           let found = false;
           for (const candidate of candidates) {
-            if (!checkCollision(nodeRacks, null, candidate, width)) {
+            if (!checkCollision(nodeRacks, null, candidate, width, 180, rDepth)) {
               finalPos = candidate;
               found = true;
               break;
@@ -1720,7 +1732,7 @@ export const useStore = create<AppState>()(
                     spawnPos[0] + (dx * width) / GRID_SPACING,
                     spawnPos[1] + (dz * (newDims.effectiveDepth + 0.02)) / GRID_SPACING,
                   ];
-                  if (!checkCollision(nodeRacks, null, candidate, width)) {
+                  if (!checkCollision(nodeRacks, null, candidate, width, 180, rDepth)) {
                     finalPos = candidate;
                     found = true;
                     break;
@@ -1736,6 +1748,8 @@ export const useStore = create<AppState>()(
           rackId: crypto.randomUUID(),
           mapId: activeNodeId!,
           rackSize,
+          rackDepth,
+          isBidirectional,
           width,
           position: finalPos,
           orientation: 180,
@@ -1786,7 +1800,7 @@ export const useStore = create<AppState>()(
         const nodeRacks = racks.filter((r) => r.mapId === rack.mapId);
 
         if (
-          checkCollision(nodeRacks, id, newPosition, rack.width, rack.orientation)
+          checkCollision(nodeRacks, id, newPosition, rack.width, rack.orientation, (rack.rackDepth || 100) / 100)
         ) {
           showToast("겹치는 위치에는 렉을 배치할 수 없습니다.", "error");
           return false;
@@ -1830,7 +1844,9 @@ export const useStore = create<AppState>()(
         });
       },
 
-      selectRack: (id) => {
+      selectedRackSide: null,
+
+      selectRack: (id, side = null) => {
         const state = get();
         if (state.isDragging && state.draggingRackId && state.dragPosition) {
           const gridX =
@@ -1853,6 +1869,7 @@ export const useStore = create<AppState>()(
 
         set({
           selectedRackId: id,
+          selectedRackSide: side,
           focusedRackId: null,
           obstructingRackIds: [],
           obstructingModelIds: [],
@@ -1920,10 +1937,18 @@ export const useStore = create<AppState>()(
           const worldX = newPosition[0] * GRID_SPACING;
 
           let xSnapped = false;
+          const myDepth = (rack.rackDepth || 100) / 100;
+          const worldZ = newPosition[1] * GRID_SPACING;
+          
           for (const other of nodeRacks) {
             if (other.rackId === id) continue;
-            // ── X축 스냅 (좌우로 나란히 붙이기): 같은 Z 행 ──
-            if (Math.abs(other.position[1] - newPosition[1]) <= 0.1) {
+            
+            const otherDepth = (other.rackDepth || 100) / 100;
+            const myFrontZ = worldZ + myDepth / 2;
+            const otherFrontZ = other.position[1] * GRID_SPACING + otherDepth / 2;
+
+            // ── X축 스냅 (좌우로 나란히 붙이기): 같은 앞면 기준 Z 정렬 ──
+            if (Math.abs(myFrontZ - otherFrontZ) <= 0.2) {
               const otherWorldX = other.position[0] * GRID_SPACING;
               const gap =
                 Math.abs(worldX - otherWorldX) - (rack.width + other.width) / 2;
@@ -1934,7 +1959,7 @@ export const useStore = create<AppState>()(
                 const snappedWorldX =
                   otherWorldX + (direction * (other.width + rack.width)) / 2 + (direction * RACK_GAP);
                 finalPosition[0] = snappedWorldX / GRID_SPACING;
-                finalPosition[1] = other.position[1]; // 완벽한 전후 정렬 (Align Z-axis)
+                finalPosition[1] = (otherFrontZ - myDepth / 2) / GRID_SPACING; // 완벽한 전면부 정렬 (Align Front Face)
                 xSnapped = true;
                 break;
               }
@@ -1943,9 +1968,6 @@ export const useStore = create<AppState>()(
 
           // ── Z축 스냅 (앞뒤로 붙이기 / back-to-back): 같은 X 열 ──
           if (!xSnapped) {
-            const worldZ = newPosition[1] * GRID_SPACING;
-            const RACK_D = 1.0; // RACK_DEPTH 상수와 동일
-
             for (const other of nodeRacks) {
               if (other.rackId === id) continue;
               const otherWorldX = other.position[0] * GRID_SPACING;
@@ -1956,14 +1978,15 @@ export const useStore = create<AppState>()(
               )
                 continue;
 
+              const otherDepth = (other.rackDepth || 100) / 100;
               const otherWorldZ = other.position[1] * GRID_SPACING;
               const zGap =
-                Math.abs(worldZ - otherWorldZ) - (RACK_D + RACK_D) / 2;
+                Math.abs(worldZ - otherWorldZ) - (myDepth + otherDepth) / 2;
 
               if (zGap >= -0.1 && zGap < SNAP_THRESHOLD) {
                 const direction = worldZ > otherWorldZ ? 1 : -1;
                 const snappedWorldZ =
-                  otherWorldZ + (direction * (RACK_D + RACK_D)) / 2;
+                  otherWorldZ + (direction * (myDepth + otherDepth)) / 2;
                 finalPosition[1] = snappedWorldZ / GRID_SPACING;
                 finalPosition[0] = other.position[0]; // 완벽한 좌우 정렬 (Align X-axis)
                 break;
@@ -1979,6 +2002,7 @@ export const useStore = create<AppState>()(
           finalPosition,
           rack.width,
           rack.orientation,
+          (rack.rackDepth || 100) / 100,
         );
         const frontClearanceViolation = checkFrontClearanceViolation(
           nodeRacks,
@@ -1986,6 +2010,7 @@ export const useStore = create<AppState>()(
           finalPosition,
           rack.orientation,
           rack.width,
+          (rack.rackDepth || 100) / 100,
         );
 
         if (colliding || frontClearanceViolation) {

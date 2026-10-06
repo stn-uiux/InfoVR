@@ -78,7 +78,7 @@
   --table-row-alt: rgba(255, 255, 255, 0.1);
   --table-border: rgba(219, 223, 234, 0.6);
   /* Toolbar/Header */
-  --toolbar-bg: rgba(255, 255, 255, 0.8);
+  --toolbar-bg: rgba(255, 255, 255, 0.9);
   --toolbar-border: rgba(255, 255, 255, 0.5);
   /* Modal */
   --modal-bg: rgba(255, 255, 255, 0.8);
@@ -847,16 +847,16 @@ body {
 select.stn-input.stn-input-lg,
 select.stn-input.stn-input-md,
 select.stn-input.stn-input-sm {
-  padding-right: 32px;
+  padding: 0 28px 0 8px;
 }
 
 select.stn-input {
   appearance: none;
   background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='24' height='24'%3E%3Cpath fill='%23888' d='M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 12px center;
+  background-position: right 6px center;
   background-size: 14px 14px;
-  padding-right: 32px;
+  padding-right: 28px;
   padding-top: 0;
   padding-bottom: 0;
 }

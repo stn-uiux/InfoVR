@@ -62,6 +62,7 @@ export interface Device {
   position: number;
   imageName?: string;
   size: number;
+  mountSide?: "front" | "rear"; // 랙 전면/후면 마운트 위치 (양방향 랙용)
   del_yn?: string;
   modiDate?: string;
   regDate?: string;
@@ -213,6 +214,8 @@ export interface Rack {
   rackTitle?: string;
   rackType?: string;
   rackSize: 24 | 32 | 48; // (ex: uHeight)
+  rackDepth?: number; // 랙 깊이 (cm)
+  isBidirectional?: boolean; // 양방향(전면/후면 모두 장착 가능) 여부
   memo?: string;
   del_yn?: string;
   modiDate?: string;

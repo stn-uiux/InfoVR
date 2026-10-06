@@ -1412,6 +1412,38 @@ export const DevicePanel = () => {
       </div>
 
       <div className="stn-side-panel-content">
+        {/* Rack Configuration (Size) (Edit Mode Only) */}
+        {isEditMode && (
+          <div className="stn-section" style={{ marginBottom: "16px" }}>
+            <h3 className="stn-section-title">Rack Size & Depth</h3>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <select
+                className="stn-input stn-input-sm"
+                style={{ width: "100%" }}
+                value={`${rack.rackSize}-${rack.rackDepth || 100}`}
+                onChange={(e) => {
+                  const [u, d] = e.target.value.split("-").map(Number);
+                  updateRack(rack.rackId, { rackSize: u as 24 | 32 | 48, rackDepth: d });
+                }}
+              >
+                {[
+                  { u: 24, d: 30 }, { u: 24, d: 60 }, { u: 24, d: 75 }, { u: 24, d: 100 }, { u: 24, d: 120 },
+                  { u: 32, d: 30 }, { u: 32, d: 60 }, { u: 32, d: 75 }, { u: 32, d: 100 }, { u: 32, d: 120 },
+                  { u: 48, d: 30 }, { u: 48, d: 60 }, { u: 48, d: 75 }, { u: 48, d: 100 }, { u: 48, d: 120 },
+                ].map((opt) => {
+                  const maxOccupiedSlot = rack.devices.reduce((max, d) => Math.max(max, d.position + d.size - 1), 0);
+                  const isDisabled = opt.u < maxOccupiedSlot;
+                  return (
+                    <option key={`${opt.u}-${opt.d}`} value={`${opt.u}-${opt.d}`} disabled={isDisabled}>
+                      {opt.u}U {opt.d}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          </div>
+        )}
+
         {/* Orientation Control (Edit Mode Only) */}
         {isEditMode && (
           <div className="stn-section" style={{ marginBottom: "16px" }}>
