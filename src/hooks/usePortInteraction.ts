@@ -721,6 +721,8 @@ function applyErrorBlinking(
           overlay.setAttribute("rx", "2.5");
           overlay.setAttribute("pointer-events", "none");
           if (portIdAttr) overlay.setAttribute("data-port-id", portIdAttr);
+          const tr = img.getAttribute("transform");
+          if (tr) overlay.setAttribute("transform", tr);
           img.parentElement.insertBefore(overlay, img.nextSibling);
         }
         if (overlay && !moduleOverlays.includes(overlay)) {

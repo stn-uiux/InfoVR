@@ -37,12 +37,11 @@ export const withComposerTask = async <T>(task: () => Promise<T>): Promise<T> =>
 };
 
 import { equipmentModels, loadCardSvgRaw, loadCardSvgRawSync, loadBaseEquipmentSvgRaw } from '../utils/cardAssets';
-import { resolveDeviceSvgContent, isChassisModel } from '../utils/deviceAssets';
+import { resolveDeviceSvgContent } from '../utils/deviceAssets';
 import { moduleDefinitions } from '../utils/moduleAssets';
 import { useStore } from '../store/useStore';
 import { generatePortMap, buildPortStatusMapFromPortStates, applyPortStatuses } from '../utils/portUtils';
 import { getElementBBox, prefixSvgIds, filterPortElements, PORT_SELECTOR, resolvePortId } from '../utils/svgUtils';
-import { DEFAULT_CHASSIS_CARDS } from '../utils/defaultChassisCards';
 import { getColSpan, type EquipmentModel, type GeneratedPort, type InsertedCard, type InsertedModule } from '../types/equipment';
 import type { EquipmentViewSide } from '../types/equipment';
 import type { PortState } from '../types';
@@ -384,7 +383,7 @@ export function useSvgComposer(
           return;
         }
 
-        let existingPromise = _composingPromises.get(_cacheKey);
+        const existingPromise = _composingPromises.get(_cacheKey);
         if (existingPromise) {
           const finalHtml = await existingPromise;
           if (isMounted) setComposedHtml(finalHtml);
@@ -488,10 +487,9 @@ export function useSvgComposer(
         _composingPromises.set(_cacheKey, composePromise.then(res => res.finalHtml));
         
         try {
-          const { finalHtml, baseComposedHtml } = await composePromise;
+          const { finalHtml } = await composePromise;
           if (isMounted) {
             setComposedHtml(finalHtml);
-            setBaseHtmlForWebp(baseComposedHtml);
           }
         } finally {
           _composingPromises.delete(_cacheKey);
@@ -504,8 +502,6 @@ export function useSvgComposer(
     withComposerTask(compose).catch(console.error);
     return () => { isMounted = false; };
   }, [modelName, cardsKey, equipModel, isModularDevice, cardSvgMap, modulesKey, portsKey, _cacheKey, generatedPortMap, insertedCards, insertedModules, viewSide]);
-
-  const [baseHtmlForWebp, setBaseHtmlForWebp] = useState<string>("");
 
   // ─── Blob URL 캐싱 ───
   const blobUrl = useMemo(() => {
@@ -585,7 +581,7 @@ function composeCards(
             const colW = equipModel.gridColWidths[c] || 0;
             const idx = getGridPositionIndex(r, c, equipModel.cardArea.columns, equipModel._rowColumns);
             if (idx === card.positionIndex && !covered.has(`${r},${c}`)) {
-              const merge = equipModel.gridMerges?.find((m: any) => m.r === r && m.c === c);
+              const merge = equipModel.gridMerges?.find(m => m.r === r && m.c === c);
               let slotW = colW;
               let slotH = rowH;
               if (merge) {
@@ -714,11 +710,30 @@ function composeModules(
 
     const targetHb = resolveTargetHitbox(hbs, module);
     const bbox = getElementBBox(targetHb);
+    const isVertical = bbox.h > bbox.w;
     const scaleFactor = 1.2;
-    const finalW = bbox.w * scaleFactor;
-    const finalH = bbox.h * scaleFactor;
-    const finalX = bbox.x - (finalW - bbox.w) / 2;
-    const finalY = bbox.y - (finalH - bbox.h) / 2;
+
+    let finalW: number;
+    let finalH: number;
+    let finalX: number;
+    let finalY: number;
+    let transformAttr: string | null = null;
+
+    if (isVertical) {
+      // 포트 영역의 세로가 더 긴 경우 90도 회전시켜 장착
+      const cx = bbox.x + bbox.w / 2;
+      const cy = bbox.y + bbox.h / 2;
+      finalW = bbox.h * scaleFactor;
+      finalH = bbox.w * scaleFactor;
+      finalX = cx - finalW / 2;
+      finalY = cy - finalH / 2;
+      transformAttr = `rotate(90 ${cx} ${cy})`;
+    } else {
+      finalW = bbox.w * scaleFactor;
+      finalH = bbox.h * scaleFactor;
+      finalX = bbox.x - (finalW - bbox.w) / 2;
+      finalY = bbox.y - (finalH - bbox.h) / 2;
+    }
 
     const img = baseDoc.createElementNS("http://www.w3.org/2000/svg", "image");
     img.setAttribute("href", moduleDef.svgUrl);
@@ -730,6 +745,10 @@ function composeModules(
     img.setAttribute("class", "inserted-module");
     img.setAttribute("data-port-id", module.portId);
     img.setAttribute("pointer-events", "none");
+    if (transformAttr) {
+      img.setAttribute("transform", transformAttr);
+      img.setAttribute("data-rotated", "90");
+    }
 
     const portNum = targetHb.getAttribute("data-port-number");
     if (portNum) img.setAttribute("data-port-number", portNum);
@@ -751,6 +770,10 @@ function composeModules(
     overlay.setAttribute("stroke", "none");
     overlay.setAttribute("pointer-events", "none");
     overlay.setAttribute("data-port-id", module.portId);
+    if (transformAttr) {
+      overlay.setAttribute("transform", transformAttr);
+      overlay.setAttribute("data-rotated", "90");
+    }
     if (portNum) overlay.setAttribute("data-port-number", portNum);
     if (origPortNum) overlay.setAttribute("data-original-port-number", origPortNum);
     if (localPort) overlay.setAttribute("data-local-port", localPort);

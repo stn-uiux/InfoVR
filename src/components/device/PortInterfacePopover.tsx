@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { Icon } from '@iconify/react';
 
 import type { PortState } from '../../types';
 
@@ -15,14 +14,12 @@ export interface PortInterfacePopoverProps {
   info: PortInfoData;
   portStates?: PortState[];
   onClose: () => void;
-  onOpenModulePopover?: () => void;
 }
 
 export const PortInterfacePopover = ({
   info,
   portStates,
   onClose,
-  onOpenModulePopover,
 }: PortInterfacePopoverProps) => {
   // Generate stable mock data based on portId
   const mockData = useMemo(() => {
@@ -189,22 +186,6 @@ export const PortInterfacePopover = ({
         }
         return null;
       })()}
-
-      {onOpenModulePopover && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '4px' }}>
-          <button
-            className="comm-btn comm-btn-sm comm-btn-primary"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenModulePopover();
-            }}
-            title="이 포트에 모듈을 장착하거나 교체합니다."
-          >
-            <Icon icon="material-symbols:edit" style={{ marginRight: "4px", fontSize: "15px" }} />
-            모듈 장착 / 변경
-          </button>
-        </div>
-      )}
     </div>
   );
 };

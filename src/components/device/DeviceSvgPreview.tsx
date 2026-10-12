@@ -555,9 +555,30 @@ export const DeviceSvgPreview = memo(({
             }
 
             const bbox = getElementBBox(targetHb);
+            const isVertical = bbox.h > bbox.w;
             const sf = 1.2;
-            const fw = bbox.w * sf, fh = bbox.h * sf;
-            const fx = bbox.x - (fw - bbox.w) / 2, fy = bbox.y - (fh - bbox.h) / 2;
+
+            let fw: number;
+            let fh: number;
+            let fx: number;
+            let fy: number;
+            let transformAttr: string | null = null;
+
+            if (isVertical) {
+              // 포트 영역의 세로가 더 긴 경우 90도 회전시켜 장착
+              const cx = bbox.x + bbox.w / 2;
+              const cy = bbox.y + bbox.h / 2;
+              fw = bbox.h * sf;
+              fh = bbox.w * sf;
+              fx = cx - fw / 2;
+              fy = cy - fh / 2;
+              transformAttr = `rotate(90 ${cx} ${cy})`;
+            } else {
+              fw = bbox.w * sf;
+              fh = bbox.h * sf;
+              fx = bbox.x - (fw - bbox.w) / 2;
+              fy = bbox.y - (fh - bbox.h) / 2;
+            }
 
             const img = baseDoc.createElementNS("http://www.w3.org/2000/svg", "image");
             img.setAttribute("href", moduleDef.svgUrl);
@@ -569,6 +590,10 @@ export const DeviceSvgPreview = memo(({
             // 스타일과 속성 모두에 pointer-events: none 설정하여 이벤트를 절대 방해하지 않게 함
             img.setAttribute("pointer-events", "none");
             img.style.pointerEvents = "none";
+            if (transformAttr) {
+              img.setAttribute("transform", transformAttr);
+              img.setAttribute("data-rotated", "90");
+            }
 
             const portNum = targetHb.getAttribute("data-port-number");
             if (portNum) img.setAttribute("data-port-number", portNum);
@@ -583,6 +608,10 @@ export const DeviceSvgPreview = memo(({
             overlay.setAttribute("stroke", "none");
             overlay.setAttribute("pointer-events", "none");
             overlay.setAttribute("data-port-id", mod.portId);
+            if (transformAttr) {
+              overlay.setAttribute("transform", transformAttr);
+              overlay.setAttribute("data-rotated", "90");
+            }
             if (portNum) overlay.setAttribute("data-port-number", portNum);
 
             // 장애 상태 확인 및 사전 스타일 주입

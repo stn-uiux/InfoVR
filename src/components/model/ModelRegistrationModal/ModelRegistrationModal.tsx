@@ -586,6 +586,47 @@ export const ModelRegistrationModal: React.FC = () => {
   // Editing mode
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
 
+  // Scroll management between list and register views
+  const listBodyRef = useRef<HTMLDivElement>(null);
+  const registerBodyRef = useRef<HTMLDivElement>(null);
+  const listScrollTopRef = useRef<number>(0);
+
+  const saveListScroll = useCallback(() => {
+    if (listBodyRef.current) {
+      listScrollTopRef.current = listBodyRef.current.scrollTop;
+    }
+  }, []);
+
+  // activeTab 전환 시 스크롤 위치 관리
+  useEffect(() => {
+    if (activeTab === "register") {
+      if (registerBodyRef.current) {
+        registerBodyRef.current.scrollTop = 0;
+      }
+      requestAnimationFrame(() => {
+        if (registerBodyRef.current) {
+          registerBodyRef.current.scrollTop = 0;
+        }
+      });
+    } else if (activeTab === "list") {
+      const savedTop = listScrollTopRef.current;
+      if (listBodyRef.current && savedTop > 0) {
+        listBodyRef.current.scrollTop = savedTop;
+      }
+      requestAnimationFrame(() => {
+        if (listBodyRef.current && savedTop > 0) {
+          listBodyRef.current.scrollTop = savedTop;
+        }
+      });
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      listScrollTopRef.current = 0;
+    }
+  }, [isOpen]);
+
 
   // Assigned cards
   const [assignedCardIds, setAssignedCardIds] = useState<string[]>([]);
@@ -746,6 +787,7 @@ export const ModelRegistrationModal: React.FC = () => {
 
   // Load model into form for editing
   const loadModelForEdit = useCallback(async (modelId: string) => {
+    saveListScroll();
     const model = customModels.find((m) => m.modelId === modelId);
     if (!model) return;
 
@@ -831,7 +873,7 @@ export const ModelRegistrationModal: React.FC = () => {
     setErrors({});
     setActiveTab("register");
     setIsFormLoading(false);
-  }, [customModels]);
+  }, [customModels, saveListScroll]);
 
   const showToastMsg = useCallback(
     (message: string, type: "success" | "error") => {
@@ -1274,7 +1316,7 @@ export const ModelRegistrationModal: React.FC = () => {
         {activeTab === "register" ? (
           <>
             {/* Body: Registration Form */}
-            <div className="mrm-body">
+            <div ref={registerBodyRef} key="mrm-register-body" className="mrm-body">
               {/* Basic Info */}
               <div className="mrm-section">
                 <div className="mrm-section-title">
@@ -1976,7 +2018,14 @@ export const ModelRegistrationModal: React.FC = () => {
         ) : (
           <>
             {/* Body: Registered Models List */}
-            <div className="mrm-body">
+            <div
+              ref={listBodyRef}
+              key="mrm-list-body"
+              className="mrm-body"
+              onScroll={(e) => {
+                listScrollTopRef.current = e.currentTarget.scrollTop;
+              }}
+            >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{
                   fontSize: 12, fontWeight: 700, color: "var(--text-tertiary)",
@@ -2016,6 +2065,7 @@ export const ModelRegistrationModal: React.FC = () => {
                   <button
                     className="comm-btn comm-btn-primary comm-btn-md"
                     onClick={() => {
+                      saveListScroll();
                       setIsFormLoading(true);
                       resetForm();
                       setActiveTab("register");
@@ -2111,6 +2161,7 @@ export const ModelRegistrationModal: React.FC = () => {
                             <button
                               className="action-icon-btn edit-btn"
                               onClick={async () => {
+                                saveListScroll();
                                 if (overrideModel) {
                                   // Load the overridden model for editing
                                   loadModelForEdit(overrideModel.modelId);
