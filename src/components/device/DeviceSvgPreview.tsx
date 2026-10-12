@@ -14,6 +14,39 @@ import { moduleDefinitions } from "../../utils/moduleAssets";
 import { getElementBBox, prefixSvgIds, isPortId, filterPortElements, PORT_SELECTOR, resolvePortId } from "../../utils/svgUtils";
 import { useStore } from "../../store/useStore";
 import { drawBlankSlots } from "../../hooks/useSvgComposer";
+import type { PortState } from "../../types";
+
+const ERROR_COLORS: Record<string, string> = {
+  critical: "#ef4444",
+  major: "#f97316",
+  minor: "#eab308",
+  warning: "#3b82f6",
+};
+
+function ensureKeyframe(animName: string, color: string) {
+  let styleEl = document.getElementById("port-blink-styles") as HTMLStyleElement | null;
+  if (!styleEl) {
+    styleEl = document.createElement("style");
+    styleEl.id = "port-blink-styles";
+    document.head.appendChild(styleEl);
+  }
+  if (!styleEl.textContent?.includes(animName)) {
+    styleEl.textContent += `
+      @keyframes ${animName} {
+        0%, 100% { fill: ${color}33; stroke: ${color}; stroke-width: 2px; }
+        50% { fill: transparent; stroke: none; }
+      }
+      @keyframes ${animName}-img {
+        0%, 100% { filter: drop-shadow(0 0 6px ${color}); opacity: 1; }
+        50% { filter: none; opacity: 0.75; }
+      }
+      @keyframes ${animName}-overlay {
+        0%, 100% { fill: ${color}44; stroke: ${color}; stroke-width: 2.5px; opacity: 1; }
+        50% { fill: transparent; stroke: transparent; opacity: 0; }
+      }
+    `;
+  }
+}
 
 const CARD_ROW_HEIGHT = 46;
 type PreviewEquipmentModel = EquipmentModel & { 
@@ -23,6 +56,7 @@ type PreviewEquipmentModel = EquipmentModel & {
   gridMerges?: { r: number; c: number; rs: number; cs: number }[];
   gridColWidths?: number[];
   gridRowHeights?: number[];
+  slotNumberMap?: Record<string, string | number>;
 };
 
 function getRowColumnCount(row: number, defaultColumns: number, customRowColumns?: number[]): number {
@@ -89,6 +123,7 @@ export interface DeviceSvgPreviewProps {
   maxWidth?: string;
   viewSide?: EquipmentViewSide;
   onCompose?: (svgRaw: string) => void;
+  portStates?: PortState[];
 }
 
 export const DeviceSvgPreview = memo(({
@@ -100,6 +135,7 @@ export const DeviceSvgPreview = memo(({
   maxWidth = "100%",
   viewSide = "front",
   onCompose,
+  portStates = [],
 }: DeviceSvgPreviewProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const cardsKey = insertedCards.map(c => c.instanceId).join(',');
@@ -109,6 +145,14 @@ export const DeviceSvgPreview = memo(({
       .sort()
       .join(","),
     [insertedModules]
+  );
+  const portsKey = useMemo(() =>
+    (portStates || [])
+      .filter(p => p.status === "error")
+      .map(p => `${p.portId}:${p.errorLevel || ""}`)
+      .sort()
+      .join(","),
+    [portStates]
   );
   const customModels = useStore((s) => s.customModels);
 
@@ -130,6 +174,7 @@ export const DeviceSvgPreview = memo(({
           gridMerges: m.gridMerges,
           gridColWidths: m.gridColWidths,
           gridRowHeights: m.gridRowHeights,
+          slotNumberMap: m.slotNumberMap,
         };
         
         if (m.variants && m.variants.length > 0) {
@@ -166,7 +211,7 @@ export const DeviceSvgPreview = memo(({
       rowColumns: model._rowColumns,
     });
   }, [equipModel]);
-  const cacheKey = `${modelName}::${viewSide}::${modelLayoutKey}::${cardsKey}::${modulesKey}`;
+  const cacheKey = `${modelName}::${viewSide}::${modelLayoutKey}::${cardsKey}::${modulesKey}::${portsKey}`;
 
   const [composedHtml, setComposedHtml] = useState<string>(() => _previewCache.get(cacheKey) || "");
 
@@ -192,7 +237,8 @@ export const DeviceSvgPreview = memo(({
     if (cached && onCompose) {
       onCompose(cached);
     }
-  }, [cacheKey, onCompose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cacheKey]);
 
   const [cardSvgMap, setCardSvgMap] = useState<Map<string, string>>(new Map());
 
@@ -232,8 +278,8 @@ export const DeviceSvgPreview = memo(({
     // 모든 카드가 로드되었는지 확인
     const allCardsLoaded = insertedCards.every(c => cardSvgMap.has(c.cardFileName));
 
-    // 모듈이 없고 모든 카드가 로드된 상태에서 유효한 캐시 히트일 때만 캐시 사용
-    if (allCardsLoaded && insertedModules.length === 0 && _previewCache.has(cacheKey)) {
+    // 모든 카드가 로드된 상태에서 유효한 캐시 히트일 때 캐시 사용
+    if (allCardsLoaded && _previewCache.has(cacheKey)) {
       const cached = _previewCache.get(cacheKey)!;
       if (composedHtml !== cached) {
         setComposedHtml(cached);
@@ -299,13 +345,32 @@ export const DeviceSvgPreview = memo(({
         baseSvgEl.style.display = "block";
 
         if (isModularDevice) {
-           drawBlankSlots(baseSvgEl, baseDoc, equipModel as any);
+           drawBlankSlots(baseSvgEl, baseDoc, equipModel as Parameters<typeof drawBlankSlots>[2]);
         }
+
+        const effectiveInsertedCards = insertedCards.map((c) => {
+          let customSlotNo = undefined;
+          
+          if (equipModel && !equipModel.slots && equipModel.cardArea) {
+            const pModel = equipModel as PreviewEquipmentModel;
+            const { row, col } = getGridPositionFromIndex(
+              c.positionIndex,
+              equipModel.cardArea.columns,
+              pModel._rowColumns
+            );
+            customSlotNo = pModel.slotNumberMap?.[`${row}-${col}`];
+          }
+
+          return {
+            ...c,
+            slotNo: customSlotNo ?? c.slotNo ?? (c.positionIndex + 1),
+          };
+        });
 
         // 카드 합성
         const orderedCards = equipModel
-          ? [...insertedCards].sort((a, b) => getCardPaintOrder(a, equipModel as PreviewEquipmentModel) - getCardPaintOrder(b, equipModel as PreviewEquipmentModel))
-          : insertedCards;
+          ? [...effectiveInsertedCards].sort((a, b) => getCardPaintOrder(a, equipModel as PreviewEquipmentModel) - getCardPaintOrder(b, equipModel as PreviewEquipmentModel))
+          : effectiveInsertedCards;
         for (const card of orderedCards) {
           const raw = cardSvgMap.get(card.cardFileName);
           if (!raw || !equipModel) continue;
@@ -349,7 +414,7 @@ export const DeviceSvgPreview = memo(({
                   const colW = pModel.gridColWidths[c] || 0;
                   const idx = getGridPositionIndex(r, c, pModel.cardArea.columns, currentRowColumns);
                   if (idx === card.positionIndex && !covered.has(`${r},${c}`)) {
-                    const merge = pModel.gridMerges?.find((m: any) => m.r === r && m.c === c);
+                    const merge = pModel.gridMerges?.find(m => m.r === r && m.c === c);
                     let slotW = colW;
                     let slotH = rowH;
                     if (merge) {
@@ -500,14 +565,59 @@ export const DeviceSvgPreview = memo(({
             img.setAttribute("width", fw.toString()); img.setAttribute("height", fh.toString());
             img.setAttribute("preserveAspectRatio", "none");
             img.setAttribute("class", "inserted-module");
+            img.setAttribute("data-port-id", mod.portId);
             // 스타일과 속성 모두에 pointer-events: none 설정하여 이벤트를 절대 방해하지 않게 함
             img.setAttribute("pointer-events", "none");
             img.style.pointerEvents = "none";
 
-            // 이미지 삽입 후, 히트박스를 이미지 뒤(DOM 순서상 나중)로 다시 옮겨서 렌더링상 최상단 보장
+            const portNum = targetHb.getAttribute("data-port-number");
+            if (portNum) img.setAttribute("data-port-number", portNum);
+
+            // 모듈 전용 에러 오버레이 rect 생성
+            const overlay = baseDoc.createElementNS("http://www.w3.org/2000/svg", "rect");
+            overlay.setAttribute("class", "inserted-module-overlay");
+            overlay.setAttribute("x", fx.toString()); overlay.setAttribute("y", fy.toString());
+            overlay.setAttribute("width", fw.toString()); overlay.setAttribute("height", fh.toString());
+            overlay.setAttribute("rx", "2.5");
+            overlay.setAttribute("fill", "transparent");
+            overlay.setAttribute("stroke", "none");
+            overlay.setAttribute("pointer-events", "none");
+            overlay.setAttribute("data-port-id", mod.portId);
+            if (portNum) overlay.setAttribute("data-port-number", portNum);
+
+            // 장애 상태 확인 및 사전 스타일 주입
+            const errorPs = (portStates || []).find(ps => {
+              if (ps.status !== "error") return false;
+              if (ps.portId === mod.portId || ps.portNumber === mod.portId) return true;
+              if (portNum && (ps.portId === portNum || ps.portNumber === portNum)) return true;
+              if (mod.portId.includes("/") && ps.portId.includes("/")) {
+                const p1 = mod.portId.split("/");
+                const p2 = ps.portId.split("/");
+                if (p1[0] === p2[0] && p1[1] === p2[1]) {
+                  const n1 = p1[2].match(/(\d+)$/)?.[1];
+                  const n2 = p2[2].match(/(\d+)$/)?.[1];
+                  return Boolean(n1 && n2 && n1 === n2);
+                }
+              }
+              const num1 = mod.portId.match(/(\d+)$/)?.[1];
+              const num2 = ps.portId.match(/(\d+)$/)?.[1];
+              return Boolean(num1 && num2 && num1 === num2);
+            });
+
+            if (errorPs) {
+              const errColor = ERROR_COLORS[errorPs.errorLevel || "critical"] || "#ef4444";
+              overlay.setAttribute("data-error-level", errorPs.errorLevel || "critical");
+              overlay.setAttribute("fill", `${errColor}33`);
+              overlay.setAttribute("stroke", errColor);
+              overlay.setAttribute("stroke-width", "2");
+              img.setAttribute("data-error-level", errorPs.errorLevel || "critical");
+            }
+
+            // 이미지 및 오버레이 삽입 후, 히트박스를 이미지 뒤(DOM 순서상 나중)로 다시 옮겨서 렌더링상 최상단 보장
             const parent = targetHb.parentNode;
             if (parent) {
               parent.insertBefore(img, targetHb);
+              parent.insertBefore(overlay, targetHb);
               // targetHb를 다시 appendChild 하여 이미지보다 뒤에 오게 함 (렌더링은 위에 됨)
               parent.appendChild(targetHb);
             }
@@ -517,7 +627,7 @@ export const DeviceSvgPreview = memo(({
         const finalHtml = new XMLSerializer().serializeToString(baseDoc);
 
         // 모든 카드가 정상적으로 로드된 경우에만 캐시 저장
-        if (allCardsLoaded && insertedModules.length === 0) {
+        if (allCardsLoaded) {
           _previewCache.set(cacheKey, finalHtml);
         }
 
@@ -564,6 +674,59 @@ export const DeviceSvgPreview = memo(({
       el.setAttribute("pointer-events", "all");
     });
 
+    // 장애 포트 및 모듈 깜빡임 처리
+    if (portStates && portStates.length > 0) {
+      portStates.forEach(ps => {
+        if (ps.status !== "error") return;
+        const color = ps.errorLevel && ERROR_COLORS[ps.errorLevel] ? ERROR_COLORS[ps.errorLevel] : "#ef4444";
+        const portEl = allPortEls.find(el => {
+          const pNum = el.getAttribute("data-port-number");
+          const pId = el.id;
+          const lPort = el.getAttribute("data-local-port");
+          if (pNum === ps.portId || pNum === ps.portNumber) return true;
+          if (pId === ps.portId || pId === ps.portNumber) return true;
+          if (ps.portId.includes("/") && pNum && pNum.includes("/")) {
+            const p1 = ps.portId.split("/");
+            const p2 = pNum.split("/");
+            if (p1[0] === p2[0] && p1[1] === p2[1]) {
+              const n1 = p1[2].match(/(\d+)$/)?.[1];
+              const n2 = p2[2].match(/(\d+)$/)?.[1];
+              return Boolean(n1 && n2 && n1 === n2);
+            }
+          }
+          const num1 = ps.portId.match(/(\d+)$/)?.[1];
+          const num2 = (pNum || pId || lPort || "").match(/(\d+)$/)?.[1];
+          return Boolean(num1 && num2 && num1 === num2);
+        });
+
+        const animName = `blink-${ps.portId.replace(/[^a-z0-9]/gi, "-")}`;
+        ensureKeyframe(animName, color);
+
+        if (portEl) {
+          portEl.style.animation = `${animName} 1.5s infinite`;
+          portEl.setAttribute("data-error-level", ps.errorLevel || "critical");
+        }
+
+        container.querySelectorAll<SVGElement>(".inserted-module, .inserted-module-overlay").forEach(mod => {
+          const modPortId = mod.getAttribute("data-port-id");
+          const modPortNum = mod.getAttribute("data-port-number");
+          const matches = modPortId === ps.portId || modPortNum === ps.portId ||
+            (modPortId && ps.portId.includes("/") && modPortId.includes("/") &&
+             modPortId.split("/")[0] === ps.portId.split("/")[0] &&
+             modPortId.split("/")[1] === ps.portId.split("/")[1] &&
+             modPortId.match(/(\d+)$/)?.[1] === ps.portId.match(/(\d+)$/)?.[1]);
+          if (matches) {
+            if (mod.classList.contains("inserted-module")) {
+              mod.style.animation = `${animName}-img 1.5s infinite`;
+            } else {
+              mod.style.animation = `${animName}-overlay 1.5s infinite`;
+            }
+            mod.setAttribute("data-error-level", ps.errorLevel || "critical");
+          }
+        });
+      });
+    }
+
     if (!editable) return;
 
     // hover 처리
@@ -584,7 +747,9 @@ export const DeviceSvgPreview = memo(({
     const resetHover = () => {
       const tooltip = getTooltip();
       if (hoveredEl) {
-        hoveredEl.style.fill = origFill; hoveredEl.style.stroke = origStroke; hoveredEl.style.strokeWidth = origStrokeWidth;
+        if (!hoveredEl.getAttribute("data-error-level")) {
+          hoveredEl.style.fill = origFill; hoveredEl.style.stroke = origStroke; hoveredEl.style.strokeWidth = origStrokeWidth;
+        }
         hoveredEl = null;
       }
       if (tooltip) tooltip.style.display = "none";
@@ -615,10 +780,28 @@ export const DeviceSvgPreview = memo(({
         const localPort = portEl.getAttribute("data-local-port");
         const portType = portEl.getAttribute("data-port-type") || "PORT";
         const portId = realPortNumber || portEl.id || localPort || "";
-        const displayId = portId.replace(/^.*port-/, "").replace(/^p/, "");
+        
+        let displayId = portId;
+        let pType = portType;
+
+        if (displayId.includes("port-")) {
+          const parts = displayId.split("-");
+          if (parts.length >= 3) {
+            if (!pType) pType = parts[1];
+            displayId = parts.slice(2).join("-");
+          } else {
+            displayId = displayId.replace(/^port-/, "");
+          }
+        } else if (/^p\d+$/.test(displayId)) {
+          displayId = displayId.replace(/^p/, "");
+        }
+
+        if (pType && displayId.includes(`${pType.toLowerCase()}-`)) {
+          displayId = displayId.replace(`${pType.toLowerCase()}-`, "");
+        }
 
         tooltip.innerHTML = `
-          <div style="font-weight:700; font-size:13px; margin-bottom:4px; color:#80deea;">${portType.toUpperCase()} ${displayId}</div>
+          <div style="font-weight:700; font-size:13px; margin-bottom:4px; color:#80deea;">${pType.toUpperCase()} ${displayId}</div>
           ${editable ? `<div style="font-size:11px; color:#e0f7fa; opacity:0.8;">Click to manage module</div>` : ""}
         `;
         tooltip.style.display = "block";
@@ -658,7 +841,7 @@ export const DeviceSvgPreview = memo(({
       container.removeEventListener("mouseout", handleMouseOut);
       container.removeEventListener("click", handleClick);
     };
-  }, [composedHtml, editable, maxWidth]);
+  }, [composedHtml, editable, maxWidth, portStates]);
 
   // 팝오버 외부 클릭 닫기
   useEffect(() => {
@@ -680,7 +863,7 @@ export const DeviceSvgPreview = memo(({
     const moduleDef = moduleDefinitions.find(m => m.moduleType === moduleType);
     if (!moduleDef) return;
     const newModule: InsertedModule = { portId, moduleType, moduleSvgFileName: moduleDef.svgFileName, hitboxId };
-    const updated = [...insertedModules.filter(m => m.portId !== portId), newModule];
+    const updated = [...insertedModules.filter(m => hitboxId ? m.hitboxId !== hitboxId : m.portId !== portId), newModule];
     onModuleChange?.(updated);
     setPopover(null);
   }, [insertedModules, onModuleChange]);

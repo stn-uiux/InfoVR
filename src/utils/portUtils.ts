@@ -251,26 +251,70 @@ export function buildPortStatusMapFromPortStates(
     const key = ps.portNumber || ps.portId;
     if (!key) continue;
 
+    let targetStatus: "normal" | "critical" | "major" | "minor" | "warning" | "disabled" = "normal";
     if (ps.status === "error") {
-      // errorLevel을 기반으로 세분화된 상태 매핑
       switch (ps.errorLevel) {
         case "critical":
-          map[key] = "critical";
+          targetStatus = "critical";
           break;
         case "major":
-          map[key] = "major";
+          targetStatus = "major";
           break;
         case "warning":
-          map[key] = "warning";
+          targetStatus = "warning";
           break;
         case "minor":
-          map[key] = "minor";
+          targetStatus = "minor";
           break;
         default:
-          map[key] = "critical";
+          targetStatus = "critical";
       }
     } else {
-      map[key] = "normal";
+      targetStatus = "normal";
+    }
+
+    const setKey = (k: string) => {
+      if (!k) return;
+      // error 상태는 항상 normal보다 높은 우선순위로 기록
+      if (!map[k] || map[k] === "normal" || targetStatus !== "normal") {
+        map[k] = targetStatus;
+      }
+    };
+
+    setKey(key);
+    if (ps.portId) setKey(ps.portId);
+    if (ps.portNumber) setKey(ps.portNumber);
+
+    // 슬롯형 / 모듈러 포트 별칭 등록 (예: 1/7/port-1, 1/7/sfp-1, 1/7/eth-1, 1/7/1)
+    if (key.includes("/")) {
+      const parts = key.split("/");
+      if (parts.length === 3) {
+        const [shelf, slot, lastPart] = parts;
+        const numMatch = lastPart.match(/(\d+)$/);
+        if (numMatch) {
+          const num = numMatch[1];
+          setKey(`${shelf}/${slot}/${num}`);
+          setKey(`${shelf}/${slot}/port-${num}`);
+          setKey(`${shelf}/${slot}/sfp-${num}`);
+          setKey(`${shelf}/${slot}/eth-${num}`);
+          setKey(`${shelf}/${slot}/qsfp-${num}`);
+        }
+      }
+    } else {
+      if (key.startsWith("port-")) {
+        const num = key.replace("port-", "");
+        setKey(num);
+        setKey(`eth-${num}`);
+        setKey(`sfp-${num}`);
+      } else {
+        const numMatch = key.match(/^(\d+)$/);
+        if (numMatch) {
+          const num = numMatch[1];
+          setKey(`port-${num}`);
+          setKey(`eth-${num}`);
+          setKey(`sfp-${num}`);
+        }
+      }
     }
   }
 

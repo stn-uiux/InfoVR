@@ -18,6 +18,7 @@ import { StnModal } from "../../ui/StnModal";
 import { cardDefinitions, equipmentModels, loadBaseEquipmentSvgRaw, getCardsForModel } from "../../../utils/cardAssets";
 import { DEVICE_TEMPLATES } from "../../../utils/deviceTemplates";
 import { getDeviceViewSides, resolveDeviceImage, resolveDeviceSvgContent, isChassisModel } from "../../../utils/deviceAssets";
+import { isPortId, PORT_SELECTOR } from "../../../utils/svgUtils";
 import { DEFAULT_CHASSIS_CARDS } from "../../../utils/defaultChassisCards";
 import { useDeviceImage } from "../../../hooks/useDeviceImage";
 
@@ -105,7 +106,10 @@ function parseSvgDimensions(svgRaw: string): { width: number; height: number } {
 }
 
 /** SVG raw text를 안전하게 축소 렌더링 */
-function SvgPreview({ svgRaw, maxHeight = 500 }: { svgRaw: string; maxHeight?: number }) {
+export function SvgPreview({ svgRaw, maxHeight = 500 }: { svgRaw: string; maxHeight?: number }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+
   const sanitized = useMemo(() => {
     // width/height를 100%로 치환하여 반응형 렌더링
     return svgRaw
@@ -114,11 +118,150 @@ function SvgPreview({ svgRaw, maxHeight = 500 }: { svgRaw: string; maxHeight?: n
       .replace(/<svg/, '<svg style="max-width:984px;max-height:' + maxHeight + 'px"');
   }, [svgRaw, maxHeight]);
 
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    // 기본 제공되는 네이티브 브라우저 툴팁(<title>) 제거 (리액트 커스텀 툴팁과 겹치거나 가리는 현상 방지)
+    container.querySelectorAll("title").forEach((t) => (t.textContent = ""));
+
+    // 사용자 요청: ports-layer 만 찾아서 스타일 적용
+    const applyPortsLayerStyle = () => {
+      const portsLayer = container.querySelector("#ports-layer");
+      if (portsLayer) {
+        portsLayer.setAttribute("style", "fill: transparent; stroke: none; pointer-events: all; cursor: pointer;");
+      }
+    };
+    
+    // 즉시 적용
+    applyPortsLayerStyle();
+
+    // 혹시 모를 비동기 렌더링/DOM 파싱 지연에 대비해 지속 관찰
+    const observer = new MutationObserver(() => applyPortsLayerStyle());
+    observer.observe(container, { childList: true, subtree: true });
+
+    const EXTENDED_SELECTOR = `${PORT_SELECTOR}, [data-local-port], #ports-layer > *`;
+    let hoveredEl: SVGElement | null = null;
+    let origFill = "";
+    let origStroke = "";
+    let origStrokeWidth = "";
+
+    const resetHover = () => {
+      const tooltip = tooltipRef.current;
+      if (hoveredEl) {
+        hoveredEl.style.fill = origFill; hoveredEl.style.stroke = origStroke; hoveredEl.style.strokeWidth = origStrokeWidth;
+        hoveredEl = null;
+      }
+      if (tooltip) tooltip.style.display = "none";
+    };
+
+    const findPortEl = (e: MouseEvent): SVGElement | null => {
+      const target = e.target as SVGElement;
+      const portEl = target.closest<SVGElement>(EXTENDED_SELECTOR);
+      // ports-layer의 자식이나 data-local-port가 있다면 유효한 포트로 간주
+      if (portEl && !isPortId(portEl.id) && !portEl.classList.contains("port-hitbox") && !portEl.getAttribute("data-local-port") && !portEl.closest("#ports-layer")) return null;
+      return portEl;
+    };
+
+    const handleMouseOver = (e: MouseEvent) => {
+      const portEl = findPortEl(e);
+      if (!portEl) { resetHover(); return; }
+      if (hoveredEl && hoveredEl !== portEl) resetHover();
+      if (hoveredEl !== portEl) {
+        hoveredEl = portEl;
+        origFill = portEl.style.fill; origStroke = portEl.style.stroke; origStrokeWidth = portEl.style.strokeWidth;
+        portEl.style.fill = "rgba(0, 229, 255, 0.25)";
+        portEl.style.stroke = "rgba(0, 229, 255, 0.7)";
+        portEl.style.strokeWidth = "1.5px";
+      }
+
+      const tooltip = tooltipRef.current;
+      if (tooltip) {
+        const realPortNumber = portEl.getAttribute("data-port-number");
+        const localPort = portEl.getAttribute("data-local-port");
+        const portType = portEl.getAttribute("data-port-type") || "PORT";
+        const portId = realPortNumber || portEl.id || localPort || "";
+        
+        let displayId = portId;
+        let pType = portType;
+
+        if (displayId.includes("port-")) {
+          const parts = displayId.split("-");
+          if (parts.length >= 3) {
+            if (!pType) pType = parts[1];
+            displayId = parts.slice(2).join("-");
+          } else {
+            displayId = displayId.replace(/^port-/, "");
+          }
+        } else if (/^p\d+$/.test(displayId)) {
+          displayId = displayId.replace(/^p/, "");
+        }
+
+        if (pType && displayId.includes(`${pType.toLowerCase()}-`)) {
+          displayId = displayId.replace(`${pType.toLowerCase()}-`, "");
+        }
+
+        tooltip.innerHTML = `
+          <div style="font-weight:700; font-size:13px; margin-bottom:4px; color:#80deea;">${pType.toUpperCase()} ${displayId}</div>
+          <div style="font-size:11px; color:#e0f7fa; opacity:0.8;">Hardware Port Analysis</div>
+        `;
+        tooltip.style.display = "block";
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const tooltip = tooltipRef.current;
+      if (tooltip) {
+        tooltip.style.left = `${e.clientX}px`;
+        tooltip.style.top = `${e.clientY - 10}px`;
+        tooltip.style.transform = "translate(-50%, -100%)";
+      }
+    };
+
+    const handleMouseOut = () => resetHover();
+
+    container.addEventListener("mouseover", handleMouseOver);
+    container.addEventListener("mousemove", handleMouseMove);
+    container.addEventListener("mouseout", handleMouseOut);
+
+    return () => {
+      observer.disconnect();
+      container.removeEventListener("mouseover", handleMouseOver);
+      container.removeEventListener("mousemove", handleMouseMove);
+      container.removeEventListener("mouseout", handleMouseOut);
+    };
+  }, [sanitized]);
+
   return (
-    <div
-      className="mrm-svg-preview"
-      dangerouslySetInnerHTML={{ __html: sanitized }}
-    />
+    <div style={{ position: "relative" }}>
+      <div
+        ref={containerRef}
+        className="mrm-svg-preview"
+        dangerouslySetInnerHTML={{ __html: sanitized }}
+      />
+      {createPortal(
+        <div
+          ref={tooltipRef}
+          className="port-tooltip"
+          style={{
+            position: "fixed",
+            display: "none",
+            zIndex: 99999,
+            background: "rgba(15, 23, 42, 0.95)",
+            border: "1px solid rgba(0, 229, 255, 0.4)",
+            borderRadius: "8px",
+            padding: "10px 14px",
+            color: "white",
+            pointerEvents: "none",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+            backdropFilter: "blur(4px)",
+            minWidth: "120px",
+            textAlign: "center"
+          }}
+        />,
+        document.body
+      )}
+    </div>
   );
 }
 
@@ -130,6 +273,7 @@ function ChassisPreviewWithOverlay({
   rowHeights: rowHeightsNum,
   rowGaps,
   merges,
+  slotNumberMap,
   onDrawEnd,
   onGridChange,
   onSave
@@ -140,8 +284,9 @@ function ChassisPreviewWithOverlay({
   rowHeights: number[];
   rowGaps?: number[];
   merges: GridMerge[];
+  slotNumberMap?: Record<string, string | number>;
   onDrawEnd?: (rect: { x: number; y: number; width: number; height: number }) => void;
-  onGridChange?: (data: { colWidths: number[]; rowHeights: number[]; rowGaps?: number[]; merges: GridMerge[]; baseX?: number; baseY?: number }) => void;
+  onGridChange?: (data: { colWidths: number[]; rowHeights: number[]; rowGaps?: number[]; merges: GridMerge[]; slotNumberMap?: Record<string, string | number>; baseX?: number; baseY?: number }) => void;
   onSave?: () => void;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -298,6 +443,7 @@ function ChassisPreviewWithOverlay({
                 rowHeights={rowHeightsNum}
                 rowGaps={rowGaps}
                 merges={merges}
+                slotNumberMap={slotNumberMap}
                 toolbarContainer={toolbarNode}
                 onGridChange={onGridChange}
                 onSave={onSave}
@@ -435,6 +581,7 @@ export const ModelRegistrationModal: React.FC = () => {
   const [gridColWidths, setGridColWidths] = useState<number[]>([]);
   const [gridRowHeights, setGridRowHeights] = useState<number[]>([]);
   const [gridMerges, setGridMerges] = useState<GridMerge[]>([]);
+  const [slotNumberMap, setSlotNumberMap] = useState<Record<string, string | number>>({});
 
   // Editing mode
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
@@ -672,10 +819,12 @@ export const ModelRegistrationModal: React.FC = () => {
       setGridColWidths(model.gridColWidths && model.gridColWidths.length > 0 ? [...model.gridColWidths] : Array.from({ length: maxCols }, () => colW));
       setGridRowHeights(model.gridRowHeights && model.gridRowHeights.length > 0 ? [...model.gridRowHeights] : (rh.length > 0 ? [...rh] : [model.cardArea.height]));
       setGridMerges(model.gridMerges || []);
+      setSlotNumberMap(model.slotNumberMap || {});
     } else {
       setGridColWidths([]);
       setGridRowHeights([]);
       setGridMerges([]);
+      setSlotNumberMap({});
     }
     setAssignedCardIds(model.assignedCardIds || []);
     setVariants(model.variants || []);
@@ -708,7 +857,7 @@ export const ModelRegistrationModal: React.FC = () => {
             if (!svg.hasAttribute("viewBox")) {
               svg.setAttribute("viewBox", `0 0 ${forceW} ${forceH}`);
             }
-            svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+            svg.setAttribute("preserveAspectRatio", "none");
             svgRaw = new XMLSerializer().serializeToString(doc);
           }
         }
@@ -725,7 +874,7 @@ export const ModelRegistrationModal: React.FC = () => {
         img.onload = () => {
           const w = forceW || img.width || 800;
           const h = forceH || img.height || 200;
-          const svgRaw = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><image href="${dataUrl}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet" /></svg>`;
+          const svgRaw = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><image href="${dataUrl}" width="${w}" height="${h}" preserveAspectRatio="none" /></svg>`;
           setRaw(svgRaw);
           setFileName(file.name);
           setError(undefined);
@@ -883,7 +1032,8 @@ export const ModelRegistrationModal: React.FC = () => {
           _rowGaps: rowGapsArr.length > 0 ? rowGapsArr.map(g => parseFloat(g) || 0) : undefined,
           gridMerges,
           gridColWidths,
-          gridRowHeights
+          gridRowHeights,
+          slotNumberMap: Object.keys(slotNumberMap).length > 0 ? slotNumberMap : undefined
         };
         const defaultCards = variants.find(v => v.variantName === "기본타입")?.insertedCards || [];
         const composedSvg = await generateComposedSvgAsync(modelName.trim(), composerModel as any, defaultCards, [], "front");
@@ -910,7 +1060,8 @@ export const ModelRegistrationModal: React.FC = () => {
         _rowGaps: rowGapsArr.length > 0 ? rowGapsArr.map(g => parseFloat(g) || 0) : undefined,
         gridMerges,
         gridColWidths,
-        gridRowHeights
+        gridRowHeights,
+        slotNumberMap: Object.keys(slotNumberMap).length > 0 ? slotNumberMap : undefined
       };
       for (let vi = 0; vi < variants.length; vi++) {
         if (!variants[vi].variantPngRaw && variants[vi].insertedCards?.length) {
@@ -964,6 +1115,7 @@ export const ModelRegistrationModal: React.FC = () => {
       gridMerges: modelType === "card-based" && gridMerges.length > 0 ? gridMerges : undefined,
       gridColWidths: modelType === "card-based" && gridColWidths.length > 0 ? gridColWidths : undefined,
       gridRowHeights: modelType === "card-based" && gridRowHeights.length > 0 ? gridRowHeights : undefined,
+      slotNumberMap: modelType === "card-based" && Object.keys(slotNumberMap).length > 0 ? slotNumberMap : undefined,
       equipmentSize: { width: dims.width, height: dims.height },
       assignedCardIds: modelType === "card-based" ? assignedCardIds : [],
       variants: modelType === "card-based" ? variants : undefined,
@@ -1454,6 +1606,7 @@ export const ModelRegistrationModal: React.FC = () => {
                         rowHeights={gridRowHeights}
                         rowGaps={rowGapsArr.map(Number)}
                         merges={gridMerges}
+                        slotNumberMap={slotNumberMap}
                         onDrawEnd={(rect) => {
                           setCaXStr(String(rect.x));
                           setCaYStr(String(rect.y));
@@ -1465,6 +1618,7 @@ export const ModelRegistrationModal: React.FC = () => {
                           setGridColWidths(Array.from({ length: cols }, () => Math.round(rect.width / cols)));
                           setGridRowHeights(Array.from({ length: rows }, () => Math.round(rect.height / rows)));
                           setGridMerges([]);
+                          setSlotNumberMap({});
                           setCaColumnsStr(String(cols));
                           setCaRowCountStr(String(rows));
                         }}
@@ -1472,6 +1626,7 @@ export const ModelRegistrationModal: React.FC = () => {
                           setGridColWidths(data.colWidths);
                           setGridRowHeights(data.rowHeights);
                           setGridMerges(data.merges);
+                          if (data.slotNumberMap) setSlotNumberMap(data.slotNumberMap);
                           if (data.rowGaps) setRowGapsArr(data.rowGaps.map(String));
                           if (data.baseX !== undefined) setCaXStr(String(Math.round(data.baseX)));
                           if (data.baseY !== undefined) setCaYStr(String(Math.round(data.baseY)));
@@ -2096,7 +2251,7 @@ export const ModelRegistrationModal: React.FC = () => {
                                   if (imgUrl) {
                                     const w = eqModel?.equipmentSize?.width || 984;
                                     const h = eqModel?.equipmentSize?.height || 200;
-                                    const dummySvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><image href="${imgUrl}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet" /></svg>`;
+                                    const dummySvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><image href="${imgUrl}" width="${w}" height="${h}" preserveAspectRatio="none" /></svg>`;
                                     setModelSvgRaw(dummySvg);
                                     setModelSvgFileName(`[${tmpl.uSize}U] ${tmpl.modelName}.png`);
                                   } else {
@@ -2115,7 +2270,7 @@ export const ModelRegistrationModal: React.FC = () => {
                                   if (rearImgUrl) {
                                     const w = eqModel?.equipmentSize?.width || 984;
                                     const h = eqModel?.equipmentSize?.height || 200;
-                                    const dummySvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><image href="${rearImgUrl}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet" /></svg>`;
+                                    const dummySvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><image href="${rearImgUrl}" width="${w}" height="${h}" preserveAspectRatio="none" /></svg>`;
                                     setUseDualView(true);
                                     setRearSvgRaw(dummySvg);
                                     setRearSvgFileName(`[${tmpl.uSize}U] ${tmpl.modelName} back.png`);
@@ -2405,7 +2560,8 @@ export const ModelRegistrationModal: React.FC = () => {
             _rowGaps: rowGapsArr.map(g => parseFloat(g) || 0),
             gridMerges: gridMerges,
             gridColWidths: gridColWidths,
-            gridRowHeights: gridRowHeights
+            gridRowHeights: gridRowHeights,
+            slotNumberMap: slotNumberMap
           } as any}
           initialCards={editingVariantIndex !== null ? variants[editingVariantIndex].insertedCards : []}
           onSave={async (res) => {

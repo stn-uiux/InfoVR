@@ -10,7 +10,7 @@ import {
   Edges,
   PivotControls,
 } from "@react-three/drei";
-import { Matrix4, Vector3, Plane, BufferGeometry, Float32BufferAttribute, BackSide } from "three";
+import { Matrix4, Vector3, Plane, BufferGeometry, Float32BufferAttribute, BackSide, Object3D } from "three";
 import { useStore } from "../../store/useStore";
 import { Rack } from "./Rack";
 import { ImportedModelMesh } from "./ImportedModelMesh";
@@ -20,6 +20,35 @@ import { calculateDynamicRoomSize } from "../../utils/rackGeometry";
 import { GRID_SPACING } from "../layout/constants";
 import { useTheme } from "../../contexts/ThemeContext";
 import { GlobalFocusLights } from "./GlobalFocusLights";
+
+/**
+ * Three.js Raycasting ignores visible: false on parent groups (https://github.com/mrdoob/three.js/issues/16031).
+ * When an object or rack is hidden (visible: false), Three.js raycasts it anyway and intercepts clicks.
+ * This filter discards any intersection where the hit object or any of its ancestors has visible === false,
+ * allowing clicks to pass through hidden objects directly to visible equipment and racks behind them.
+ */
+const RaycastVisibilityFilter = () => {
+  const { events } = useThree();
+  useEffect(() => {
+    const originalFilter = events.filter;
+    events.filter = (hits, state) => {
+      const visibleHits = hits.filter((hit) => {
+        let obj: Object3D | null = hit.object;
+        while (obj) {
+          if (!obj.visible) return false;
+          obj = obj.parent;
+        }
+        return true;
+      });
+      return originalFilter ? originalFilter(visibleHits, state) : visibleHits;
+    };
+    return () => {
+      events.filter = originalFilter;
+    };
+  }, [events]);
+
+  return null;
+};
 
 /**
  * Optimizes performance by baking shadow maps statically when objects are not moving.
@@ -629,6 +658,7 @@ export const Scene = () => {
       />
       <CameraRefSync />
       <CameraController />
+      <RaycastVisibilityFilter />
     </Canvas>
   );
 };

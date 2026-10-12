@@ -38,10 +38,12 @@ interface InteractiveGridEditorProps {
     rowHeights: number[];
     rowGaps?: number[];
     merges: GridMerge[];
+    slotNumberMap?: Record<string, string | number>;
     baseX?: number;
     baseY?: number;
   }) => void;
   onSave?: () => void;
+  slotNumberMap?: Record<string, string | number>;
 }
 
 function getSvgPoint(
@@ -146,6 +148,7 @@ export default function InteractiveGridEditor({
   rowHeights,
   rowGaps,
   merges,
+  slotNumberMap,
   toolbarContainer,
   onGridChange,
   onSave,
@@ -645,7 +648,14 @@ export default function InteractiveGridEditor({
       );
 
       // Cell label (dimensions)
-      const cellText = (merge && (merge.rs > 1 || merge.cs > 1)) ? `${merge.rs}×${merge.cs} · ${Math.round(w)}×${Math.round(h)}` : `${Math.round(w)}×${Math.round(h)}`;
+      let cellText = (merge && (merge.rs > 1 || merge.cs > 1)) ? `${merge.rs}×${merge.cs} · ${Math.round(w)}×${Math.round(h)}` : `${Math.round(w)}×${Math.round(h)}`;
+      const customSlot = slotNumberMap ? slotNumberMap[`${r}-${c}`] : undefined;
+      const autoSlotNo = r * cols + c + 1;
+      if (customSlot !== undefined) {
+        cellText = `Slot ${customSlot} | ${cellText}`;
+      } else {
+        cellText = `Slot ${autoSlotNo} | ${cellText}`;
+      }
       const approxW = cellText.length * 6.5 * invScale + 12 * invScale;
       cellRects.push(
         <g key={`cell-label-${r}-${c}`} style={{ pointerEvents: "none" }}>
@@ -1080,10 +1090,14 @@ export default function InteractiveGridEditor({
         >
           <div style={{ fontSize: "12px", fontWeight: "bold", color: "var(--text-primary)", marginBottom: "4px" }}>셀 크기 편집</div>
           <form
+            key={`${contextMenu.r}-${contextMenu.c}`}
             onSubmit={(e) => {
               e.preventDefault();
               const wVal = parseInt((e.currentTarget.elements.namedItem('w') as HTMLInputElement).value, 10);
               const hVal = parseInt((e.currentTarget.elements.namedItem('h') as HTMLInputElement).value, 10);
+              const slotStr = (e.currentTarget.elements.namedItem('slot') as HTMLInputElement).value.trim();
+              const slotVal = slotStr ? (isNaN(Number(slotStr)) ? slotStr : Number(slotStr)) : undefined;
+
               if (!isNaN(wVal) && !isNaN(hVal) && wVal >= 1 && hVal >= 1) {
                 const newColWidths = [...colWidths];
                 const newRowHeights = [...rowHeights];
@@ -1097,7 +1111,21 @@ export default function InteractiveGridEditor({
                 
                 targetCols.forEach(cc => { newColWidths[cc] = wVal; });
                 targetRows.forEach(cr => { newRowHeights[cr] = hVal; });
-                onGridChange({ colWidths: newColWidths, rowHeights: newRowHeights, merges });
+
+                const newSlotNumberMap = { ...(slotNumberMap || {}) };
+                if (slotVal !== undefined) {
+                  // Check for duplicates
+                  const isDuplicate = Object.entries(newSlotNumberMap).some(([k, v]) => v === slotVal && !selectedCells.has(k));
+                  if (isDuplicate) {
+                    alert(`슬롯 번호 ${slotVal}은(는) 이미 다른 셀에 지정되어 있습니다.`);
+                    return;
+                  }
+                  selectedCells.forEach(key => { newSlotNumberMap[key] = slotVal; });
+                } else {
+                  selectedCells.forEach(key => { delete newSlotNumberMap[key]; });
+                }
+
+                onGridChange({ colWidths: newColWidths, rowHeights: newRowHeights, merges, slotNumberMap: newSlotNumberMap });
                 setContextMenu(null);
               }
             }}
@@ -1108,6 +1136,7 @@ export default function InteractiveGridEditor({
                 name="w"
                 type="number" 
                 defaultValue={currentW} 
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}
                 style={{ width: "60px", background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border-medium)", borderRadius: "4px", padding: "2px 4px", fontSize: "12px" }}
               />
             </div>
@@ -1117,6 +1146,18 @@ export default function InteractiveGridEditor({
                 name="h"
                 type="number" 
                 defaultValue={currentH} 
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}
+                style={{ width: "60px", background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border-medium)", borderRadius: "4px", padding: "2px 4px", fontSize: "12px" }}
+              />
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "8px" }}>
+              <label style={{ fontSize: "12px", color: "var(--text-secondary)" }}>슬롯 번호</label>
+              <input 
+                name="slot"
+                type="text" 
+                defaultValue={slotNumberMap ? slotNumberMap[`${contextMenu.r}-${contextMenu.c}`] ?? "" : ""}
+                placeholder={`${contextMenu.r * colWidths.length + contextMenu.c + 1}`}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}
                 style={{ width: "60px", background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border-medium)", borderRadius: "4px", padding: "2px 4px", fontSize: "12px" }}
               />
             </div>

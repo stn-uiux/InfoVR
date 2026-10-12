@@ -17,6 +17,9 @@ import {
   GRID_SPACING,
 } from "../components/layout/constants";
 import sampleCardsRaw from "./sampleCards.json";
+import { getEffectiveCards } from "./sampleUtils";
+import type { CustomEquipmentModel } from "../types/equipment";
+import initialCustomModelsData from "./customModels.json";
 
 const sampleCards = sampleCardsRaw as Record<string, any[]>;
 
@@ -173,31 +176,61 @@ const generateGroupRacks = (
         };
 
         // 에러 포트 설정 — portName/portNumber 사전 설정으로 PortErrorSynchronizer 트리거 방지
+        const effectiveCards = getEffectiveCards(device, initialCustomModelsData as CustomEquipmentModel[]);
         if (hasError && devices.length === 0) {
           // 장비의 포트 개수가 적은 경우를 대비하여 1~4 사이의 앞쪽 포트 번호를 주로 할당합니다.
           const portNum = (localIdx % 4) + 1;
           const errorLevels = ["warning", "minor", "major", "critical"] as const;
           
           let portId = `port-${portNum}`;
-          if (device.insertedCards && device.insertedCards.length > 0) {
+          
+          if (effectiveCards && effectiveCards.length > 0) {
             // Find a data-bearing card instead of blindly picking the first card (which is often a management card with no data ports)
-            const dataCard = device.insertedCards.find(c => 
+            const dataCard = effectiveCards.find(c => 
               !c.cardFileName.toLowerCase().includes("cpiom") && 
               !c.cardFileName.toLowerCase().includes("r-series-9") &&
               !c.cardFileName.toLowerCase().includes("cpm")
-            ) || device.insertedCards[0];
+            ) || effectiveCards[0];
             
             portId = `${dataCard.shelfNo}/${dataCard.slotNo}/port-${portNum}`;
           }
 
-          device.portStates = [{
+          device.portStates.push({
             portId: portId,
             status: "error" as const,
             errorLevel: errorLevels[localIdx % errorLevels.length],
             errorMessage: "Link down",
             portNumber: portId,
             portName: `Port ${portNum}`, // 사전 설정 — enrichment 트리거 방지
-          }];
+          });
+        }
+
+        // 정상(사용 중) 포트 랜덤 생성 (2~8개)
+        const numNormalPorts = Math.floor(Math.random() * 7) + 2;
+        for (let i = 0; i < numNormalPorts; i++) {
+          const portNum = Math.floor(Math.random() * 24) + 1;
+          let portId = `port-${portNum}`;
+          
+          if (effectiveCards && effectiveCards.length > 0) {
+            // 데이터 카드를 우선적으로 선택
+            const dataCards = effectiveCards.filter(c => 
+              !c.cardFileName.toLowerCase().includes("cpiom") && 
+              !c.cardFileName.toLowerCase().includes("cpm")
+            );
+            const targetCards = dataCards.length > 0 ? dataCards : effectiveCards;
+            const randomCard = targetCards[Math.floor(Math.random() * targetCards.length)];
+            portId = `${randomCard.shelfNo}/${randomCard.slotNo}/port-${portNum}`;
+          }
+
+          // 중복 방지 (에러 포트나 이미 추가된 정상 포트와 겹치지 않게)
+          if (!device.portStates.find(p => p.portId === portId)) {
+            device.portStates.push({
+              portId: portId,
+              status: "normal" as const,
+              portNumber: portId,
+              portName: `Port ${portNum}`,
+            });
+          }
         }
 
         devices.push(device);

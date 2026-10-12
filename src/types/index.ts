@@ -202,6 +202,7 @@ export interface RegisteredDevice {
   generatedPorts?: import("./equipment").GeneratedPort[];
   defaultViewSide?: import("./equipment").EquipmentViewSide;
   devicePngRaw?: string;
+  portStates?: PortState[];
 }
 
 // 렉 방향

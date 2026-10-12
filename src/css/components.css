@@ -417,6 +417,11 @@
   min-width: 0;
 }
 
+.device-modal-footer {
+  padding: 0 24px 24px 24px;
+  flex-shrink: 0;
+}
+
 .device-modal-svg-area {
   background-color: var(--bg-secondary);
   border-radius: var(--radius-md);
@@ -537,7 +542,7 @@
 
 /* --- Active Faults --- */
 .active-faults {
-  margin-top: 20px;
+  margin-top: 16px;
   padding: 16px;
   background-color: var(--bg-secondary);
   border-left: 4px solid var(--text-secondary);

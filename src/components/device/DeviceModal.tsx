@@ -1,11 +1,13 @@
 import { useEffect, useState, useMemo, useRef, useCallback, memo } from 'react';
 import { createPortal } from 'react-dom';
+import { Icon } from '@iconify/react';
 import { useStore } from "../../store/useStore";
 import { useShallow } from 'zustand/react/shallow';
 import { useSvgComposer } from "../../hooks/useSvgComposer";
 import { usePortInteraction } from "../../hooks/usePortInteraction";
 import { ModulePopover } from "./ModulePopover";
 import type { ModulePopoverData } from "./ModulePopover";
+import { PortInterfacePopover, type PortInfoData } from "./PortInterfacePopover";
 import type { EquipmentViewSide, InsertedModule, ModuleType } from "../../types/equipment";
 import { moduleDefinitions } from "../../utils/moduleAssets";
 import { getDeviceViewSides } from "../../utils/deviceAssets";
@@ -337,8 +339,11 @@ export const DeviceModal = ({ deviceId, onClose }: { deviceId: string; onClose: 
 
   // ─── 모듈 상태 관리 ───
   const [modulePopover, setModulePopover] = useState<ModulePopoverData | null>(null);
+  const [infoPopover, setInfoPopover] = useState<PortInfoData | null>(null);
   const [localModules, setLocalModules] = useState<InsertedModule[]>([]);
-  const isEditMode = useStore(s => s.isEditMode);
+  const [localEditMode, setLocalEditMode] = useState(false);
+  const storeEditMode = useStore(s => s.isEditMode);
+  const isEditMode = localEditMode || storeEditMode;
 
   const deviceInsertedModules = device?.insertedModules;
   const deviceInsertedModulesKey = useMemo(
@@ -366,18 +371,25 @@ export const DeviceModal = ({ deviceId, onClose }: { deviceId: string; onClose: 
   useEffect(() => {
     const container = svgContainerRef.current;
     if (!container) return;
-    const handlePopover = (e: Event) => setModulePopover((e as CustomEvent).detail);
-    container.addEventListener("port-module-popover", handlePopover);
-    return () => container.removeEventListener("port-module-popover", handlePopover);
+    const handleModulePopover = (e: Event) => setModulePopover((e as CustomEvent).detail);
+    const handleInfoPopover = (e: Event) => setInfoPopover((e as CustomEvent).detail);
+    
+    container.addEventListener("port-module-popover", handleModulePopover);
+    container.addEventListener("port-info-popover", handleInfoPopover);
+    return () => {
+      container.removeEventListener("port-module-popover", handleModulePopover);
+      container.removeEventListener("port-info-popover", handleInfoPopover);
+    };
   }, []);
 
   // 팝오버 외부 클릭 시 닫기
   useEffect(() => {
-    if (!modulePopover) return;
+    if (!modulePopover && !infoPopover) return;
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (target.closest(".module-popover, .port-hitbox, [id*='port-'], [id^='p']")) return;
+      if (target.closest(".module-popover, .port-info-popover, .port-hitbox, [id*='port-'], [id^='p']")) return;
       setModulePopover(null);
+      setInfoPopover(null);
     };
     const timer = setTimeout(() => {
       window.addEventListener("click", handleClickOutside, { capture: true });
@@ -386,7 +398,7 @@ export const DeviceModal = ({ deviceId, onClose }: { deviceId: string; onClose: 
       clearTimeout(timer);
       window.removeEventListener("click", handleClickOutside, { capture: true });
     };
-  }, [modulePopover]);
+  }, [modulePopover, infoPopover]);
 
   // ─── 모듈 삽입/제거 ───
   const handleInsertModule = useCallback((portId: string, moduleType: ModuleType, hitboxId?: string) => {
@@ -406,27 +418,63 @@ export const DeviceModal = ({ deviceId, onClose }: { deviceId: string; onClose: 
     });
     setModulePopover(null);
 
-    if (device?.deviceId) {
-      const currentModules = device.insertedModules || [];
+    const targetDeviceId = device?.deviceId || deviceId;
+    if (targetDeviceId) {
+      const currentModules = device?.insertedModules || [];
       const updated = [...currentModules.filter(m => hitboxId ? m.hitboxId !== hitboxId : m.portId !== portId), newModule];
-      
+
+      // 샘플 데이터 등으로 인해 portStates의 포트 ID 표현(예: 1/7/port-1 vs 1/7/sfp-1)이 다른 경우,
+      // 장애 상태의 portId를 현재 클릭/삽입된 포트 ID와 동기화하여 지속적으로 장애 표출 유지
+      const updatedPortStates = device?.portStates ? [...device.portStates] : undefined;
+      if (updatedPortStates) {
+        const matchingErrorIdx = updatedPortStates.findIndex(ps => {
+          if (ps.status !== "error") return false;
+          if (ps.portId === portId || ps.portNumber === portId) return true;
+          // 슬롯 및 포트 번호 대조 (예: 1/7/port-1 과 1/7/sfp-1)
+          if (portId.includes("/") && ps.portId.includes("/")) {
+            const p1 = portId.split("/");
+            const p2 = ps.portId.split("/");
+            if (p1[0] === p2[0] && p1[1] === p2[1]) {
+              const n1 = p1[2].match(/(\d+)$/)?.[1];
+              const n2 = p2[2].match(/(\d+)$/)?.[1];
+              return Boolean(n1 && n2 && n1 === n2);
+            }
+          }
+          const num1 = portId.match(/(\d+)$/)?.[1];
+          const num2 = ps.portId.match(/(\d+)$/)?.[1];
+          return Boolean(num1 && num2 && num1 === num2);
+        });
+
+        if (matchingErrorIdx !== -1) {
+          updatedPortStates[matchingErrorIdx] = {
+            ...updatedPortStates[matchingErrorIdx],
+            portId: portId,
+            portNumber: portId,
+          };
+        }
+      }
+
       // 1. 즉시 스토어 업데이트 (Undo 기록 생성)
-      updateRegisteredDevice(device.deviceId, { insertedModules: updated });
+      updateRegisteredDevice(targetDeviceId, {
+        insertedModules: updated,
+        ...(updatedPortStates ? { portStates: updatedPortStates } : {}),
+      });
     }
-  }, [device, updateRegisteredDevice]);
+  }, [device, deviceId, updateRegisteredDevice]);
 
   const handleRemoveModule = useCallback((portId: string, hitboxId?: string) => {
     setLocalModules(prev => prev.filter(m => hitboxId ? m.hitboxId !== hitboxId : m.portId !== portId));
     setModulePopover(null);
 
-    if (device?.deviceId) {
-      const currentModules = device.insertedModules || [];
+    const targetDeviceId = device?.deviceId || deviceId;
+    if (targetDeviceId) {
+      const currentModules = device?.insertedModules || [];
       const updated = currentModules.filter(m => hitboxId ? m.hitboxId !== hitboxId : m.portId !== portId);
-      
+
       // 1. 즉시 스토어 업데이트 (Undo 기록 생성)
-      updateRegisteredDevice(device.deviceId, { insertedModules: updated });
+      updateRegisteredDevice(targetDeviceId, { insertedModules: updated });
     }
-  }, [device, updateRegisteredDevice]);
+  }, [device, deviceId, updateRegisteredDevice]);
 
   const getModuleForPort = useCallback((portId: string, hitboxId?: string) => {
     return localModules.find(m => hitboxId ? m.hitboxId === hitboxId : m.portId === portId);
@@ -457,7 +505,17 @@ export const DeviceModal = ({ deviceId, onClose }: { deviceId: string; onClose: 
             <div className="device-modal-header-inner">
               <div className="device-modal-title-row">
                 <h2 className="device-modal-title">{device.title}</h2>
-                <button className="device-modal-close" onClick={onClose}>×</button>
+                <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <button
+                    className={`comm-btn comm-btn-sm ${isEditMode ? "comm-btn-primary" : "comm-btn-secondary"}`}
+                    onClick={() => setLocalEditMode(prev => !prev)}
+                    title="포트에 모듈을 장착/제거할 수 있는 편집 모드를 전환합니다."
+                  >
+                    <Icon icon="material-symbols:edit" style={{ marginRight: "4px" }} />
+                    {isEditMode ? "모듈 편집 모드" : "모듈 편집"}
+                  </button>
+                  <button className="device-modal-close" onClick={onClose}>×</button>
+                </div>
               </div>
               <div className="device-modal-meta">
                 <span className="device-type-badge">{device.type || "Router"}</span>
@@ -502,7 +560,10 @@ export const DeviceModal = ({ deviceId, onClose }: { deviceId: string; onClose: 
               </div>
             </div>
 
-            {/* Active Faults */}
+          </div>
+
+          {/* Active Faults (Fixed at Bottom) */}
+          <div className="device-modal-footer">
             <ActiveFaults portStates={devicePortStates} />
           </div>
         </div>
@@ -517,6 +578,25 @@ export const DeviceModal = ({ deviceId, onClose }: { deviceId: string; onClose: 
           existingModule={existingModule}
           onInsert={handleInsertModule}
           onRemove={handleRemoveModule}
+        />
+      )}
+
+      {/* Port Interface Popover */}
+      {infoPopover && !isEditMode && (
+        <PortInterfacePopover 
+          info={infoPopover} 
+          portStates={devicePortStates}
+          onClose={() => setInfoPopover(null)} 
+          onOpenModulePopover={() => {
+            setModulePopover({
+              portId: infoPopover.portId,
+              portType: infoPopover.portType,
+              hitboxId: infoPopover.hitboxId,
+              x: infoPopover.x,
+              y: infoPopover.y,
+            });
+            setInfoPopover(null);
+          }}
         />
       )}
     </div>,

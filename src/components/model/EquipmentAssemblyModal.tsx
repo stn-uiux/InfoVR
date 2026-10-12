@@ -481,6 +481,27 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
     return sm._gridRowHeights || sm.gridRowHeights;
   }, [selectedModel]);
 
+  const effectiveInsertedCards = useMemo(() => {
+    if (!selectedModel) return insertedCards;
+    return insertedCards.map((c) => {
+      let customSlotNo = undefined;
+      
+      if (!selectedModel.slots && selectedModel.cardArea) {
+        const { row, col } = getGridPositionFromIndex(
+          c.positionIndex,
+          selectedModel.cardArea.columns,
+          (selectedModel as { _rowColumns?: number[] })._rowColumns
+        );
+        customSlotNo = selectedModel.slotNumberMap?.[`${row}-${col}`];
+      }
+
+      return {
+        ...c,
+        slotNo: customSlotNo ?? c.slotNo ?? (c.positionIndex + 1),
+      };
+    });
+  }, [insertedCards, selectedModel]);
+
   const allCardDefinitions = useMemo(() => {
     const customMapped = customCards.map((c) => ({
       cardFileName: `custom-card-${c.cardId}`,
@@ -552,10 +573,17 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
   useEffect(() => {
     if (open) {
       if (initialCards && initialCards.length > 0) {
-        setInsertedCards(initialCards.map(c => ({
-          ...c,
-          slotNo: c.slotNo ?? (c.positionIndex + 1)
-        })));
+        setInsertedCards(initialCards.map(c => {
+          let customSlotNo = undefined;
+          if (inlineModel && !inlineModel.slots && inlineModel.cardArea) {
+            const { row, col } = getGridPositionFromIndex(c.positionIndex, inlineModel.cardArea.columns, inlineModel._rowColumns);
+            customSlotNo = inlineModel.slotNumberMap?.[`${row}-${col}`];
+          }
+          return {
+            ...c,
+            slotNo: customSlotNo ?? c.slotNo ?? (c.positionIndex + 1)
+          };
+        }));
         // slotNextId도 최대값 + 1로 설정하여 ID 충돌 방지
         const maxId = initialCards.reduce((max, c) => {
           const num = parseInt(c.instanceId.split("-").pop() || "0", 10);
@@ -574,10 +602,17 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
     setSelectedModel(model);
 
     if (model._initialCards && model._initialCards.length > 0) {
-      setInsertedCards(model._initialCards.map(c => ({
-        ...c,
-        slotNo: c.slotNo ?? (c.positionIndex + 1)
-      })));
+      setInsertedCards(model._initialCards.map(c => {
+        let customSlotNo = undefined;
+        if (!model.slots && model.cardArea) {
+          const { row, col } = getGridPositionFromIndex(c.positionIndex, model.cardArea.columns, model._rowColumns);
+          customSlotNo = model.slotNumberMap?.[`${row}-${col}`];
+        }
+        return {
+          ...c,
+          slotNo: customSlotNo ?? c.slotNo ?? (c.positionIndex + 1)
+        };
+      }));
       const maxId = model._initialCards.reduce((max, c) => {
         const num = parseInt(c.instanceId.split("-").pop() || "0", 10);
         return num > max ? num : max;
@@ -619,18 +654,18 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
   // === slots 모델: slotId 기반 점유 맵 ===
   const slotOccupiedMap = useMemo(() => {
     const map = new Map<string, InsertedCard>();
-    for (const c of insertedCards) {
+    for (const c of effectiveInsertedCards) {
       if (c.slotId) map.set(c.slotId, c);
     }
     return map;
-  }, [insertedCards]);
+  }, [effectiveInsertedCards]);
 
   // === 같은 행에서 full/half 슬롯 상호 배제 (geometry overlap) ===
   const blockedSlotIds = useMemo(() => {
     const blocked = new Set<string>();
 
     if (selectedModel?.slots) {
-      for (const card of insertedCards) {
+      for (const card of effectiveInsertedCards) {
         if (!card.slotId) continue;
         const occupied = selectedModel.slots.find(s => s.slotId === card.slotId);
         if (!occupied) continue;
@@ -808,7 +843,7 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
       const posIndex = slot.positionIndex;
       const effectiveCols = currentGridColWidths && currentGridColWidths.length > 0 ? currentGridColWidths.length : selectedModel.cardArea.columns;
 
-      if (!canInsertAt(insertedCards, posIndex, selectedCard.widthType, effectiveCols, currentRowColumns)) {
+      if (!canInsertAt(effectiveInsertedCards, posIndex, selectedCard.widthType, effectiveCols, currentRowColumns)) {
         setWarning(
           selectedCard.widthType === "full"
             ? "Full 카드는 빈 행의 첫 번째 열에서만 삽입할 수 있습니다."
@@ -817,6 +852,9 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
         return;
       }
 
+      const { row, col } = getGridPositionFromIndex(posIndex, selectedModel.cardArea.columns, currentRowColumns);
+      const customSlotNo = selectedModel.slotNumberMap?.[`${row}-${col}`];
+
       const newCard: InsertedCard = {
         instanceId: `card-instance-${String(slotNextId).padStart(3, "0")}`,
         cardFileName: selectedCard.cardFileName,
@@ -824,7 +862,7 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
         svgUrl: selectedCard.svgUrl,
         widthType: selectedCard.widthType,
         shelfNo: 1,
-        slotNo: posIndex + 1,
+        slotNo: customSlotNo ?? (posIndex + 1),
         positionIndex: posIndex,
         svgHeight: selectedCard.svgHeight,
       };
@@ -851,20 +889,20 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
 
     // Generate Port Map
     const cardSvgMap = new Map<string, string>();
-    for (const card of insertedCards) {
+    for (const card of effectiveInsertedCards) {
       if (!cardSvgMap.has(card.cardFileName)) {
         const raw = await loadCardSvgRaw(card.cardFileName);
         if (raw) cardSvgMap.set(card.cardFileName, raw);
       }
     }
-    const generatedPorts = generatePortMap(insertedCards, cardSvgMap);
+    const generatedPorts = generatePortMap(effectiveInsertedCards, cardSvgMap);
 
     if (onSave) {
-      const res = await onSave({ model: selectedModel, cards: insertedCards, generatedPorts });
+      const res = await onSave({ model: selectedModel, cards: effectiveInsertedCards, generatedPorts });
       if (res === false) return;
     }
     onClose();
-  }, [selectedModel, insertedCards, onSave, onClose, currentRowHeights, currentRowGaps, currentRowColumns, slots]);
+  }, [selectedModel, effectiveInsertedCards, onSave, onClose, currentRowHeights, currentRowGaps, currentRowColumns, slots]);
 
   const effectiveColumns = useMemo(() => {
     if (currentGridColWidths && currentGridColWidths.length > 0) return currentGridColWidths.length;
@@ -873,19 +911,19 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
 
   // 점유 맵
   const occupied = useMemo(
-    () => getOccupiedPositions(insertedCards, effectiveColumns, currentRowColumns),
-    [insertedCards, effectiveColumns, currentRowColumns],
+    () => getOccupiedPositions(effectiveInsertedCards, effectiveColumns, currentRowColumns),
+    [effectiveInsertedCards, effectiveColumns, currentRowColumns],
   );
 
   // 카드 인스턴스 → 슬롯 위치 매핑
   const cardAtSlot = useMemo(() => {
     const map = new Map<string, InsertedCard>();
-    for (const c of insertedCards) {
+    for (const c of effectiveInsertedCards) {
       const { row, col } = getGridPositionFromIndex(c.positionIndex, effectiveColumns, currentRowColumns);
       map.set(`${row}-${col}`, c);
     }
     return map;
-  }, [insertedCards, effectiveColumns, currentRowColumns]);
+  }, [effectiveInsertedCards, effectiveColumns, currentRowColumns]);
 
   if (!open) return null;
 

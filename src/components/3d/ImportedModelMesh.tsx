@@ -382,6 +382,7 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
   }, [model.position, model.rotation, model.scale]);
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
+    if (isObstructing) return;
     if (e.button !== 0) return; // Only allow left-click
     if (e.delta > 15) return; // Ignore if user dragged
     (e as any).stoppedByModel = true;
@@ -463,8 +464,10 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
   const innerContent = (
     <group
       userData={{ isInnerContent: true }}
-      onClick={handleClick}
+      raycast={isObstructing ? () => null : undefined}
+      onClick={isObstructing ? undefined : handleClick}
       onPointerOver={(e) => {
+        if (isObstructing) return;
         if (useStore.getState().isGizmoHovered) return;
         const hitGizmoHelper = e.intersections.some((hit) => {
           let obj: Object3D | null = hit.object;
@@ -485,6 +488,7 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
         }
       }}
       onPointerMove={(e) => {
+        if (isObstructing) return;
         if (useStore.getState().isGizmoHovered) return;
         const hitGizmoHelper = e.intersections.some((hit) => {
           let obj: Object3D | null = hit.object;
@@ -593,7 +597,11 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
   );
 
   return (
-    <group userData={{ isModelContainer: true, modelId: model.id }} visible={!isObstructing}>
+    <group
+      userData={{ isModelContainer: true, modelId: model.id }}
+      visible={!isObstructing}
+      raycast={isObstructing ? () => null : undefined}
+    >
       {shouldTransform ? (
         <group userData={{ isGizmo: true }}>
           <PivotControls

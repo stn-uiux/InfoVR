@@ -250,7 +250,7 @@ export const DashboardWidgets = () => {
     }
 
     // First select and focus the rack
-    selectRack(error.rackId);
+    selectRack(error.rackId, "front");
     focusRack(error.rackId);
     // Then open the device modal with highlighted port (use setTimeout to ensure state updates)
     setTimeout(() => {

@@ -57,10 +57,8 @@ function getPerforatedTexture(rackSize: number): CanvasTexture {
   return tex;
 }
 
-// Snapshot of selectedRackId captured inside handlePointerDown BEFORE selectRack()
-// mutates it. Since the Interaction Layer is geometrically closer to the camera,
-// handlePointerDown fires FIRST, then DeviceMesh's onClick fires and reads this.
-let selectedRackIdBeforePointerDown: string | null = null;
+// We no longer need selectedRackIdBeforePointerDown because interactBox becomes invisible 
+// when the rack is selected, preventing click event bubbling conflicts entirely.
 
 type RackProps = RackType;
 
@@ -79,6 +77,7 @@ export const Rack = memo(({
   const [hoveredSide, setHoveredSide] = useState<"front" | "rear" | null>(null);
   // Boolean selectors: only re-render when THIS rack's selection state changes
   const isSelected = useStore((state: AppState) => state.selectedRackId === rackId);
+  const selectedRackSide = useStore((state: AppState) => state.selectedRackSide);
   const isHovered = useStore((state: AppState) => state.hoveredRackId === rackId);
   const isFocused = useStore((state: AppState) => state.focusedRackId === rackId);
   const isObstructing = useStore((state: AppState) => state.obstructingRackIds.includes(rackId));
@@ -231,11 +230,8 @@ export const Rack = memo(({
     }
 
     e.stopPropagation();
-    const { selectRack, setDragging, updateDragPosition, isEditMode } =
+    const { setDragging, updateDragPosition, isEditMode } =
       useStore.getState();
-
-    // Snapshot BEFORE mutation — DeviceMesh onClick reads this for two-step gate
-    selectedRackIdBeforePointerDown = useStore.getState().selectedRackId;
 
     if (!isEditMode) return;
 
@@ -338,6 +334,7 @@ export const Rack = memo(({
       <group
         ref={groupRef}
         visible={!isObstructing}
+        raycast={isObstructing ? () => null : undefined}
         position={initialPos as unknown as Vector3}
         rotation={initialRot as unknown as Euler}
         scale={[1, 1, 1]}
@@ -506,6 +503,8 @@ export const Rack = memo(({
           <group>
             {/* Front Interact Box */}
             <mesh
+              visible={!(isSelected && !isEditMode && selectedRackSide === "front")}
+              raycast={isObstructing ? () => null : undefined}
               geometry={SHARED_GEO.interactBox}
               scale={[width, height, depth / 2]}
               position={[0, 0, depth / 4]}
@@ -558,7 +557,6 @@ export const Rack = memo(({
                 const isSelected = state.selectedRackId === rackId;
                 setHoveredSide("front");
                 if (!isSelected) {
-                  e.stopPropagation();
                   setHoveredRack(rackId);
                   if (!state.isDragging) {
                     document.body.style.cursor = state.isEditMode ? "grab" : "pointer";
@@ -581,6 +579,8 @@ export const Rack = memo(({
 
             {/* Rear Interact Box */}
             <mesh
+              visible={!(isSelected && !isEditMode && selectedRackSide === "rear")}
+              raycast={isObstructing ? () => null : undefined}
               geometry={SHARED_GEO.interactBox}
               scale={[width, height, depth / 2]}
               position={[0, 0, -depth / 4]}
@@ -633,7 +633,6 @@ export const Rack = memo(({
                 const isSelected = state.selectedRackId === rackId;
                 setHoveredSide("rear");
                 if (!isSelected) {
-                  e.stopPropagation();
                   setHoveredRack(rackId);
                   if (!state.isDragging) {
                     document.body.style.cursor = state.isEditMode ? "grab" : "pointer";
@@ -656,6 +655,8 @@ export const Rack = memo(({
           </group>
         ) : (
           <mesh
+            visible={!(isSelected && !isEditMode)}
+            raycast={isObstructing ? () => null : undefined}
             geometry={SHARED_GEO.interactBox}
             scale={[width, height, depth]}
             onPointerDown={isObstructing ? undefined : handlePointerDown}
@@ -716,7 +717,6 @@ export const Rack = memo(({
   
               // Only capture hover for the rack if it is NOT selected
               if (!isSelected) {
-                e.stopPropagation();
                 setHoveredRack(rackId);
                 if (!state.isDragging) {
                   document.body.style.cursor = state.isEditMode ? "grab" : "pointer";
@@ -815,7 +815,7 @@ export const Rack = memo(({
           </group>
         )}
 
-        <group position={[0, 0, depth / 2 - 0.07]}>
+        <group position={[0, 0, depth / 2 - 0.07]} key={`devices-${isSelected}`}>
           {/* Main White Light extracted to GlobalFocusLights */}
           {devices.map((device) => (
             <MemoDeviceMesh
@@ -874,9 +874,9 @@ const MemoDeviceMesh = memo(({ device, rackHeight, rackWidth, rackId, isObstruct
   device: Device; rackHeight: number; rackWidth: number; rackId: string; isObstructing: boolean; rackTitle?: string; rackDepth?: number;
 }) => {
   const onSelect = useCallback(() => {
-    const { focusRack, selectDevice, isEditMode } = useStore.getState();
+    const { focusRack, selectDevice, isEditMode, selectedRackId } = useStore.getState();
     if (isEditMode) return;
-    if (selectedRackIdBeforePointerDown === rackId) {
+    if (selectedRackId === rackId) {
       selectDevice(device.itemId);
     } else {
       focusRack(rackId);
@@ -1064,7 +1064,8 @@ const DeviceMesh = ({
         if (isObstructing) return;
         const state = useStore.getState();
         if (state.isGizmoHovered) return;
-        if (state.isEditMode && state.selectedRackId === rackId) return;
+        if (state.selectedRackId !== rackId) return;
+        if (state.isEditMode) return;
 
         const hitGizmoHelper = e.intersections.some((hit) => {
           let obj: Object3D | null = hit.object;
@@ -1091,7 +1092,8 @@ const DeviceMesh = ({
         if (isObstructing) return;
         const state = useStore.getState();
         if (state.isGizmoHovered) return;
-        if (state.isEditMode && state.selectedRackId === rackId) return;
+        if (state.selectedRackId !== rackId) return;
+        if (state.isEditMode) return;
 
         const hitGizmoHelper = e.intersections.some((hit) => {
           let obj: Object3D | null = hit.object;
@@ -1111,6 +1113,14 @@ const DeviceMesh = ({
         }
 
         e.stopPropagation();
+        
+        // R3F 렌더링 최적화/캐싱으로 인해 onPointerOver가 누락되는 경우를 대비해
+        // onPointerMove에서도 hover 상태를 강제로 복구해줍니다.
+        if (!isDeviceHovered) {
+          setIsDeviceHovered(true);
+          document.body.style.cursor = "pointer";
+        }
+
         state.setHoveredDevice({
           device,
           x: e.clientX,
@@ -1120,6 +1130,7 @@ const DeviceMesh = ({
         });
       }}
       onPointerOut={(e) => {
+        if (useStore.getState().selectedRackId !== rackId) return;
         e.stopPropagation();
         setIsDeviceHovered(false);
         const { hoveredDevice, setHoveredDevice } = useStore.getState();

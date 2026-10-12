@@ -61,7 +61,7 @@ export const ErrorMarker = ({ rack }: ErrorMarkerProps) => {
       useStore.getState();
     if (isDragging || draggingModelId !== null) return;
     if ("stopPropagation" in e) (e as React.MouseEvent).stopPropagation();
-    selectRack(rack.rackId);
+    selectRack(rack.rackId, "front");
     focusRack(rack.rackId);
   };
 
@@ -77,7 +77,7 @@ export const ErrorMarker = ({ rack }: ErrorMarkerProps) => {
           const { isDragging, draggingModelId } = useStore.getState();
           if (isDragging || draggingModelId !== null) return;
           e.stopPropagation();
-          useStore.getState().selectRack(rack.rackId);
+          useStore.getState().selectRack(rack.rackId, "front");
           useStore.getState().focusRack(rack.rackId);
         }}
       >

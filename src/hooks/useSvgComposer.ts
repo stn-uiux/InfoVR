@@ -66,6 +66,7 @@ type ComposerEquipmentModel = EquipmentModel & {
   gridColWidths?: number[];
   gridRowHeights?: number[];
   baseEquipmentViewSvgRaw?: string;
+  slotNumberMap?: Record<string, string | number>;
 };
 
 function getRowColumnCount(row: number, defaultColumns: number, customRowColumns?: number[]): number {
@@ -232,6 +233,7 @@ export function useSvgComposer(
           gridMerges: m.gridMerges,
           gridColWidths: m.gridColWidths,
           gridRowHeights: m.gridRowHeights,
+          slotNumberMap: m.slotNumberMap,
         };
         
         if (m.variants && m.variants.length > 0) {
@@ -256,6 +258,25 @@ export function useSvgComposer(
     allEquipmentModels.find(m => m.modelName === modelName),
     [allEquipmentModels, modelName]
   );
+
+  const effectiveInsertedCards = useMemo(() => {
+    return insertedCards.map((c) => {
+      let customSlotNo = undefined;
+      if (equipModel && !equipModel.slots && equipModel.cardArea) {
+        const { row, col } = getGridPositionFromIndex(
+          c.positionIndex,
+          equipModel.cardArea.columns,
+          equipModel._rowColumns
+        );
+        customSlotNo = equipModel.slotNumberMap?.[`${row}-${col}`];
+      }
+      return {
+        ...c,
+        originalSlotNo: c.slotNo ?? (c.positionIndex + 1),
+        slotNo: customSlotNo ?? c.slotNo ?? (c.positionIndex + 1),
+      };
+    });
+  }, [insertedCards, equipModel]);
 
   const modelLayoutKey = useMemo(() => {
     if (!equipModel) return "";
@@ -336,9 +357,9 @@ export function useSvgComposer(
   // ─── 포트 맵 ───
   const generatedPorts = useMemo<GeneratedPort[]>(() => {
     if (!isModularDevice || cardSvgMap.size === 0) return [];
-    const ports = generatePortMap(insertedCards, cardSvgMap);
+    const ports = generatePortMap(effectiveInsertedCards, cardSvgMap);
     return applyPortStatuses(ports, statusMap);
-  }, [isModularDevice, insertedCards, cardSvgMap, statusMap]);
+  }, [isModularDevice, effectiveInsertedCards, cardSvgMap, statusMap]);
 
 
 
@@ -411,10 +432,10 @@ export function useSvgComposer(
         const baseComposedHtml = new XMLSerializer().serializeToString(baseDoc);
 
         // ─── 카드 합성 ───
-        composeCards(baseSvgEl, baseDoc, parser, insertedCards, cardSvgMap, equipModel);
+        composeCards(baseSvgEl, baseDoc, parser, effectiveInsertedCards, cardSvgMap, equipModel);
 
         // ─── 모듈 합성 ───
-        composeModules(baseSvgEl, baseDoc, insertedModules);
+        composeModules(baseSvgEl, baseDoc, insertedModules, statusMap, generatedPortMap);
 
         // ─── 포트 스타일 사전 초기화 (직렬화 전 메모리 트리에서 처리) ───
         const allPortEls = filterPortElements(
@@ -645,6 +666,9 @@ function composeCards(
       const uniquePortKey = portType ? `${portType}-${localPort}` : localPort;
       const realPortNumber = `${card.shelfNo}/${card.slotNo}/${uniquePortKey}`;
       hb.setAttribute("data-port-number", realPortNumber);
+      if (card.originalSlotNo !== undefined && card.originalSlotNo !== card.slotNo) {
+        hb.setAttribute("data-original-port-number", `${card.shelfNo}/${card.originalSlotNo}/${uniquePortKey}`);
+      }
       hb.setAttribute("data-card-instance", instancePrefix);
     });
 
@@ -659,6 +683,8 @@ function composeModules(
   baseSvgEl: SVGSVGElement,
   baseDoc: Document,
   insertedModules: InsertedModule[],
+  statusMap?: Record<string, string>,
+  generatedPortMap?: Map<string, GeneratedPort>,
 ) {
   // 전체 포트 엘리먼트 수집
   const allPortEls = filterPortElements(
@@ -705,10 +731,57 @@ function composeModules(
     img.setAttribute("data-port-id", module.portId);
     img.setAttribute("pointer-events", "none");
 
+    const portNum = targetHb.getAttribute("data-port-number");
+    if (portNum) img.setAttribute("data-port-number", portNum);
+    const origPortNum = targetHb.getAttribute("data-original-port-number");
+    if (origPortNum) img.setAttribute("data-original-port-number", origPortNum);
+    const localPort = targetHb.getAttribute("data-local-port");
+    if (localPort) img.setAttribute("data-local-port", localPort);
+    if (targetHb.id) img.setAttribute("data-hitbox-id", targetHb.id);
+
+    // 모듈 전용 에러/하이라이트 오버레이 rect 생성 (장애 발생 시 모듈 표면 블링킹용)
+    const overlay = baseDoc.createElementNS("http://www.w3.org/2000/svg", "rect");
+    overlay.setAttribute("class", "inserted-module-overlay");
+    overlay.setAttribute("x", finalX.toString());
+    overlay.setAttribute("y", finalY.toString());
+    overlay.setAttribute("width", finalW.toString());
+    overlay.setAttribute("height", finalH.toString());
+    overlay.setAttribute("rx", "2.5");
+    overlay.setAttribute("fill", "transparent");
+    overlay.setAttribute("stroke", "none");
+    overlay.setAttribute("pointer-events", "none");
+    overlay.setAttribute("data-port-id", module.portId);
+    if (portNum) overlay.setAttribute("data-port-number", portNum);
+    if (origPortNum) overlay.setAttribute("data-original-port-number", origPortNum);
+    if (localPort) overlay.setAttribute("data-local-port", localPort);
+    if (targetHb.id) overlay.setAttribute("data-hitbox-id", targetHb.id);
+
+    const errorStatus = (generatedPortMap && (
+      (portNum && generatedPortMap.get(portNum)?.status !== "normal" && generatedPortMap.get(portNum)?.status) ||
+      (module.portId && generatedPortMap.get(module.portId)?.status !== "normal" && generatedPortMap.get(module.portId)?.status)
+    )) || (statusMap && (
+      (statusMap[module.portId] && statusMap[module.portId] !== "normal" && statusMap[module.portId]) ||
+      (portNum && statusMap[portNum] && statusMap[portNum] !== "normal" && statusMap[portNum]) ||
+      (targetHb.id && statusMap[targetHb.id] && statusMap[targetHb.id] !== "normal" && statusMap[targetHb.id]) ||
+      (localPort && statusMap[`port-${localPort}`] && statusMap[`port-${localPort}`] !== "normal" && statusMap[`port-${localPort}`])
+    ));
+
+    if (errorStatus && errorStatus !== "normal") {
+      const errColor = PORT_STATUS_COLORS[errorStatus] || "#ef4444";
+      overlay.setAttribute("data-error-level", errorStatus);
+      overlay.setAttribute("fill", `${errColor}33`);
+      overlay.setAttribute("stroke", errColor);
+      overlay.setAttribute("stroke-width", "2");
+      img.setAttribute("data-error-level", errorStatus);
+      targetHb.setAttribute("data-error-level", errorStatus);
+    }
+
+    targetHb.setAttribute("data-has-module", "true");
 
     const parent = targetHb.parentNode;
     if (parent) {
       parent.insertBefore(img, targetHb);
+      parent.insertBefore(overlay, targetHb);
       parent.appendChild(targetHb);
     }
   });
@@ -900,9 +973,26 @@ export async function generateComposedSvgAsync(
   
   const statusMap = buildPortStatusMapFromPortStates([]);
 
+  const effectiveInsertedCards = insertedCards.map((c) => {
+    let customSlotNo = undefined;
+    if (equipModel && !equipModel.slots && equipModel.cardArea) {
+      const { row, col } = getGridPositionFromIndex(
+        c.positionIndex,
+        equipModel.cardArea.columns,
+        equipModel._rowColumns
+      );
+      customSlotNo = equipModel.slotNumberMap?.[`${row}-${col}`];
+    }
+    return {
+      ...c,
+      originalSlotNo: c.slotNo ?? (c.positionIndex + 1),
+      slotNo: customSlotNo ?? c.slotNo ?? (c.positionIndex + 1),
+    };
+  });
+
   drawBlankSlots(baseSvgEl, baseDoc, equipModel);
-  composeCards(baseSvgEl, baseDoc, parser, insertedCards, cardSvgMap, equipModel);
-  composeModules(baseSvgEl, baseDoc, insertedModules);
+  composeCards(baseSvgEl, baseDoc, parser, effectiveInsertedCards, cardSvgMap, equipModel);
+  composeModules(baseSvgEl, baseDoc, insertedModules, statusMap);
   
   const allPortEls = filterPortElements(Array.from(baseSvgEl.querySelectorAll(PORT_SELECTOR)));
   allPortEls.forEach((el) => {

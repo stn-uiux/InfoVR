@@ -415,9 +415,9 @@ export const CameraController = () => {
     // 동적 장애물 업데이트 (포커스 모드일 때 매 프레임 재계산)
     if (controls) {
       const storeState = useStore.getState();
-      if (storeState.focusedRackId) {
-
-        const targetRack = storeState.racks.find(r => r.rackId === storeState.focusedRackId);
+      const activeTargetId = storeState.focusedRackId || (!storeState.isEditMode ? storeState.selectedRackId : null);
+      if (activeTargetId) {
+        const targetRack = storeState.racks.find(r => r.rackId === activeTargetId);
 
         if (targetRack) {
           // 목표 랙의 중심점
@@ -426,106 +426,93 @@ export const CameraController = () => {
           const rackHeight = targetRack.rackSize * U_HEIGHT + 0.1;
           const targetCenterY = rackHeight * 0.5;
 
-
-          // 타겟 랙이 바라보는 방향 (앞면 방향)
-          const orientation = targetRack.orientation ?? 180;
-          const orientationRad = ((180 - orientation) * Math.PI) / 180;
-          const camDirX = Math.sin(orientationRad);
-          const camDirZ = Math.cos(orientationRad);
-
           const obstructingIds: string[] = [];
           const obstructingModelIds: string[] = [];
           const allRacks = storeState.racks.filter(
-            (r) => r.mapId === storeState.activeNodeId && r.rackId !== storeState.focusedRackId
+            (r) => r.mapId === storeState.activeNodeId && r.rackId !== activeTargetId
           );
 
           for (const other of allRacks) {
             const otherX = other.position[0] * GRID_SPACING;
             const otherZ = other.position[1] * GRID_SPACING;
 
-            const dx = otherX - rackX;
-            const dz = otherZ - rackZ;
+            const camPosToUse = isAnimating.current ? vTargetPos.current : camera.position;
+            const camXZ = new Vector2(camPosToUse.x, camPosToUse.z);
+            const targetXZ = new Vector2(rackX, rackZ);
+            const dirXZ = new Vector2().subVectors(targetXZ, camXZ);
+            const distToTargetXZ = dirXZ.length();
+            if (distToTargetXZ === 0) continue;
+            dirXZ.normalize();
 
-            // 1. 타겟 랙 앞면에 위치하는 랙(맞은편 랙)인지 검사
-            const projFront = dx * camDirX + dz * camDirZ;
-            const perpDistFront = Math.abs(dx * camDirZ - dz * camDirX);
+            const otherXZ = new Vector2(otherX, otherZ);
+            const vecToOtherXZ = new Vector2().subVectors(otherXZ, camXZ);
+            const projSightXZ = vecToOtherXZ.dot(dirXZ);
 
-            // 타겟 랙 정면 방향에 있고 폭이 1.2 이내인 맞은편 랙인지 확인
-            if (projFront > 0.3 && perpDistFront < 1.2) {
-              // 2. 현재 카메라 위치가 맞은편 랙 뒤로 넘어가서 시야를 가리는 상태인지 검사
-              // 랙 높이가 서로 다를 때 중심점 3D 거리를 사용하면 오차가 크므로 XZ 평면(바닥)과 Y 높이를 분리해서 계산
-              const camPosToUse = isAnimating.current ? vTargetPos.current : camera.position;
-              const camXZ = new Vector2(camPosToUse.x, camPosToUse.z);
-              const targetXZ = new Vector2(rackX, rackZ);
-              const dirXZ = new Vector2().subVectors(targetXZ, camXZ);
-              const distToTargetXZ = dirXZ.length();
-              if (distToTargetXZ === 0) continue;
-              dirXZ.normalize();
+            const otherHalfWidth = (other.width || 0.6) / 2;
+            const otherHalfDepth = ((other.rackDepth || 100) / 100) / 2;
+            const otherRadius = Math.sqrt(otherHalfWidth * otherHalfWidth + otherHalfDepth * otherHalfDepth) + 0.3;
 
-              const otherXZ = new Vector2(otherX, otherZ);
-              const vecToOtherXZ = new Vector2().subVectors(otherXZ, camXZ);
-              const projSightXZ = vecToOtherXZ.dot(dirXZ);
+            // 맞은편 또는 시야를 가리는 다른 랙이 카메라와 목표 랙 사이에 위치하는지 검사
+            if (projSightXZ > -otherRadius && projSightXZ < distToTargetXZ - 0.2) {
+              const perpSqXZ = Math.max(0, vecToOtherXZ.lengthSq() - projSightXZ * projSightXZ);
+              const perpDistSightXZ = Math.sqrt(perpSqXZ);
 
-              // 맞은편 랙이 카메라와 목표 랙 사이(XZ 기준)에 위치하는가?
-              // 랙 자체의 깊이(Depth)가 있으므로 카메라가 랙 중심점보다 1.2m 정도 앞(또는 뒤)에 있어도 랙 내부에 위치하여 시야를 가릴 수 있음
-              if (projSightXZ > -1.2 && projSightXZ < distToTargetXZ + 1.2) {
-                // 시선 직선으로부터 수직으로 떨어진 가로 거리
-                const perpSqXZ = Math.max(0, vecToOtherXZ.lengthSq() - projSightXZ * projSightXZ);
-                const perpDistSightXZ = Math.sqrt(perpSqXZ);
+              if (perpDistSightXZ < otherRadius + 0.4) {
+                const ratio = Math.max(0, Math.min(1, projSightXZ / distToTargetXZ));
+                const sightYAtRack = camPosToUse.y + ratio * (targetCenterY - camPosToUse.y);
+                const otherHeight = other.rackSize * U_HEIGHT + 0.1;
 
-                // 가로 폭으로 1.2m 이내에 들어와서 시야를 가릴 때
-                if (perpDistSightXZ < 1.2) {
-                  // 카메라가 목표 랙을 내려다보는 시선이 맞은편 랙 위쪽 허공을 지나가는지 검사
-                  const ratio = projSightXZ / distToTargetXZ;
-                  const sightYAtRack = camPosToUse.y + ratio * (targetCenterY - camPosToUse.y);
-
-                  const otherHeight = other.rackSize * U_HEIGHT + 0.1;
-
-                  // 시선 높이가 맞은편 랙의 실제 높이보다 낮거나, 카메라 자체가 랙 높이보다 낮다면 (화면 하단을 가림) 숨김 처리
-                  if (sightYAtRack < otherHeight + 0.5 || camPosToUse.y < otherHeight + 0.5) {
-                    obstructingIds.push(other.rackId);
-                  }
+                if (sightYAtRack < otherHeight + 0.5 || camPosToUse.y < otherHeight + 0.5) {
+                  obstructingIds.push(other.rackId);
                 }
               }
             }
           }
 
-          // Imported Models Obstructing Logic
+          // Imported Models Obstructing Logic (벽, 파티션 등 모든 3D 오브젝트)
           const allModels = storeState.importedModels;
 
           for (const other of allModels) {
             const otherX = other.position[0];
             const otherZ = other.position[2];
 
-            const dx = otherX - rackX;
-            const dz = otherZ - rackZ;
+            const isWall = other.builtinType === "Wall";
+            const isPartition = other.builtinType === "Partition";
+            const wp = other.wallParams;
+            const pp = other.partitionParams;
 
-            const projFront = dx * camDirX + dz * camDirZ;
-            const perpDistFront = Math.abs(dx * camDirZ - dz * camDirX);
+            const baseW = isWall ? (wp?.length ?? 1) : isPartition ? (pp?.length ?? 1) : (other.baseSize?.[0] ?? 1);
+            const baseH = isWall ? (wp?.height ?? 2.5) : isPartition ? (pp?.height ?? 2) : (other.baseSize?.[1] ?? 2);
+            const baseD = isWall ? (wp?.thickness ?? 0.2) : isPartition ? (pp?.thickness ?? 0.1) : (other.baseSize?.[2] ?? 1);
 
-            const depth = other.baseSize ? other.baseSize[2] * other.scale[2] : 1.0;
-            const width = other.baseSize ? other.baseSize[0] * other.scale[0] : 1.0;
-            const height = other.baseSize ? other.baseSize[1] * other.scale[1] : 2.0;
-            const radius = Math.max(depth, width) / 2 + 0.6; // Slightly padded
+            const width = baseW * other.scale[0];
+            const height = baseH * other.scale[1];
+            const depth = baseD * other.scale[2];
+            const radius = Math.sqrt(width * width + depth * depth) / 2 + 0.6; // 회전 무관 XZ 평면 바운딩 반경
 
-            if (projFront > 0.3 && perpDistFront < radius + 1.0) {
-              const camPosToUse = isAnimating.current ? vTargetPos.current : camera.position;
-              const camXZ = new Vector2(camPosToUse.x, camPosToUse.z);
-              const targetXZ = new Vector2(rackX, rackZ);
-              const dirXZ = new Vector2().subVectors(targetXZ, camXZ);
-              const distToTargetXZ = dirXZ.length();
-              if (distToTargetXZ === 0) continue;
-              dirXZ.normalize();
+            const camPosToUse = isAnimating.current ? vTargetPos.current : camera.position;
+            const camXZ = new Vector2(camPosToUse.x, camPosToUse.z);
+            const targetXZ = new Vector2(rackX, rackZ);
+            const dirXZ = new Vector2().subVectors(targetXZ, camXZ);
+            const distToTargetXZ = dirXZ.length();
+            if (distToTargetXZ === 0) continue;
+            dirXZ.normalize();
 
-              const otherXZ = new Vector2(otherX, otherZ);
-              const vecToOtherXZ = new Vector2().subVectors(otherXZ, camXZ);
-              const projSightXZ = vecToOtherXZ.dot(dirXZ);
+            const otherXZ = new Vector2(otherX, otherZ);
+            const vecToOtherXZ = new Vector2().subVectors(otherXZ, camXZ);
+            const projSightXZ = vecToOtherXZ.dot(dirXZ);
 
-              if (projSightXZ > -radius && projSightXZ < distToTargetXZ + radius) {
-                const perpSqXZ = Math.max(0, vecToOtherXZ.lengthSq() - projSightXZ * projSightXZ);
-                const perpDistSightXZ = Math.sqrt(perpSqXZ);
+            if (projSightXZ > -radius && projSightXZ < distToTargetXZ - 0.2) {
+              const perpSqXZ = Math.max(0, vecToOtherXZ.lengthSq() - projSightXZ * projSightXZ);
+              const perpDistSightXZ = Math.sqrt(perpSqXZ);
 
-                if (perpDistSightXZ < radius + 0.5) {
+              if (perpDistSightXZ < radius + 0.3) {
+                const ratio = Math.max(0, Math.min(1, projSightXZ / distToTargetXZ));
+                const sightY = camPosToUse.y + ratio * (targetCenterY - camPosToUse.y);
+                const modelBottom = other.position[1];
+                const modelTop = modelBottom + height;
+
+                if (sightY < modelTop + 0.4 && camPosToUse.y < modelTop + 0.5) {
                   obstructingModelIds.push(other.id);
                 }
               }
@@ -589,6 +576,10 @@ export const CameraController = () => {
 
     orbitControls.update();
 
+    if (state.events && state.events.update) {
+      state.events.update();
+    }
+
     const posDist = camera.position.distanceTo(vTargetPos.current);
     const targetDist = orbitControls.target.distanceTo(vTargetLookAt.current);
 
@@ -598,6 +589,10 @@ export const CameraController = () => {
       state.camera.zoom = vTargetZoom.current;
       state.camera.updateProjectionMatrix();
       orbitControls.update();
+      
+      if (state.events && state.events.update) {
+        state.events.update();
+      }
 
       isAnimating.current = false;
 

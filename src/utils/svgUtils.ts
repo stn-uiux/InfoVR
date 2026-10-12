@@ -112,7 +112,7 @@ export function prefixSvgIds(svgEl: Element, prefix: string) {
   });
 }
 
-/** 동적 CSS @keyframes 주입 (에러 블링킹 애니메이션용) */
+/** 동적 CSS @keyframes 주입 (포트 및 꽂힌 모듈의 에러 블링킹 애니메이션용) */
 export function ensureKeyframe(name: string, color: string) {
   const styleId = `style-${name}`;
   if (document.getElementById(styleId)) return;
@@ -123,6 +123,37 @@ export function ensureKeyframe(name: string, color: string) {
       0% { fill: ${color}22; stroke: ${color}; stroke-width: 1px; }
       50% { fill: ${color}aa; stroke: ${color}; stroke-width: 3px; }
       100% { fill: ${color}22; stroke: ${color}; stroke-width: 1px; }
+    }
+    @keyframes ${name}-img {
+      0% {
+        filter: drop-shadow(0 0 2px ${color}) drop-shadow(0 0 4px ${color});
+        opacity: 0.85;
+      }
+      50% {
+        filter: drop-shadow(0 0 8px ${color}) drop-shadow(0 0 16px ${color}) saturate(1.8) brightness(1.25);
+        opacity: 1;
+      }
+      100% {
+        filter: drop-shadow(0 0 2px ${color}) drop-shadow(0 0 4px ${color});
+        opacity: 0.85;
+      }
+    }
+    @keyframes ${name}-overlay {
+      0% {
+        fill: ${color}2b;
+        stroke: ${color};
+        stroke-width: 2px;
+      }
+      50% {
+        fill: ${color}b3;
+        stroke: ${color};
+        stroke-width: 3.5px;
+      }
+      100% {
+        fill: ${color}2b;
+        stroke: ${color};
+        stroke-width: 2px;
+      }
     }
   `;
   document.head.appendChild(style);

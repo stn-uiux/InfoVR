@@ -269,8 +269,8 @@ export const resolveDeviceSvgContent = async (
       return wrapperSvg;
     } catch (err) {
       console.error("Failed to load PNG dimensions for fallback SVG wrapper:", err);
-      // Fallback to a generic 984x200 viewBox with 'meet' to avoid distortion if loading fails
-      const wrapperSvg = `<svg viewBox="0 0 984 200" width="984" height="200" xmlns="http://www.w3.org/2000/svg"><image href="${pngUrl}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" /></svg>`;
+      // Fallback to a generic 984x200 viewBox with 'none' to stretch and fill the unit
+      const wrapperSvg = `<svg viewBox="0 0 984 200" width="984" height="200" xmlns="http://www.w3.org/2000/svg"><image href="${pngUrl}" width="100%" height="100%" preserveAspectRatio="none" /></svg>`;
       svgContentCache.set(cacheKey, wrapperSvg);
       return wrapperSvg;
     }

@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import type { CardWidthType } from "../../../types/equipment";
 import { StnFormField } from "../../ui/StnFormField";
 import { StnInput } from "../../ui/StnInput";
+import { SvgPreview } from "./ModelRegistrationModal";
 
 interface Props {
   open: boolean;
@@ -266,11 +267,7 @@ export const CardRegistrationForm: React.FC<Props> = ({
           </div>
         </StnFormField>
 
-        {svgRaw && (
-          <div className="mrm-svg-preview">
-            <div dangerouslySetInnerHTML={{ __html: svgRaw }} />
-          </div>
-        )}
+        {svgRaw && <SvgPreview svgRaw={svgRaw} maxHeight={220} />}
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
           <button className="mrm-btn secondary" onClick={onClose}>

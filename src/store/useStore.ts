@@ -326,7 +326,7 @@ export interface AppState {
   removeRegisteredDevices: (ids: string[]) => void;
   updateRegisteredDevice: (
     id: string,
-    updates: Partial<RegisteredDevice> & { generatedPorts?: GeneratedPort[] },
+    updates: Partial<RegisteredDevice> & { generatedPorts?: GeneratedPort[]; portStates?: import("../types").PortState[] },
     skipUndo?: boolean,
   ) => void;
   upsertRegisteredDevices: (devices: Omit<RegisteredDevice, "deviceId">[]) => {
@@ -1499,13 +1499,13 @@ export const useStore = create<AppState>()(
           // Phase 4: 해당 device가 없는 rack은 참조 유지 (불필요한 복사 방지)
           let racksChanged = false;
           const updatedRacks = state.racks.map((rack) => {
-            const hasTarget = rack.devices.some(d => d.deviceId === id);
+            const hasTarget = rack.devices.some(d => d.deviceId === id || d.itemId === id);
             if (!hasTarget) return rack; // 원래 참조 유지
             racksChanged = true;
             return {
               ...rack,
               devices: rack.devices.map((device) => {
-                if (device.deviceId === id) {
+                if (device.deviceId === id || device.itemId === id) {
                   return {
                     ...device,
                     title: updates.title ?? device.title,
@@ -1518,13 +1518,78 @@ export const useStore = create<AppState>()(
                     insertedModules: updates.insertedModules !== undefined ? updates.insertedModules : device.insertedModules,
                     defaultViewSide: updates.defaultViewSide !== undefined ? updates.defaultViewSide : device.defaultViewSide,
                     devicePngRaw: updates.devicePngRaw !== undefined ? updates.devicePngRaw : device.devicePngRaw,
-                    portStates: updates.generatedPorts
-                      ? updates.generatedPorts.map(gp => {
-                        const ex = device.portStates.find(p => p.portId === gp.realPortNumber);
-                        if (ex) return { ...ex, portName: gp.portType, portNumber: gp.realPortNumber };
-                        return { portId: gp.realPortNumber, portNumber: gp.realPortNumber, portName: gp.portType, status: "normal" } as PortState;
-                      })
-                      : device.portStates,
+                    portStates: (() => {
+                      let nextStates: PortState[] = device.portStates || [];
+                      if (updates.portStates !== undefined) {
+                        nextStates = updates.portStates;
+                      } else if (updates.generatedPorts && updates.generatedPorts.length > 0) {
+                        const mapped = updates.generatedPorts.map(gp => {
+                          const ex = (device.portStates || []).find(p => p.portId === gp.realPortNumber || p.portNumber === gp.realPortNumber);
+                          if (ex) return { ...ex, portName: gp.portType, portNumber: gp.realPortNumber };
+                          const errEx = (device.portStates || []).find(p => {
+                            if (p.status !== "error") return false;
+                            if (p.portId.includes("/") && gp.realPortNumber.includes("/")) {
+                              const p1 = p.portId.split("/");
+                              const p2 = gp.realPortNumber.split("/");
+                              if (p1[0] === p2[0] && p1[1] === p2[1]) {
+                                const n1 = p1[2].match(/(\d+)$/)?.[1];
+                                const n2 = p2[2].match(/(\d+)$/)?.[1];
+                                return Boolean(n1 && n2 && n1 === n2);
+                              }
+                            }
+                            const num1 = p.portId.match(/(\d+)$/)?.[1];
+                            const num2 = gp.realPortNumber.match(/(\d+)$/)?.[1];
+                            return Boolean(num1 && num2 && num1 === num2);
+                          });
+                          if (errEx) {
+                            return {
+                              ...errEx,
+                              portId: gp.realPortNumber,
+                              portNumber: gp.realPortNumber,
+                              portName: gp.portType,
+                            };
+                          }
+                          return { portId: gp.realPortNumber, portNumber: gp.realPortNumber, portName: gp.portType, status: "normal" } as PortState;
+                        });
+
+                        (device.portStates || []).forEach(oldPs => {
+                          if (oldPs.status === "error") {
+                            const exists = mapped.some(m => m.portId === oldPs.portId || m.portNumber === oldPs.portNumber);
+                            if (!exists) mapped.push(oldPs);
+                          }
+                        });
+                        nextStates = mapped;
+                      }
+
+                      // updates.insertedModules가 제공된 경우 장애 포트와 모듈 portId 동기화
+                      const mods = updates.insertedModules !== undefined ? updates.insertedModules : device.insertedModules;
+                      if (mods && mods.length > 0) {
+                        nextStates = nextStates.map(ps => {
+                          if (ps.status !== "error") return ps;
+                          const matchingMod = mods.find(m => {
+                            if (m.portId === ps.portId || m.portId === ps.portNumber) return true;
+                            if (m.portId.includes("/") && ps.portId.includes("/")) {
+                              const p1 = m.portId.split("/");
+                              const p2 = ps.portId.split("/");
+                              if (p1[0] === p2[0] && p1[1] === p2[1]) {
+                                const n1 = p1[2].match(/(\d+)$/)?.[1];
+                                const n2 = p2[2].match(/(\d+)$/)?.[1];
+                                return Boolean(n1 && n2 && n1 === n2);
+                              }
+                            }
+                            const num1 = m.portId.match(/(\d+)$/)?.[1];
+                            const num2 = ps.portId.match(/(\d+)$/)?.[1];
+                            return Boolean(num1 && num2 && num1 === num2);
+                          });
+                          if (matchingMod) {
+                            return { ...ps, portId: matchingMod.portId, portNumber: matchingMod.portId };
+                          }
+                          return ps;
+                        });
+                      }
+
+                      return nextStates;
+                    })(),
                   };
                 }
                 return device;

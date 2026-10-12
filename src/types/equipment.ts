@@ -97,6 +97,7 @@ export interface EquipmentModel {
   gridMerges?: { r: number; c: number; rs: number; cs: number }[];
   gridColWidths?: number[];
   gridRowHeights?: number[];
+  slotNumberMap?: Record<string, string | number>;
 }
 
 /** 카드 정의 (카드 라이브러리에 표시) */
@@ -155,7 +156,8 @@ export interface InsertedCard {
   svgUrl: string;
   widthType: CardWidthType;
   shelfNo: number;
-  slotNo: number;
+  slotNo: string | number;
+  originalSlotNo?: string | number;
   /** 그리드 내 위치 인덱스 (row * columns + col) */
   positionIndex: number;
   /** 카드 SVG 원본 높이 */
@@ -259,6 +261,7 @@ export interface CustomEquipmentModel {
   gridColWidths?: number[];
   /** 각 행의 높이 배열 (그리드 에디터 개별 높이 지원 - rowHeights와 분리 보존용) */
   gridRowHeights?: number[];
+  slotNumberMap?: Record<string, string | number>;
   /** 장비 SVG 원본 크기 */
   equipmentSize?: {
     width: number;

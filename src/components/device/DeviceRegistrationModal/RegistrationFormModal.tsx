@@ -10,7 +10,7 @@ import type { InsertedCard, GeneratedPort, InsertedModule, EquipmentViewSide } f
 import { useStore } from "../../../store/useStore";
 import { getEffectiveTemplates } from "../../../utils/deviceTemplates";
 import { getDeviceViewSides, hasDeviceSvgAsset } from "../../../utils/deviceAssets";
-import type { VendorName, HierarchyNode, RegisteredDevice } from "../../../types";
+import type { VendorName, HierarchyNode, RegisteredDevice, PortState } from "../../../types";
 import { getEffectiveCards } from "../../../utils/sampleUtils";
 import { convertSvgToPngAsync } from "../../../utils/imageUtils";
 
@@ -71,6 +71,7 @@ export const RegistrationFormModal = ({
 
   // Module State
   const [insertedModules, setInsertedModules] = useState<InsertedModule[]>([]);
+  const [devicePortStates, setDevicePortStates] = useState<PortState[]>([]);
   const [defaultViewSide, setDefaultViewSide] = useState<EquipmentViewSide>("front");
 
   const [composedSvgFront, setComposedSvgFront] = useState<string | null>(null);
@@ -154,10 +155,24 @@ export const RegistrationFormModal = ({
           setIp(device.IPAddr || "");
 
           if (device.vendor) setVendor(device.vendor);
-          setInsertedCards(getEffectiveCards(device as any, customModels));
+          setInsertedCards(getEffectiveCards(device, customModels));
           setInsertedModules(device.insertedModules || []);
 
           setDefaultViewSide(device.defaultViewSide || "front");
+
+          // 랙 장비 또는 등록 장비에서 기존 portStates 추출
+          let pStates: PortState[] = [];
+          for (const r of useStore.getState().racks) {
+            const d = r.devices.find(d => d.deviceId === editingDeviceId || d.itemId === editingDeviceId);
+            if (d && d.portStates && d.portStates.length > 0) {
+              pStates = d.portStates;
+              break;
+            }
+          }
+          if (pStates.length === 0 && device.portStates && device.portStates.length > 0) {
+            pStates = device.portStates;
+          }
+          setDevicePortStates(pStates);
         }
       } else {
         const firstRoom = nodes.find(n => n.type === "room");
@@ -167,6 +182,7 @@ export const RegistrationFormModal = ({
         const initialTemplate = effectiveTemplates[0];
         setInsertedCards(initialTemplate?.variant?.insertedCards || []);
         setInsertedModules([]);
+        setDevicePortStates([]);
         setGeneratedPorts([]);
         setSelectedModelIdx(0);
         setDeviceName("");
@@ -187,7 +203,7 @@ export const RegistrationFormModal = ({
       const initialTitle = device.title || "";
       const initialIp = device.IPAddr || "";
       const initialVendor = device.vendor || "Nokia";
-      const initialCards = getEffectiveCards(device as any, customModels);
+      const initialCards = getEffectiveCards(device, customModels);
       const initialModules = device.insertedModules || [];
       const initialViewSide = device.defaultViewSide || "front";
 
@@ -279,20 +295,62 @@ export const RegistrationFormModal = ({
     payload.defaultViewSide = defaultViewSide;
     if (vendor) payload.vendor = vendor;
 
-    if (isCustomized) {
-      payload.insertedCards = insertedCards;
-      payload.generatedPorts = generatedPorts;
-    } else {
-      payload.insertedCards = [];
-      payload.generatedPorts = [];
-    }
-    // 모듈 정보 포함
-    payload.insertedModules = insertedModules;
-
     if (editingDeviceId) {
+      if (insertedCards && insertedCards.length > 0) {
+        payload.insertedCards = insertedCards;
+      }
+      if (generatedPorts && generatedPorts.length > 0) {
+        payload.generatedPorts = generatedPorts;
+      }
+
+      // 기존 장비의 portStates 보존 및 모듈 삽입된 장애 포트 동기화
+      if (devicePortStates && devicePortStates.length > 0) {
+        const updatedPortStates = [...devicePortStates];
+        insertedModules.forEach(mod => {
+          const modPortId = mod.portId;
+          const matchingErrIdx = updatedPortStates.findIndex(ps => {
+            if (ps.status !== "error") return false;
+            if (ps.portId === modPortId || ps.portNumber === modPortId) return true;
+            if (modPortId.includes("/") && ps.portId.includes("/")) {
+              const p1 = modPortId.split("/");
+              const p2 = ps.portId.split("/");
+              if (p1[0] === p2[0] && p1[1] === p2[1]) {
+                const n1 = p1[2].match(/(\d+)$/)?.[1];
+                const n2 = p2[2].match(/(\d+)$/)?.[1];
+                return Boolean(n1 && n2 && n1 === n2);
+              }
+            }
+            const num1 = modPortId.match(/(\d+)$/)?.[1];
+            const num2 = ps.portId.match(/(\d+)$/)?.[1];
+            return Boolean(num1 && num2 && num1 === num2);
+          });
+
+          if (matchingErrIdx !== -1) {
+            updatedPortStates[matchingErrIdx] = {
+              ...updatedPortStates[matchingErrIdx],
+              portId: modPortId,
+              portNumber: modPortId,
+            };
+          }
+        });
+
+        payload.portStates = updatedPortStates;
+      }
+
+      payload.insertedModules = insertedModules;
+
       updateRegisteredDevice(editingDeviceId, payload);
       onSuccess(title.trim(), true);
     } else {
+      if (isCustomized) {
+        payload.insertedCards = insertedCards;
+        payload.generatedPorts = generatedPorts;
+      } else {
+        payload.insertedCards = [];
+        payload.generatedPorts = [];
+      }
+      payload.insertedModules = insertedModules;
+
       addRegisteredDevice(payload);
       onSuccess(title.trim(), false);
     }
@@ -579,6 +637,7 @@ export const RegistrationFormModal = ({
                       editable={true}
                       maxWidth="100%"
                       viewSide={side}
+                      portStates={devicePortStates}
                       onCompose={(svg) => {
                         if (side === "front") setComposedSvgFront(svg);
                         else setComposedSvgRear(svg);

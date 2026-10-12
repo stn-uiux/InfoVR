@@ -79,7 +79,7 @@ export const FocusCarousel: React.FC = () => {
     // Requirements: Wrap around to the last rack if at the first.
     const prevIndex = currentIndex === -1 ? groupRacks.length - 1 : (currentIndex - 1 + groupRacks.length) % groupRacks.length;
     const targetId = groupRacks[prevIndex].rackId;
-    selectRack(targetId);
+    selectRack(targetId, "front");
     focusRack(targetId);
     setIsListOpen(false);
   };
@@ -89,7 +89,7 @@ export const FocusCarousel: React.FC = () => {
     // Requirements: Wrap around to the first rack if at the last.
     const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % groupRacks.length;
     const targetId = groupRacks[nextIndex].rackId;
-    selectRack(targetId);
+    selectRack(targetId, "front");
     focusRack(targetId);
     setIsListOpen(false);
   };
@@ -128,7 +128,7 @@ export const FocusCarousel: React.FC = () => {
                   key={rack.rackId}
                   className={`focus-list-item ${isCurrent ? 'is-current' : ''}`}
                   onClick={() => {
-                    selectRack(rack.rackId);
+                    selectRack(rack.rackId, "front");
                     focusRack(rack.rackId);
                     setIsListOpen(false);
                   }}

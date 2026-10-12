@@ -4,11 +4,13 @@ import { findNode } from "../../utils/nodeUtils";
 
 export const DeviceTooltip = () => {
   const hoveredDevice = useStore((s) => s.hoveredDevice);
+  const selectedDeviceId = useStore((s) => s.selectedDeviceId);
   const registeredDevices = useStore((s) => s.registeredDevices);
   const racks = useStore((s) => s.racks);
   const nodes = useStore((s) => s.nodes);
 
-  if (!hoveredDevice) return null;
+  // 장비 상세보기 창(DeviceModal)이 열려있을 경우 툴팁을 숨겨서 겹치지 않게 합니다.
+  if (!hoveredDevice || selectedDeviceId) return null;
 
   const { device, x, y, rackTitle, rackId } = hoveredDevice;
   const errorInfo = getHighestError(device.portStates);
