@@ -4,6 +4,7 @@ import { useStore } from "../../../store/useStore";
 
 import type { RegisteredDevice } from "../../../types";
 import { StnBadge } from "../../ui/StnBadge";
+import { getDeviceTypeLabel } from "../../../utils/deviceTypes";
 
 export interface DeviceRowProps {
   device: RegisteredDevice;
@@ -104,7 +105,7 @@ export const DeviceRow = React.memo(({
           fontSize: "12px",
         }}
       >
-        {device.type}
+        {getDeviceTypeLabel(device.type)}
       </td>
       <td>
         <span className="drm-vendor-tag">{device.vendor}</span>

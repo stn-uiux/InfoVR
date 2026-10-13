@@ -272,8 +272,8 @@ export interface CustomEquipmentModel {
   
   /** 장비종류 (서버, 전송, 교환 등) */
   deviceCategory?: string;
-  /** 장비 타입 (Router, Switch, Server) */
-  type?: "Switch" | "Router" | "Server";
+  /** 장비 종류 (Router, Switch, Server, Transport, Security, Storage) */
+  type?: import("./index").DeviceType;
   /** 세부유형 (IP-MPLS, ROADM 등) */
   deviceSubtype?: string;
   /** 제조사 */

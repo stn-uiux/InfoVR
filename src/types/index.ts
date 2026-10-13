@@ -46,8 +46,9 @@ export type VendorName =
   | "텔레필드"
   | string;
 
-// 장비 타입
-export type DeviceType = "Switch" | "Router" | "Server" | "MSPP";
+// 장비 종류 (라우터 / 스위치 / 서버 / 광전송장비 / 보안장비 / 스토리지)
+// 표시 라벨 및 레거시 값("MSPP" 등) 정규화는 utils/deviceTypes.ts 참고
+export type DeviceType = "Router" | "Switch" | "Server" | "Transport" | "Security" | "Storage";
 
 /** 
  * [VITE_CACHE_BREAKER_9999] 
@@ -251,7 +252,8 @@ export type BuiltinModelType =
   | "PartitionModel"
   | "TableLarge"
   | "TableSmall"
-  | "DoorAuto";
+  | "DoorAuto"
+  | "CCTV";
 
 // 가시성 모드 (투명 유리 vs 불투명)
 export type VisibilityMode = "transparent" | "opaque";

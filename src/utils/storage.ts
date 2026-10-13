@@ -1,6 +1,6 @@
-import type { Device, DeviceType, ErrorLevel, HierarchyNode, NodeType, Orientation, Rack, RegisteredDevice, VendorName } from "../types";
+import type { Device, ErrorLevel, HierarchyNode, NodeType, Orientation, Rack, RegisteredDevice, VendorName } from "../types";
 import { useStore } from "../store/useStore";
-import { DEVICE_TEMPLATES } from "./deviceTemplates";
+import { DEVICE_TEMPLATES, resolveDeviceType } from "./deviceTemplates";
 import { RACK_WIDTH_STANDARD } from "../components/layout/constants";
 import {
   migrateGroupNameToNodeId,
@@ -449,7 +449,7 @@ export const loadRackFromExcel = (file: File): Promise<Partial<Rack>> => {
 	          return {
 	            itemId: String(d.deviceId || generateUUID()),
 	            title: String(d.title || ""),
-	            type: (d.type || "Server") as DeviceType,
+	            type: resolveDeviceType(d.modelName as string | undefined, d.type, useStore.getState().customModels),
 	            size: Number(d.size),
 	            position: Number(d.position),
 	            imageUrl: d.imageUrl as string | undefined,
@@ -1033,7 +1033,7 @@ export const importGroupPackage = (
               return {
                 itemId: dItemId,
                 title: String(getValue(d, "title", "deviceName", "name") || ""),
-                type: (getValue(d, "type") || "Server") as DeviceType,
+                type: resolveDeviceType(getValue(d, "modelName") as string | undefined, getValue(d, "type"), useStore.getState().customModels),
                 size: Number(getValue(d, "size") || 1),
                 position: Number(getValue(d, "position") || 1),
                 modelName: getValue(d, "modelName"),
@@ -1080,7 +1080,7 @@ export const importGroupPackage = (
             deviceGroupId: nodeTarget,
             title: String(getValue(d, "title", "deviceName", "name") || ""),
             modelName: String(getValue(d, "modelName") || ""),
-            type: (getValue(d, "type") || "Server") as DeviceType,
+            type: resolveDeviceType(getValue(d, "modelName") as string | undefined, getValue(d, "type"), useStore.getState().customModels),
             size: Number(getValue(d, "size") || 1),
             IPAddr: String(getValue(d, "IPAddr", "ip") || ""),
             macAddr: String(getValue(d, "macAddr", "mac") || ""),

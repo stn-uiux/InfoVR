@@ -6587,7 +6587,7 @@ input:checked+.slider:before {
   color: var(--text-secondary);
   margin: 0;
   display: flex;
-  alignItems: center;
+  align-items: center;
   gap: 8px;
 }
 
@@ -6686,4 +6686,218 @@ input:checked+.slider:before {
 .comm-btn-md svg.asset-lib-icon {
   width: 18px !important;
   height: 18px !important;
+}
+
+/* ==========================================================================
+   Mode Transition Overlay (Edit Mode ON / OFF Dimmed Loading)
+   ========================================================================== */
+.mode-transition-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: rgba(10, 15, 29, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: modeOverlayFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  pointer-events: all;
+  user-select: none;
+}
+
+@keyframes modeOverlayFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.mode-transition-card {
+  position: relative;
+  width: 380px;
+  max-width: 90vw;
+  padding: 36px 32px 30px;
+  background: rgba(24, 32, 50, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 32px rgba(59, 130, 246, 0.15);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: modeCardPop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes modeCardPop {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.mode-transition-spinner-container {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.mode-transition-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.08);
+  animation: modeSpinnerRotate 0.9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.mode-transition-ring.edit-mode {
+  border-top-color: #22c55e;
+  border-right-color: #4ade80;
+  box-shadow: 0 0 16px rgba(34, 197, 94, 0.35);
+}
+
+.mode-transition-ring.view-mode {
+  border-top-color: #3b82f6;
+  border-right-color: #60a5fa;
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.35);
+}
+
+@keyframes modeSpinnerRotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.mode-transition-icon-wrap {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mode-transition-center-icon {
+  font-size: 26px;
+}
+
+.mode-transition-center-icon.edit-color {
+  color: #4ade80;
+  filter: drop-shadow(0 0 8px rgba(74, 222, 128, 0.6));
+}
+
+.mode-transition-center-icon.view-color {
+  color: #60a5fa;
+  filter: drop-shadow(0 0 8px rgba(96, 165, 250, 0.6));
+}
+
+.mode-transition-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  margin-bottom: 12px;
+}
+
+.mode-transition-badge.edit-badge {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.3);
+}
+
+.mode-transition-badge.view-badge {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(96, 165, 250, 0.3);
+}
+
+.mode-transition-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+  animation: modeDotPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes modeDotPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.7);
+  }
+}
+
+.mode-transition-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+}
+
+.mode-transition-desc {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.65);
+  margin-bottom: 24px;
+  line-height: 1.4;
+}
+
+.mode-transition-progress-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.mode-transition-progress-bar {
+  height: 100%;
+  border-radius: 9999px;
+  width: 35%;
+  animation: modeProgressAnim 1.2s infinite ease-in-out;
+}
+
+.mode-transition-progress-bar.edit-bar {
+  background: linear-gradient(90deg, #22c55e, #86efac);
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+}
+
+.mode-transition-progress-bar.view-bar {
+  background: linear-gradient(90deg, #3b82f6, #93c5fd);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+}
+
+@keyframes modeProgressAnim {
+  0% {
+    transform: translateX(-100%);
+    width: 30%;
+  }
+  50% {
+    width: 55%;
+  }
+  100% {
+    transform: translateX(350%);
+    width: 30%;
+  }
 }

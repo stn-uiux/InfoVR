@@ -10,6 +10,7 @@ import { getDeviceViewSides } from "../../utils/deviceAssets";
 import type { Device, PortState } from "../../types";
 import type { CustomEquipmentModel } from "../../types/equipment";
 import { getEffectiveCards } from "../../utils/sampleUtils";
+import { getDeviceTypeLabel } from "../../utils/deviceTypes";
 // ─── SvgPortView ─── (SVG 프리뷰 + 포트 상호작용)
 const SvgPortView = memo(({ device, portStates, tooltipRef, editable, viewSide = "front", customModels }: {
   device: Device;
@@ -347,20 +348,32 @@ export const DeviceModal = ({ deviceId, onClose }: { deviceId: string; onClose: 
     };
   }, []);
 
-  // 팝오버 외부 클릭 시 닫기
+  // 팝오버 외부 클릭 및 ESC 키 입력 시 닫기
   useEffect(() => {
     if (!infoPopover) return;
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: MouseEvent | PointerEvent) => {
       const target = e.target as HTMLElement;
-      if (target.closest(".port-info-popover, .port-hitbox, [id*='port-'], [id^='p']")) return;
+      if (target.closest(".port-info-popover")) return;
       setInfoPopover(null);
     };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setInfoPopover(null);
+      }
+    };
+
     const timer = setTimeout(() => {
+      window.addEventListener("pointerdown", handleClickOutside, { capture: true });
       window.addEventListener("click", handleClickOutside, { capture: true });
+      window.addEventListener("keydown", handleKeyDown);
     }, 50);
+
     return () => {
       clearTimeout(timer);
+      window.removeEventListener("pointerdown", handleClickOutside, { capture: true });
       window.removeEventListener("click", handleClickOutside, { capture: true });
+      window.removeEventListener("keydown", handleKeyDown);
     };
   }, [infoPopover]);
 
@@ -392,7 +405,7 @@ export const DeviceModal = ({ deviceId, onClose }: { deviceId: string; onClose: 
                 </div>
               </div>
               <div className="device-modal-meta">
-                <span className="device-type-badge">{device.type || "Router"}</span>
+                <span className="device-type-badge">{getDeviceTypeLabel(device.type || "Router")}</span>
                 <span className="device-rack-info">Rack: {rackName || device.rackId || "Unknown"}</span>
                 {displayVendor && <span className="device-rack-info">Vendor: {displayVendor}</span>}
                 {displayModel && <span className="device-rack-info">Model: {displayModel}</span>}

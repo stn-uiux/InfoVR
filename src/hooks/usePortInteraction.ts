@@ -261,7 +261,16 @@ export function usePortInteraction(
       if (!portId) return;
 
       const originalPortId = portEl.getAttribute("data-original-port-number");
-      const isInUse = portStateMap.has(portId) || (originalPortId && portStateMap.has(originalPortId));
+      const dpn = portEl.getAttribute("data-port-number");
+      const dlp = portEl.getAttribute("data-local-port");
+
+      const matchedState = (portId && portStateMap.get(portId)) ||
+                           (originalPortId && portStateMap.get(originalPortId)) ||
+                           (dpn && portStateMap.get(dpn)) ||
+                           (dlp && portStateMap.get(dlp)) ||
+                           (portEl.id && portStateMap.get(portEl.id));
+
+      const isInUse = !!matchedState || portStateMap.has(portId) || (originalPortId && portStateMap.has(originalPortId));
       if (!editable && !isInUse) return;
 
       const rect = portEl.getBoundingClientRect();
@@ -273,6 +282,7 @@ export function usePortInteraction(
         hitboxId: portEl.id,
         x: rect.left + rect.width / 2,
         y: rect.top,
+        portState: matchedState,
       };
 
       if (editable) {

@@ -240,17 +240,37 @@ function buildSlotGrid(
   return slots;
 }
 
-function getOccupiedPositions(cards: InsertedCard[], columns = 2, customRowColumns?: number[]): Set<string> {
+function isModelSlotHorizontal(
+  model?: EquipmentModel | null,
+  gridColWidths?: number[],
+  gridRowHeights?: number[],
+  customRowHeights?: number[],
+  customRowColumns?: number[],
+): boolean {
+  if (!model?.cardArea) return true;
+  const colW = gridColWidths?.[0] ?? (model.cardArea.width / (customRowColumns?.[0] ?? model.cardArea.columns ?? 1));
+  const rowH = gridRowHeights?.[0] ?? (customRowHeights?.[0] ?? CARD_ROW_HEIGHT);
+  return colW > rowH;
+}
+
+function getOccupiedPositions(
+  cards: InsertedCard[],
+  columns = 2,
+  customRowColumns?: number[],
+  isSlotHorizontal = true,
+): Set<string> {
   const set = new Set<string>();
   for (const c of cards) {
     const { row, col, columns: rowColumns } = getGridPositionFromIndex(c.positionIndex, columns, customRowColumns);
-    const span = getColSpan(c.widthType, rowColumns);
-    const maxRow = c.widthType === "vfull" ? 100 : 1; 
+    const isVfullRotated = isSlotHorizontal && c.widthType === "vfull";
+    const span = isVfullRotated ? rowColumns : getColSpan(c.widthType, rowColumns);
+    const maxRow = (!isSlotHorizontal && c.widthType === "vfull") ? 100 : 1;
 
     for (let r = 0; r < maxRow; r++) {
-      const targetRow = c.widthType === "vfull" ? r : row;
+      const targetRow = (!isSlotHorizontal && c.widthType === "vfull") ? r : row;
+      const startCol = isVfullRotated ? 0 : col;
       for (let offset = 0; offset < span; offset += 1) {
-        set.add(`${targetRow}-${col + offset}`);
+        set.add(`${targetRow}-${startCol + offset}`);
       }
     }
   }
@@ -263,18 +283,21 @@ function canInsertAt(
   widthType: CardWidthType,
   columns: number,
   customRowColumns?: number[],
+  isSlotHorizontal = true,
 ): boolean {
-  const occupied = getOccupiedPositions(cards, columns, customRowColumns);
+  const occupied = getOccupiedPositions(cards, columns, customRowColumns, isSlotHorizontal);
   const { row, col, columns: rowColumns } = getGridPositionFromIndex(posIndex, columns, customRowColumns);
-  const span = getColSpan(widthType, rowColumns);
-  const maxRow = widthType === "vfull" ? 100 : 1;
+  const isVfullRotated = isSlotHorizontal && widthType === "vfull";
+  const span = isVfullRotated ? rowColumns : getColSpan(widthType, rowColumns);
+  const maxRow = (!isSlotHorizontal && widthType === "vfull") ? 100 : 1;
 
-  if (col + span > rowColumns) return false;
+  if (!isVfullRotated && col + span > rowColumns) return false;
 
   for (let r = 0; r < maxRow; r++) {
-    const targetRow = widthType === "vfull" ? r : row;
+    const targetRow = (!isSlotHorizontal && widthType === "vfull") ? r : row;
+    const startCol = isVfullRotated ? 0 : col;
     for (let offset = 0; offset < span; offset += 1) {
-      if (occupied.has(`${targetRow}-${col + offset}`)) return false;
+      if (occupied.has(`${targetRow}-${startCol + offset}`)) return false;
     }
   }
 
@@ -297,7 +320,15 @@ function getCardPaintOrder(card: InsertedCard, model: EquipmentModel & { _rowCol
 }
 
 /* ────── 카드 SVG 인라인 렌더링 ────── */
-const CardInlineSvg = ({ cardFileName }: { cardFileName: string }) => {
+const CardInlineSvg = ({
+  cardFileName,
+  slotWidth,
+  slotHeight,
+}: {
+  cardFileName: string;
+  slotWidth?: number;
+  slotHeight?: number;
+}) => {
   const ref = useRef<HTMLDivElement>(null);
   const [svgHtml, setSvgHtml] = useState<string | null>(null);
 
@@ -305,45 +336,80 @@ const CardInlineSvg = ({ cardFileName }: { cardFileName: string }) => {
     let m = true;
     loadCardSvgRaw(cardFileName).then((raw) => {
       if (m && raw) {
-        // 1. viewBox가 없으면 기존 width/height를 기반으로 생성
-        let responsiveRaw = raw;
-        const viewBoxMatch = responsiveRaw.match(/<svg[^>]*viewBox="[^"]*"/);
-        let viewBoxToInject = "";
-        if (!viewBoxMatch) {
-          const widthMatch = responsiveRaw.match(/<svg[^>]*width="([^"]+)"/);
-          const heightMatch = responsiveRaw.match(/<svg[^>]*height="([^"]+)"/);
-          if (widthMatch && heightMatch) {
-            const w = parseFloat(widthMatch[1]);
-            const h = parseFloat(heightMatch[1]);
-            if (!isNaN(w) && !isNaN(h)) {
-              viewBoxToInject = ` viewBox="0 0 ${w} ${h}"`;
+        try {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(raw, "image/svg+xml");
+          const svgEl = doc.querySelector("svg");
+          if (!svgEl) {
+            setSvgHtml(raw);
+            return;
+          }
+
+          let origW = 100;
+          let origH = 20;
+          const vb = svgEl.getAttribute("viewBox");
+          if (vb) {
+            const parts = vb.trim().split(/[\s,]+/).map(Number);
+            if (parts.length >= 4 && !isNaN(parts[2]) && !isNaN(parts[3]) && parts[2] > 0 && parts[3] > 0) {
+              origW = parts[2];
+              origH = parts[3];
+            }
+          } else {
+            const w = parseFloat(svgEl.getAttribute("width") || "");
+            const h = parseFloat(svgEl.getAttribute("height") || "");
+            if (!isNaN(w) && !isNaN(h) && w > 0 && h > 0) {
+              origW = w;
+              origH = h;
             }
           }
+
+          const isSlotHorizontal =
+            slotWidth !== undefined && slotHeight !== undefined
+              ? slotWidth > slotHeight
+              : false;
+          const isCardVertical = origH > origW;
+          const shouldRotateCcw = isCardVertical && isSlotHorizontal;
+          const shouldRotateCw =
+            !isCardVertical &&
+            !isSlotHorizontal &&
+            slotWidth !== undefined &&
+            slotHeight !== undefined;
+
+          if (shouldRotateCcw || shouldRotateCw) {
+            const g = doc.createElementNS("http://www.w3.org/2000/svg", "g");
+            if (shouldRotateCcw) {
+              // 세로 카드 → 가로 슬롯: 반시계 90도 회전
+              g.setAttribute("transform", `translate(0, ${origW}) rotate(-90)`);
+            } else {
+              // 가로 카드 → 세로 슬롯: 시계 90도 회전
+              g.setAttribute("transform", `translate(${origH}, 0) rotate(90)`);
+            }
+            while (svgEl.firstChild) {
+              g.appendChild(svgEl.firstChild);
+            }
+            svgEl.appendChild(g);
+            svgEl.setAttribute("viewBox", `0 0 ${origH} ${origW}`);
+          } else {
+            svgEl.setAttribute("viewBox", `0 0 ${origW} ${origH}`);
+          }
+
+          svgEl.setAttribute("width", "100%");
+          svgEl.setAttribute("height", "100%");
+          svgEl.setAttribute("preserveAspectRatio", "none");
+
+          // image 태그 preserveAspectRatio 처리
+          svgEl.querySelectorAll("image").forEach((img) => {
+            img.setAttribute("preserveAspectRatio", "none");
+          });
+
+          setSvgHtml(svgEl.outerHTML);
+        } catch {
+          setSvgHtml(raw);
         }
-
-        // 2. <svg> 태그 무조건 100% 꽉 채우도록 덮어쓰기
-        responsiveRaw = responsiveRaw.replace(/<svg([^>]*)>/, (match, inner) => {
-          let newInner = inner
-            .replace(/\bwidth="[^"]*"/g, '')
-            .replace(/\bheight="[^"]*"/g, '')
-            .replace(/\bpreserveAspectRatio="[^"]*"/g, '');
-          return `<svg width="100%" height="100%" preserveAspectRatio="none"${viewBoxToInject}${newInner}>`;
-        });
-
-        // 3. SVG 내의 <image> 태그들도 비율을 무시하고 100% 꽉 채우도록 덮어쓰기
-        responsiveRaw = responsiveRaw.replace(/<image([^>]*)>/g, (match, inner) => {
-          let newInner = inner
-            .replace(/\bwidth="[^"]*"/g, '')
-            .replace(/\bheight="[^"]*"/g, '')
-            .replace(/\bpreserveAspectRatio="[^"]*"/g, '');
-          return `<image width="100%" height="100%" preserveAspectRatio="none"${newInner}>`;
-        });
-
-        setSvgHtml(responsiveRaw);
       }
     });
     return () => { m = false; };
-  }, [cardFileName]);
+  }, [cardFileName, slotWidth, slotHeight]);
 
   if (!svgHtml) return null;
   return (
@@ -843,16 +909,28 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
       const posIndex = slot.positionIndex;
       const effectiveCols = currentGridColWidths && currentGridColWidths.length > 0 ? currentGridColWidths.length : selectedModel.cardArea.columns;
 
-      if (!canInsertAt(effectiveInsertedCards, posIndex, selectedCard.widthType, effectiveCols, currentRowColumns)) {
+      const isSlotHorizontal = isModelSlotHorizontal(
+        selectedModel,
+        currentGridColWidths,
+        currentGridRowHeights,
+        currentRowHeights,
+        currentRowColumns,
+      );
+
+      if (!canInsertAt(effectiveInsertedCards, posIndex, selectedCard.widthType, effectiveCols, currentRowColumns, isSlotHorizontal)) {
         setWarning(
-          selectedCard.widthType === "full"
-            ? "Full 카드는 빈 행의 첫 번째 열에서만 삽입할 수 있습니다."
+          selectedCard.widthType === "full" || (isSlotHorizontal && selectedCard.widthType === "vfull")
+            ? "Full 카드는 빈 행에서만 삽입할 수 있습니다."
             : "이미 다른 카드가 있는 슬롯입니다.",
         );
         return;
       }
 
       const { row, col } = getGridPositionFromIndex(posIndex, selectedModel.cardArea.columns, currentRowColumns);
+      const isVfullRotated = isSlotHorizontal && selectedCard.widthType === "vfull";
+      const targetPosIndex = isVfullRotated
+        ? getGridPositionIndex(row, 0, selectedModel.cardArea.columns, currentRowColumns)
+        : posIndex;
       const customSlotNo = selectedModel.slotNumberMap?.[`${row}-${col}`];
 
       const newCard: InsertedCard = {
@@ -862,14 +940,14 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
         svgUrl: selectedCard.svgUrl,
         widthType: selectedCard.widthType,
         shelfNo: 1,
-        slotNo: customSlotNo ?? (posIndex + 1),
-        positionIndex: posIndex,
+        slotNo: customSlotNo ?? (targetPosIndex + 1),
+        positionIndex: targetPosIndex,
         svgHeight: selectedCard.svgHeight,
       };
       setInsertedCards((prev) => [...prev, newCard]);
       setSlotNextId((n) => n + 1);
     },
-    [selectedCard, selectedModel, insertedCards, slotNextId, currentRowColumns, currentGridColWidths],
+    [selectedCard, selectedModel, effectiveInsertedCards, slotNextId, currentRowColumns, currentGridColWidths, currentGridRowHeights, currentRowHeights],
   );
 
   // 카드 제거
@@ -909,10 +987,15 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
     return selectedModel?.cardArea?.columns ?? 2;
   }, [currentGridColWidths, selectedModel?.cardArea?.columns]);
 
+  const isSlotHorizontal = useMemo(
+    () => isModelSlotHorizontal(selectedModel, currentGridColWidths, currentGridRowHeights, currentRowHeights, currentRowColumns),
+    [selectedModel, currentGridColWidths, currentGridRowHeights, currentRowHeights, currentRowColumns]
+  );
+
   // 점유 맵
   const occupied = useMemo(
-    () => getOccupiedPositions(effectiveInsertedCards, effectiveColumns, currentRowColumns),
-    [effectiveInsertedCards, effectiveColumns, currentRowColumns],
+    () => getOccupiedPositions(effectiveInsertedCards, effectiveColumns, currentRowColumns, isSlotHorizontal),
+    [effectiveInsertedCards, effectiveColumns, currentRowColumns, isSlotHorizontal],
   );
 
   // 카드 인스턴스 → 슬롯 위치 매핑
@@ -1190,7 +1273,11 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
                             >
                               {card ? (
                                 <>
-                                  <CardInlineSvg cardFileName={card.cardFileName} />
+                                  <CardInlineSvg
+                                    cardFileName={card.cardFileName}
+                                    slotWidth={slot.width}
+                                    slotHeight={slotHeight}
+                                  />
                                   <button
                                     className="remove-btn"
                                     onClick={(e) => {
@@ -1251,7 +1338,11 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
                                 >
                                   {card ? (
                                     <>
-                                      <CardInlineSvg cardFileName={card.cardFileName} />
+                                      <CardInlineSvg
+                                        cardFileName={card.cardFileName}
+                                        slotWidth={subSlot.width}
+                                        slotHeight={subSlot.height}
+                                      />
                                       <button
                                         className="remove-btn"
                                         onClick={(e) => {
@@ -1285,13 +1376,21 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
                           let slotTop = slot.y - selectedModel.cardArea!.y;
                           if (card) {
                             if (!currentGridColWidths || currentGridColWidths.length === 0) {
-                              const colSpan = getColSpan(card.widthType, getRowColumnCount(slot.row, selectedModel.cardArea!.columns, currentRowColumns));
+                              const colSpan = isSlotHorizontal && card.widthType === "vfull"
+                                ? getRowColumnCount(slot.row, selectedModel.cardArea!.columns, currentRowColumns)
+                                : getColSpan(card.widthType, getRowColumnCount(slot.row, selectedModel.cardArea!.columns, currentRowColumns));
                               slotWidth = slot.width * colSpan;
                             }
                             
                             if (card.widthType === "vfull") {
-                              slotHeight = selectedModel.cardArea!.height;
-                              slotTop = 0;
+                              if (isSlotHorizontal) {
+                                if (currentGridColWidths && currentGridColWidths.length > 0) {
+                                  slotWidth = selectedModel.cardArea!.width;
+                                }
+                              } else {
+                                slotHeight = selectedModel.cardArea!.height;
+                                slotTop = 0;
+                              }
                             }
                           }
 
@@ -1313,7 +1412,11 @@ export const EquipmentAssemblyModal: React.FC<Props> = ({ open, onClose, initial
                             >
                               {card ? (
                                 <>
-                                  <CardInlineSvg cardFileName={card.cardFileName} />
+                                  <CardInlineSvg
+                                    cardFileName={card.cardFileName}
+                                    slotWidth={slotWidth}
+                                    slotHeight={slotHeight}
+                                  />
                                   <button
                                     className="remove-btn"
                                     onClick={(e) => {

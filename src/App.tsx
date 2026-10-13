@@ -14,6 +14,7 @@ import { UnsavedChangesDialog } from "./components/system/UnsavedChangesDialog";
 import { DeviceModal } from "./components/device/DeviceModal";
 import { DeviceTooltip } from "./components/device/DeviceTooltip";
 import { InitialLoader } from "./components/layout/InitialLoader";
+import { ModeTransitionOverlay } from "./components/layout/ModeTransitionOverlay";
 import { SettingsDropdown } from "./components/layout/SettingsDropdown";
 const ImportExportModal = React.lazy(() =>
   import("./components/system/ImportExportModal").then((m) => ({
@@ -52,6 +53,7 @@ import logoLightFull from "./assets/logo/InfoVR_light_full.svg";
 import logoDarkFull from "./assets/logo/InfoVR_dark_full.svg";
 import { exportRoomLayoutJson, importRoomLayoutJson } from "./utils/roomLayoutStorage";
 import layoutSTN from "./assets/layout_STN.json";
+import { resolveDeviceType } from "./utils/deviceTemplates";
 
 /* ---------- Device Delete Confirmation Modal (top-level, z=99999) ---------- */
 const DeviceDeleteConfirmModal = () => {
@@ -199,6 +201,7 @@ function App() {
   const loadState = useStore((s) => s.loadState);
   const selectedRackId = useStore((s) => s.selectedRackId);
   const isEditMode = useStore((s) => s.isEditMode);
+  const isModeTransitioning = useStore((s) => s.isModeTransitioning);
   const setIsEditMode = useStore((s) => s.setIsEditMode);
   const setImportExportModalRackId = useStore((s) => s.setImportExportModalRackId);
   const setDeviceRegistrationModalOpen = useStore((s) => s.setDeviceRegistrationModalOpen);
@@ -617,16 +620,23 @@ function App() {
                         ...r,
                         rackId: newRackId,
                         mapId: newId,
-                        devices: (r.devices || []).map((d: any) => ({ ...d, itemId: crypto.randomUUID(), rackId: newRackId }))
+                        devices: (r.devices || []).map((d: any) => ({
+                          ...d,
+                          itemId: crypto.randomUUID(),
+                          rackId: newRackId,
+                          type: resolveDeviceType(d.modelName, d.type, state.customModels),
+                        }))
                       };
                     });
                     const newModels = (layoutSTN.importedModels || []).map((m: any) => ({
                       ...m,
-                      id: crypto.randomUUID()
+                      id: crypto.randomUUID(),
+                      type: resolveDeviceType(m.modelName, m.type, state.customModels),
                     }));
                     const newDevices = (layoutSTN.registeredDevices || []).map((d: any) => ({
                       ...d,
-                      deviceGroupId: newId
+                      deviceGroupId: newId,
+                      type: resolveDeviceType(d.modelName, d.type, state.customModels),
                     }));
 
                     state.setActiveNode(newId);
@@ -672,7 +682,8 @@ function App() {
 
           {/* Edit Mode Toggle */}
           <div
-            className={`stn-mode-indicator ${isEditMode ? "active" : ""}`}
+            className={`stn-mode-indicator ${isEditMode ? "active" : ""} ${isModeTransitioning ? "disabled" : ""}`}
+            style={isModeTransitioning ? { opacity: 0.7, pointerEvents: "none" } : undefined}
             onClick={() => setIsEditMode(!isEditMode)}
           >
             <div
@@ -765,6 +776,9 @@ function App() {
 
       {/* Initial Loading Screen */}
       <InitialLoader />
+
+      {/* Edit Mode Transition Dimmed Loading Overlay */}
+      <ModeTransitionOverlay />
     </div>
   );
 }

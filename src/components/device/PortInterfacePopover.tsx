@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef, useLayoutEffect, useState } from 'react';
 
 import type { PortState } from '../../types';
 
@@ -8,6 +8,7 @@ export interface PortInfoData {
   hitboxId?: string;
   x: number;
   y: number;
+  portState?: PortState;
 }
 
 export interface PortInterfacePopoverProps {
@@ -21,6 +22,100 @@ export const PortInterfacePopover = ({
   portStates,
   onClose,
 }: PortInterfacePopoverProps) => {
+  // 포트 상태 매칭 (직접 전달된 portState 우선, 없으면 다양한 ID 포맷으로 검색)
+  const pState = useMemo(() => {
+    if (info.portState) return info.portState;
+    if (!portStates || portStates.length === 0) return undefined;
+
+    // 1. 정확한 portId 또는 portNumber 일치
+    let found = portStates.find(p => p.portId === info.portId || p.portNumber === info.portId);
+    if (found) return found;
+
+    // 2. hitboxId 일치
+    if (info.hitboxId) {
+      found = portStates.find(p => p.portId === info.hitboxId || p.portNumber === info.hitboxId);
+      if (found) return found;
+    }
+
+    // 3. 접두사 제거 비교 (예: port-5 vs 5, eth-5 vs 5, sfp-5 vs 5)
+    const cleanInfoId = info.portId.replace(/^(port|eth|sfp|qsfp)-/i, "");
+    found = portStates.find(p => {
+      const cleanPId = p.portId.replace(/^(port|eth|sfp|qsfp)-/i, "");
+      return cleanPId === cleanInfoId;
+    });
+    if (found) return found;
+
+    // 4. hitboxId 접두사 제거 비교
+    if (info.hitboxId) {
+      const cleanHitboxId = info.hitboxId.replace(/^(port|eth|sfp|qsfp)-/i, "");
+      found = portStates.find(p => {
+        const cleanPId = p.portId.replace(/^(port|eth|sfp|qsfp)-/i, "");
+        return cleanPId === cleanHitboxId;
+      });
+      if (found) return found;
+    }
+
+    // 5. 슬래시(/) 포함 모듈러 포트 매칭 (예: 1/1/port-5 또는 1/1/5)
+    if (info.portId.includes("/")) {
+      const infoParts = info.portId.split("/");
+      const lastInfo = infoParts[infoParts.length - 1].replace(/^(port|eth|sfp|qsfp)-/i, "");
+      found = portStates.find(p => {
+        if (!p.portId.includes("/")) return false;
+        const pParts = p.portId.split("/");
+        const lastP = pParts[pParts.length - 1].replace(/^(port|eth|sfp|qsfp)-/i, "");
+        return infoParts.slice(0, -1).join("/") === pParts.slice(0, -1).join("/") && lastInfo === lastP;
+      });
+      if (found) return found;
+    }
+
+    // 6. 끝자리 숫자 매칭 fallback (예: 둘 다 5번 포트)
+    const infoNumMatch = info.portId.match(/(\d+)$/);
+    if (infoNumMatch) {
+      const infoNum = infoNumMatch[1];
+      found = portStates.find(p => {
+        const pNumMatch = p.portId.match(/(\d+)$/);
+        return pNumMatch && pNumMatch[1] === infoNum;
+      });
+      if (found) return found;
+    }
+
+    return undefined;
+  }, [info, portStates]);
+
+  const isFault = pState && pState.status !== "normal";
+  const faultLevel = isFault ? (pState.errorLevel || pState.status || "critical").toLowerCase() : "normal";
+
+  // 사용자 지정 색상 맵: critical(빨강), major(주황), minor(노랑), warning(파랑), 정상(초록)
+  const SEVERITY_COLORS: Record<string, { color: string; bg: string; border: string }> = {
+    critical: {
+      color: "#ef4444",
+      bg: "rgba(239, 68, 68, 0.08)",
+      border: "rgba(239, 68, 68, 0.3)",
+    },
+    major: {
+      color: "#f97316",
+      bg: "rgba(249, 115, 22, 0.08)",
+      border: "rgba(249, 115, 22, 0.3)",
+    },
+    minor: {
+      color: "#eab308",
+      bg: "rgba(234, 179, 8, 0.08)",
+      border: "rgba(234, 179, 8, 0.3)",
+    },
+    warning: {
+      color: "#3b82f6",
+      bg: "rgba(59, 130, 246, 0.08)",
+      border: "rgba(59, 130, 246, 0.3)",
+    },
+    normal: {
+      color: "#00b11f",
+      bg: "rgba(0, 177, 31, 0.08)",
+      border: "rgba(0, 177, 31, 0.3)",
+    },
+  };
+
+  const severityConfig = SEVERITY_COLORS[faultLevel] || SEVERITY_COLORS.critical;
+
   // Generate stable mock data based on portId
   const mockData = useMemo(() => {
     // simple hash
@@ -52,15 +147,70 @@ export const PortInterfacePopover = ({
     };
   }, [info.portId]);
 
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // 예상 높이: 약 280~320px. 위쪽에 320px 공간이 없으면 아래쪽에 띄우도록 기본값 설정
+  const initialPlaceBelow = info.y < 320;
+  const [placement, setPlacement] = useState<{
+    top: number;
+    left: number;
+  }>({
+    left: info.x,
+    top: initialPlaceBelow ? info.y + 24 : Math.max(16, info.y - 300),
+  });
+
+  useLayoutEffect(() => {
+    const el = popoverRef.current;
+    if (!el) return;
+
+    const rect = el.getBoundingClientRect();
+    const popW = rect.width || 420;
+    const popH = rect.height || 280;
+
+    const vh = window.innerHeight;
+    const vw = window.innerWidth;
+
+    // 포트 위/아래 공간
+    const spaceAbove = info.y - 16;
+    const spaceBelow = vh - info.y - 16;
+
+    // 위쪽 공간이 팝오버 높이 + 여백보다 부족하면 아래쪽에 띄움
+    let placeBelow = spaceAbove < (popH + 16);
+    // 아래쪽 공간도 부족한데 위쪽 공간이 더 넓다면 위쪽 선택
+    if (placeBelow && spaceBelow < (popH + 16) && spaceAbove > spaceBelow) {
+      placeBelow = false;
+    }
+
+    let top = placeBelow ? info.y + 20 : info.y - popH - 12;
+
+    // 뷰포트 상/하단 클램핑 (화면 밖으로 절대 잘리지 않도록 보정)
+    if (top < 16) {
+      top = 16;
+    } else if (top + popH > vh - 16) {
+      top = Math.max(16, vh - popH - 16);
+    }
+
+    // 뷰포트 좌/우측 클램핑
+    const margin = 16;
+    const clampedLeft = Math.max(popW / 2 + margin, Math.min(vw - popW / 2 - margin, info.x));
+
+    setPlacement({
+      top,
+      left: clampedLeft,
+    });
+  }, [info.x, info.y, isFault]);
+
   return (
     <div
+      ref={popoverRef}
       className="port-info-popover comm-panel"
       onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
       style={{
         position: 'fixed',
-        left: info.x,
-        top: info.y < 150 ? info.y + 24 : info.y - 8,
-        transform: info.y < 150 ? "translate(-50%, 0)" : "translate(-50%, -100%)",
+        left: placement.left,
+        top: placement.top,
+        transform: "translate(-50%, 0)",
         zIndex: 11000,
         padding: "16px",
         minWidth: "400px",
@@ -74,11 +224,13 @@ export const PortInterfacePopover = ({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <div style={{ 
-            color: 'var(--theme-primary)', 
-            backgroundColor: 'var(--hover-bg)',
+            color: severityConfig.color, 
+            backgroundColor: isFault ? severityConfig.bg : 'var(--hover-bg)',
+            border: isFault ? `1px solid ${severityConfig.border}` : '1px solid transparent',
             padding: '8px',
             borderRadius: '8px',
-            display: 'flex'
+            display: 'flex',
+            transition: 'all 0.2s ease'
           }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="16" y="16" width="6" height="6" rx="1" />
@@ -89,8 +241,25 @@ export const PortInterfacePopover = ({
             </svg>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <div style={{ fontSize: '15px', fontWeight: 'bold', color: 'var(--text-primary)', letterSpacing: '0.5px' }}>
-              {info.portId}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ fontSize: '15px', fontWeight: 'bold', color: 'var(--text-primary)', letterSpacing: '0.5px' }}>
+                {info.portId}
+              </div>
+              {isFault && (
+                <span 
+                  className={`comm-chip comm-chip-${faultLevel}`} 
+                  style={{ 
+                    fontSize: '10px', 
+                    padding: '1px 6px', 
+                    textTransform: 'uppercase',
+                    color: severityConfig.color,
+                    backgroundColor: severityConfig.bg,
+                    borderColor: severityConfig.border
+                  }}
+                >
+                  {faultLevel}
+                </span>
+              )}
             </div>
             <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
               {mockData.ip}
@@ -156,36 +325,53 @@ export const PortInterfacePopover = ({
         </div>
       </div>
 
-      {(() => {
-        const pState = portStates?.find(p => p.portId === info.portId);
-        if (pState && pState.status !== "normal") {
-          const level = pState.errorLevel || pState.status || "error";
-          const chipClass =
-            level === "critical" ? "comm-chip-critical" :
-            level === "major" ? "comm-chip-major" :
-            level === "minor" ? "comm-chip-minor" :
-            level === "warning" ? "comm-chip-warning" : "comm-chip-critical";
-          
-          return (
-            <div style={{
-              backgroundColor: 'var(--panel-in-bg)', 
-              borderRadius: '6px', 
-              padding: '12px 16px',
-              border: '1px solid var(--border-weak)',
-              borderLeft: '4px solid var(--text-secondary)'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-primary)' }}>Active Fault</span>
-                <span className={`comm-chip ${chipClass}`}>{level}</span>
-              </div>
-              <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                {pState.errorMessage || "Unknown Error"}
-              </div>
+      {isFault && (
+        <div style={{
+          backgroundColor: severityConfig.bg,
+          borderRadius: '6px', 
+          padding: '12px 16px',
+          border: `1px solid ${severityConfig.border}`,
+          borderLeft: `4px solid ${severityConfig.color}`,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ 
+                display: 'inline-block', 
+                width: '8px', 
+                height: '8px', 
+                borderRadius: '50%', 
+                backgroundColor: severityConfig.color,
+                boxShadow: `0 0 6px ${severityConfig.color}`
+              }} />
+              <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-primary)' }}>Active Fault</span>
             </div>
-          );
-        }
-        return null;
-      })()}
+            <span 
+              className={`comm-chip comm-chip-${faultLevel}`} 
+              style={{ 
+                textTransform: 'uppercase', 
+                fontSize: '10px', 
+                padding: '2px 6px',
+                color: severityConfig.color,
+                backgroundColor: severityConfig.bg,
+                borderColor: severityConfig.border
+              }}
+            >
+              {faultLevel}
+            </span>
+          </div>
+          <div style={{ fontSize: '12.5px', color: 'var(--text-primary)', fontWeight: '500', lineHeight: 1.4 }}>
+            {pState.errorMessage || "Unknown Error"}
+          </div>
+          {pState.portId && pState.portId !== info.portId && (
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+              장애 대상 포트: <strong style={{ color: 'var(--text-primary)' }}>{pState.portId}</strong>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

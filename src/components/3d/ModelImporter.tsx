@@ -215,7 +215,7 @@ export const ModelImporter = () => {
           name: def.label,
           fileName: def.fileName,
           dataUrl: def.assetUrl,
-          position: [0, 0, 0],
+          position: def.defaultPosition ? [...def.defaultPosition] : [0, 0, 0],
           rotation: [0, 0, 0],
           scale: [1, 1, 1],
           isMoveEnabled: false,

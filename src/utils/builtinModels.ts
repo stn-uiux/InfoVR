@@ -9,7 +9,12 @@ export interface BuiltinModelDef {
   fileName: string;
   /** UI(팔레트) 노출 여부 (기존 호환성을 위해 유지하되 버튼은 숨길 때 사용) */
   hidden?: boolean;
+  /** 기본 생성 좌표 (예: 천장 부착 모델의 경우 [0, 4.0, 0]) */
+  defaultPosition?: [number, number, number];
 }
+
+/** 가상 공간 천장 기본 높이 (미터 단위) */
+export const CYBER_SPACE_CEILING_HEIGHT = 4.0;
 
 /** Default wall parameters */
 export const DEFAULT_WALL_PARAMS: WallParams = {
@@ -158,5 +163,13 @@ export const BUILTIN_MODELS: BuiltinModelDef[] = [
     icon: "mdi:door-sliding-open",
     assetUrl: "/models/door_auto.glb",
     fileName: "__builtin_door_auto.glb",
+  },
+  {
+    type: "CCTV",
+    label: "CCTV",
+    icon: "mdi:cctv",
+    assetUrl: "/models/cctv.glb",
+    fileName: "__builtin_cctv.glb",
+    defaultPosition: [0, CYBER_SPACE_CEILING_HEIGHT, 0],
   },
 ];

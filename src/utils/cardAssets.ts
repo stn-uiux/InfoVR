@@ -642,4 +642,21 @@ export const equipmentModels: EquipmentModel[] = [
     equipmentSize: { width: 984, height: 192 },
     cardArea: { x: 0, y: 0, width: 984, height: 192, columns: 1, columnWidth: 984 },
   },
+  {
+    modelId: "1850-tss-160",
+    modelName: "1850 TSS-160",
+    rackUnit: "7U",
+    baseSvgUrl: "[7U] 1850-TSS-160.png",
+    equipmentSize: { width: 984, height: 672 },
+    cardArea: {
+      x: 217,
+      y: 73,
+      width: 747,
+      height: 572,
+      columns: 1,
+      columnWidth: 747,
+    },
+    _rowHeights: [42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 73, 73],
+    _rowGaps: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  },
 ];

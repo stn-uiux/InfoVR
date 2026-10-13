@@ -11,6 +11,8 @@ import type {
   EquipmentViewSide,
   EquipmentVariant,
 } from "../../../types/equipment";
+import type { DeviceType } from "../../../types";
+import { DEVICE_TYPE_OPTIONS, getDeviceTypeLabel, normalizeDeviceType } from "../../../utils/deviceTypes";
 import { CardRegistrationForm } from "./CardRegistrationForm";
 import { EquipmentAssemblyModal } from "../EquipmentAssemblyModal";
 import { CardThumbnail } from "../../device/CardThumbnail";
@@ -537,7 +539,7 @@ export const ModelRegistrationModal: React.FC = () => {
   // Form state
   const [modelName, setModelName] = useState("");
   const [vendor, setVendor] = useState("Cisco");
-  const [deviceType, setDeviceType] = useState<"Switch" | "Router" | "Server">("Router");
+  const [deviceType, setDeviceType] = useState<DeviceType>("Router");
   const [unit, setUnit] = useState<number>(1);
   const [modelType, setModelType] = useState<CustomModelType>("normal");
   const [modelSvgRaw, setModelSvgRaw] = useState<string | null>(null);
@@ -797,7 +799,7 @@ export const ModelRegistrationModal: React.FC = () => {
     setEditingModelId(modelId);
     setModelName(model.modelName);
     setVendor(model.vendor || "Nokia");
-    setDeviceType(model.type || "Router");
+    setDeviceType(normalizeDeviceType(model.type, "Router"));
     setUnit(model.unit);
     setModelType(model.modelType);
     setModelSvgRaw(model.modelSvgRaw);
@@ -1229,41 +1231,51 @@ export const ModelRegistrationModal: React.FC = () => {
 
   const uniqueTypes = useMemo(() => {
     const defaultTypes = DEVICE_TEMPLATES.map(t => t.type);
-    const customTypes = customModels.map(m => m.type || "Router");
-    return Array.from(new Set([...defaultTypes, ...customTypes])).filter(Boolean).sort();
+    const customTypes = customModels.map(m => normalizeDeviceType(m.type, "Router"));
+    const allTypes = Array.from(new Set([...defaultTypes, ...customTypes])).filter(Boolean) as DeviceType[];
+    const orderMap = new Map(DEVICE_TYPE_OPTIONS.map((o, idx) => [o.value, idx]));
+    return allTypes.sort((a, b) => {
+      const oa = orderMap.has(a) ? orderMap.get(a)! : 999;
+      const ob = orderMap.has(b) ? orderMap.get(b)! : 999;
+      return oa - ob || a.localeCompare(b);
+    });
   }, [customModels]);
 
   const sortedDefaultTemplates = useMemo(() => {
     const list = [...DEVICE_TEMPLATES.filter((t) => {
       if (deletedDefaultTemplates.includes(t.modelName)) return false;
       if (filterVendor !== "All" && t.vendor !== filterVendor) return false;
-      if (filterType !== "All" && t.type !== filterType) return false;
+      const overrideModel = customModels.find((m) => m.modelName === t.modelName);
+      const effectiveType = normalizeDeviceType(overrideModel?.type, t.type);
+      if (filterType !== "All" && effectiveType !== filterType) return false;
       return true;
     })];
     return list.sort((a, b) => {
       if (sortBy === "size" && a.uSize !== b.uSize) return a.uSize - b.uSize;
       return a.modelName.localeCompare(b.modelName);
     });
-  }, [deletedDefaultTemplates, sortBy, filterVendor, filterType]);
+  }, [deletedDefaultTemplates, sortBy, filterVendor, filterType, customModels]);
 
   const sortedHiddenTemplates = useMemo(() => {
     const list = [...DEVICE_TEMPLATES.filter((t) => {
       if (!deletedDefaultTemplates.includes(t.modelName)) return false;
       if (filterVendor !== "All" && t.vendor !== filterVendor) return false;
-      if (filterType !== "All" && t.type !== filterType) return false;
+      const overrideModel = customModels.find((m) => m.modelName === t.modelName);
+      const effectiveType = normalizeDeviceType(overrideModel?.type, t.type);
+      if (filterType !== "All" && effectiveType !== filterType) return false;
       return true;
     })];
     return list.sort((a, b) => {
       if (sortBy === "size" && a.uSize !== b.uSize) return a.uSize - b.uSize;
       return a.modelName.localeCompare(b.modelName);
     });
-  }, [deletedDefaultTemplates, sortBy, filterVendor, filterType]);
+  }, [deletedDefaultTemplates, sortBy, filterVendor, filterType, customModels]);
 
   const sortedCustomModels = useMemo(() => {
     const list = [...customModels.filter(m => {
       if (DEVICE_TEMPLATES.some(t => t.modelName === m.modelName)) return false;
       if (filterVendor !== "All" && (m.vendor || "Nokia") !== filterVendor) return false;
-      if (filterType !== "All" && (m.type || "Router") !== filterType) return false;
+      if (filterType !== "All" && normalizeDeviceType(m.type, "Router") !== filterType) return false;
       return true;
     })];
     return list.sort((a, b) => {
@@ -1368,11 +1380,13 @@ export const ModelRegistrationModal: React.FC = () => {
                     <select
                       className="stn-input"
                       value={deviceType}
-                      onChange={(e) => setDeviceType(e.target.value as "Switch" | "Router" | "Server")}
+                      onChange={(e) => setDeviceType(e.target.value as DeviceType)}
                     >
-                      <option value="Router">Router</option>
-                      <option value="Switch">Switch</option>
-                      <option value="Server">Server</option>
+                      {DEVICE_TYPE_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label} ({opt.value})
+                        </option>
+                      ))}
                     </select>
                   </StnFormField>
 
@@ -2051,7 +2065,11 @@ export const ModelRegistrationModal: React.FC = () => {
                     style={{ minWidth: 100, width: "auto", flexShrink: 0 }}
                   >
                     <option value="All">모든 종류</option>
-                    {uniqueTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                    {uniqueTypes.map(t => (
+                      <option key={t} value={t}>
+                        {getDeviceTypeLabel(t)} ({t})
+                      </option>
+                    ))}
                   </select>
                   <select
                     className="stn-input stn-input-md"
@@ -2147,7 +2165,7 @@ export const ModelRegistrationModal: React.FC = () => {
                                 <span>·</span>
                                 <span>{tmpl.vendor}</span>
                                 <span>·</span>
-                                <span>{tmpl.type}</span>
+                                <span>{getDeviceTypeLabel(tmpl.type)}</span>
                                 {isCardBased && overrideModel && (
                                   <>
                                     <span>·</span>
@@ -2407,7 +2425,7 @@ export const ModelRegistrationModal: React.FC = () => {
                                   <span>·</span>
                                   <span>{tmpl.vendor}</span>
                                   <span>·</span>
-                                  <span>{tmpl.type}</span>
+                                  <span>{getDeviceTypeLabel(tmpl.type)}</span>
                                 </div>
                               </div>
                             </div>
@@ -2490,6 +2508,8 @@ export const ModelRegistrationModal: React.FC = () => {
                               </div>
                               <div className="model-meta">
                                 <span>{model.unit}U</span>
+                                <span>·</span>
+                                <span>{getDeviceTypeLabel(model.type || "Router")}</span>
                                 <span>·</span>
                                 <span>
                                   {model.equipmentSize

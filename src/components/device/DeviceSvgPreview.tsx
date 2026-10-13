@@ -464,9 +464,16 @@ export const DeviceSvgPreview = memo(({
             }
           } else continue;
 
+          const isSlotHorizontal = cardW > cardH;
+
           if (card.widthType === "vfull" && (equipModel as PreviewEquipmentModel).cardArea) {
-            cardH = (equipModel as PreviewEquipmentModel).cardArea!.height;
-            y = (equipModel as PreviewEquipmentModel).cardArea!.y;
+            if (isSlotHorizontal) {
+              cardW = (equipModel as PreviewEquipmentModel).cardArea!.width;
+              x = (equipModel as PreviewEquipmentModel).cardArea!.x;
+            } else {
+              cardH = (equipModel as PreviewEquipmentModel).cardArea!.height;
+              y = (equipModel as PreviewEquipmentModel).cardArea!.y;
+            }
           }
 
           const vb = cardSvgEl.getAttribute("viewBox");
@@ -475,8 +482,27 @@ export const DeviceSvgPreview = memo(({
           const instancePrefix = card.instanceId || `card-${card.positionIndex}`;
           prefixSvgIds(cardSvgEl, instancePrefix);
 
+          const isSlotHorizontalForRotation = cardW > cardH;
+          const isCardVertical = origH > origW;
+          const shouldRotateCcw = isCardVertical && isSlotHorizontalForRotation;
+          const shouldRotateCw = !isCardVertical && !isSlotHorizontalForRotation;
+
           const cardGroup = baseDoc.createElementNS("http://www.w3.org/2000/svg", "g");
-          cardGroup.setAttribute("transform", `translate(${x}, ${y}) scale(${cardW / origW}, ${cardH / origH})`);
+          if (shouldRotateCcw) {
+            // 세로 카드 → 가로 슬롯: 반시계 90도(-90도) 회전하여 눕힘
+            const scaleU = cardH / origW;
+            const scaleV = cardW / origH;
+            cardGroup.setAttribute("transform", `translate(${x}, ${y + cardH}) rotate(-90) scale(${scaleU}, ${scaleV})`);
+            cardGroup.setAttribute("data-rotated", "-90");
+          } else if (shouldRotateCw) {
+            // 가로 카드 → 세로 슬롯: 시계 90도(+90도) 회전하여 세움
+            const scaleU = cardH / origW;
+            const scaleV = cardW / origH;
+            cardGroup.setAttribute("transform", `translate(${x + cardW}, ${y}) rotate(90) scale(${scaleU}, ${scaleV})`);
+            cardGroup.setAttribute("data-rotated", "90");
+          } else {
+            cardGroup.setAttribute("transform", `translate(${x}, ${y}) scale(${cardW / origW}, ${cardH / origH})`);
+          }
           cardGroup.setAttribute("data-card-instance", instancePrefix);
 
           // 포트 히트박스 속성 처리

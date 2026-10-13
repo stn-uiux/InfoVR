@@ -163,6 +163,19 @@ export default function InteractiveGridEditor({
   const [lastSelectedCell, setLastSelectedCell] = useState<{ r: number, c: number } | null>(null);
   const [dragStartClientPos, setDragStartClientPos] = useState({ x: 0, y: 0 });
   const [isTableSelected, setIsTableSelected] = useState(false);
+  const [hoveredCell, setHoveredCell] = useState<{
+    r: number;
+    c: number;
+    slotName: string;
+    sizeText: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    isNarrow: boolean;
+    mouseX: number;
+    mouseY: number;
+  } | null>(null);
 
   const [invScale, setInvScale] = useState(1);
 
@@ -244,6 +257,7 @@ export default function InteractiveGridEditor({
       if (!svg) return;
 
       isDragging.current = true;
+      setHoveredCell(null);
       setDragType(type);
       setDragIndex(index);
       setDragStartGrid({ baseX, baseY, colWidths: [...colWidths], rowHeights: [...rowHeights] });
@@ -626,6 +640,27 @@ export default function InteractiveGridEditor({
         }
       }
 
+      // Dimensions & slot text
+      const sizeText = (merge && (merge.rs > 1 || merge.cs > 1))
+        ? `${merge.rs}×${merge.cs} · ${Math.round(w)}×${Math.round(h)}`
+        : `${Math.round(w)}×${Math.round(h)}`;
+      const customSlot = slotNumberMap ? slotNumberMap[`${r}-${c}`] : undefined;
+      const autoSlotNo = r * cols + c + 1;
+      const slotNo = customSlot !== undefined ? customSlot : autoSlotNo;
+      const slotName = `Slot ${slotNo}`;
+      const fullCellText = `${slotName} | ${sizeText}`;
+
+      // 텍스트 너비 및 가로가 좁은 셀 판정
+      const fullApproxW = fullCellText.length * 6.5 * invScale + 12 * invScale;
+      // 풀 텍스트가 셀 너비(여백 고려)보다 크면 좁은 셀로 판단하여 슬롯 번호만 표시 ('Slot ' 제외)
+      const isNarrow = fullApproxW > (w - 6 * invScale);
+
+      const cellText = isNarrow ? `${slotNo}` : fullCellText;
+      const approxW = Math.min(
+        cellText.length * 6.5 * invScale + 12 * invScale,
+        Math.max(w - 2 * invScale, 14 * invScale)
+      );
+
       cellRects.push(
         <rect
           key={`cell-${r}-${c}`}
@@ -640,23 +675,62 @@ export default function InteractiveGridEditor({
           vectorEffect="non-scaling-stroke"
           style={{ cursor: "move" }}
           onPointerDown={(e) => handleDragStart(e, "move")}
-          onPointerMove={handleDragMove}
+          onPointerMove={(e) => {
+            if (isDragging.current) {
+              handleDragMove(e);
+            } else if (svgRef.current) {
+              const pt = getSvgPoint(svgRef.current, e.clientX, e.clientY);
+              setHoveredCell((prev) => {
+                if (!prev || prev.r !== r || prev.c !== c) {
+                  return {
+                    r,
+                    c,
+                    slotName,
+                    sizeText,
+                    x,
+                    y,
+                    w,
+                    h,
+                    isNarrow,
+                    mouseX: pt.x,
+                    mouseY: pt.y,
+                  };
+                }
+                return {
+                  ...prev,
+                  mouseX: pt.x,
+                  mouseY: pt.y,
+                };
+              });
+            }
+          }}
           onPointerUp={handleDragEnd}
           onClick={(e) => handleCellClick(r, c, e)}
           onContextMenu={(e) => handleCellContextMenu(e, r, c)}
+          onPointerEnter={(e) => {
+            if (!isDragging.current && svgRef.current) {
+              const pt = getSvgPoint(svgRef.current, e.clientX, e.clientY);
+              setHoveredCell({
+                r,
+                c,
+                slotName,
+                sizeText,
+                x,
+                y,
+                w,
+                h,
+                isNarrow,
+                mouseX: pt.x,
+                mouseY: pt.y,
+              });
+            }
+          }}
+          onPointerLeave={() => {
+            setHoveredCell((prev) => (prev?.r === r && prev?.c === c ? null : prev));
+          }}
         />
       );
 
-      // Cell label (dimensions)
-      let cellText = (merge && (merge.rs > 1 || merge.cs > 1)) ? `${merge.rs}×${merge.cs} · ${Math.round(w)}×${Math.round(h)}` : `${Math.round(w)}×${Math.round(h)}`;
-      const customSlot = slotNumberMap ? slotNumberMap[`${r}-${c}`] : undefined;
-      const autoSlotNo = r * cols + c + 1;
-      if (customSlot !== undefined) {
-        cellText = `Slot ${customSlot} | ${cellText}`;
-      } else {
-        cellText = `Slot ${autoSlotNo} | ${cellText}`;
-      }
-      const approxW = cellText.length * 6.5 * invScale + 12 * invScale;
       cellRects.push(
         <g key={`cell-label-${r}-${c}`} style={{ pointerEvents: "none" }}>
           <rect
@@ -895,6 +969,60 @@ export default function InteractiveGridEditor({
       </text>
     </g>
   ) : null;
+
+  // ── Hover tooltip for cells (follows mouse cursor at bottom-right) ──
+  const cellTooltip = (!isDragging.current && dragType === null && hoveredCell) ? (() => {
+    const tooltipContent = `${hoveredCell.slotName} | ${hoveredCell.sizeText}`;
+    const tipW = tooltipContent.length * 6.8 * invScale + 18 * invScale;
+    const tipH = 22 * invScale;
+
+    // 마우스 커서 우측 하단 오프셋
+    const offsetX = 14 * invScale;
+    const offsetY = 18 * invScale;
+
+    let tipX = hoveredCell.mouseX + offsetX;
+    let tipY = hoveredCell.mouseY + offsetY;
+
+    // SVG 뷰박스 경계를 고려하여 툴팁이 잘리지 않도록 조정
+    const svg = svgRef.current;
+    const vb = svg?.viewBox?.baseVal;
+    const maxW = vb && vb.width > 0 ? vb.width : totalW + baseX + 200;
+    const maxH = vb && vb.height > 0 ? vb.height : totalH + baseY + 200;
+
+    if (tipX + tipW > maxW - 4 * invScale) {
+      tipX = hoveredCell.mouseX - tipW - 8 * invScale;
+    }
+    if (tipY + tipH > maxH - 4 * invScale) {
+      tipY = hoveredCell.mouseY - tipH - 8 * invScale;
+    }
+
+    return (
+      <g style={{ pointerEvents: "none" }} key="cell-hover-tooltip">
+        <rect
+          x={tipX}
+          y={tipY}
+          width={tipW}
+          height={tipH}
+          fill="rgba(15, 23, 42, 0.94)"
+          stroke="rgba(0, 200, 255, 0.85)"
+          strokeWidth={1.5 * invScale}
+          rx={4 * invScale}
+        />
+        <text
+          x={tipX + tipW / 2}
+          y={tipY + tipH / 2 + 3.8 * invScale}
+          textAnchor="middle"
+          fontSize={10.5 * invScale}
+          fontFamily="sans-serif"
+          style={{ pointerEvents: "none" }}
+        >
+          <tspan fill="rgba(0, 220, 255, 1)" fontWeight="700">{hoveredCell.slotName}</tspan>
+          <tspan fill="rgba(255, 255, 255, 0.45)"> | </tspan>
+          <tspan fill="#f1f5f9" fontWeight="600">{hoveredCell.sizeText}</tspan>
+        </text>
+      </g>
+    );
+  })() : null;
 
   const btnStyle: React.CSSProperties = {
     padding: "3px 8px",
@@ -1202,6 +1330,7 @@ export default function InteractiveGridEditor({
         {edgeHandles}
         {infoLabel}
         {resizeTooltip}
+        {cellTooltip}
       </g>
 
       {/* HTML toolbar via Portal */}

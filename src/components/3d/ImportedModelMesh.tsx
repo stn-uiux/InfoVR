@@ -256,11 +256,13 @@ import type { GlassParams } from "../../types";
 const GltfMesh = ({ 
   url, 
   onLoaded,
-  glassParams
+  glassParams,
+  isCeilingMounted
 }: { 
   url: string; 
   onLoaded?: (size: [number, number, number], hasGlass: boolean) => void;
   glassParams?: GlassParams;
+  isCeilingMounted?: boolean;
 }) => {
   const { scene: gltfScene } = useGLTF(url);
 
@@ -275,8 +277,11 @@ const GltfMesh = ({
     box.getCenter(center);
     box.getSize(size);
 
-    // Center X, Z and set bottom (min Y) to 0 so it sits on the floor
-    clone.position.set(-center.x, -box.min.y, -center.z);
+    // Center X, Z.
+    // For ceiling-mounted models (CCTV), set top (max Y) to 0 so its top surface touches the ceiling flat.
+    // For floor-mounted models, set bottom (min Y) to 0 so it sits on the floor.
+    const yOffset = isCeilingMounted ? -box.max.y : -box.min.y;
+    clone.position.set(-center.x, yOffset, -center.z);
 
     let foundGlass = false;
     clone.traverse((child) => {
@@ -349,6 +354,10 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
   const isPartition = model.builtinType === "Partition";
   const isClock = model.builtinType === "Clock";
   const isLight = model.builtinType === "Light";
+  const isCctv =
+    model.builtinType === "CCTV" ||
+    model.fileName?.toLowerCase().includes("cctv") ||
+    model.name?.toLowerCase().includes("cctv");
 
   // Sensor data for DigitalClock — synced with dashboard overview
   const activeNodeId = useStore((s) => s.activeNodeId);
@@ -532,6 +541,7 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
             <GltfMesh 
               url={model.dataUrl} 
               glassParams={model.glassParams}
+              isCeilingMounted={isCctv}
               onLoaded={(size, hasGlass) => {
                 const updates: any = {};
                 if (!model.baseSize || model.baseSize[0] !== size[0] || model.baseSize[1] !== size[1] || model.baseSize[2] !== size[2]) {
@@ -563,7 +573,9 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
                   ? 1.25
                   : isLight
                     ? 0.6
-                    : 1.4,
+                    : isCctv
+                      ? -(model.baseSize?.[1] ?? 0.25) - 0.2
+                      : 1.4,
             0,
           ]}
         >
@@ -605,8 +617,9 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
       {shouldTransform ? (
         <group userData={{ isGizmo: true }}>
           <PivotControls
+            userData={{ isGizmo: true }}
             matrix={matrix}
-          anchor={[0, -1, 0]}
+            anchor={isCctv ? [0, 1, 0] : [0, -1, 0]}
           depthTest={false}
           fixed
           scale={75}

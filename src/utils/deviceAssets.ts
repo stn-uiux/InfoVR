@@ -58,7 +58,9 @@ function findCustomModelByName(modelName: string) {
 }
 
 function getLookupNames(modelName: string): string[] {
-  return [modelName];
+  const normalized = modelName.replace(/\s+/g, "-");
+  const spaced = modelName.replace(/-/g, " ");
+  return Array.from(new Set([modelName, normalized, spaced]));
 }
 
 function getAssetKey(modelName: string, side: EquipmentViewSide): string {
@@ -78,6 +80,8 @@ function parseAssetName(filename: string): { modelName: string; side: EquipmentV
     side,
   };
 }
+
+import tss160Png from "../assets/card/[7U] 1850-TSS-160.png";
 
 // Eagerly import all PNG images from src/assets/
 const assetModules = import.meta.glob<{ default: string }>(["../assets/*.png", "../assets/gwacheon/*.png"], {
@@ -99,6 +103,22 @@ for (const [path, mod] of Object.entries(assetModules)) {
     }
   }
 }
+
+// 1850 TSS-160 명시적 매핑
+deviceImageMap.set("1850 TSS-160", tss160Png);
+deviceImageMap.set("1850-TSS-160", tss160Png);
+deviceImageMap.set("1850-tss-160", tss160Png);
+deviceImageMap.set("1850 tss-160", tss160Png);
+deviceImageSideMap.set("1850 tss-160::front", tss160Png);
+deviceImageSideMap.set("1850-tss-160::front", tss160Png);
+
+// 하위 호환
+deviceImageMap.set("1850 TSS-130", tss160Png);
+deviceImageMap.set("1850-TSS-130", tss160Png);
+deviceImageMap.set("1850-tss-130", tss160Png);
+deviceImageMap.set("1850 tss-130", tss160Png);
+deviceImageSideMap.set("1850 tss-130::front", tss160Png);
+deviceImageSideMap.set("1850-tss-130::front", tss160Png);
 
 // Lazy import all SVG files from src/assets/ as raw text
 // Using ?raw avoids fetch() and URL-encoding issues with special char filenames.

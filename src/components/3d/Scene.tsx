@@ -33,11 +33,35 @@ const RaycastVisibilityFilter = () => {
     const originalFilter = events.filter;
     events.filter = (hits, state) => {
       const visibleHits = hits.filter((hit) => {
-        let obj: Object3D | null = hit.object;
-        while (obj) {
-          if (!obj.visible) return false;
-          obj = obj.parent;
+        // PivotControls 기즈모(AxisArrow, PlaneSlider, AxisRotator 등) 및 GizmoHelper는
+        // 인터랙션을 위해 투명 히트박스(visible: false)나 헬퍼 메쉬를 사용하므로 항상 보존합니다.
+        let isGizmo = false;
+        let curr: Object3D | null = hit.object;
+        while (curr) {
+          if (
+            curr.userData?.isGizmo ||
+            curr.userData?.isGizmoHelper ||
+            curr.name?.toLowerCase().includes("gizmo") ||
+            curr.name?.toLowerCase().includes("pivot")
+          ) {
+            isGizmo = true;
+            break;
+          }
+          curr = curr.parent;
         }
+
+        if (isGizmo) return true;
+
+        // Three.js Issue #16031: Raycasting ignores visible: false on parent groups.
+        // 부모 그룹이 숨겨져 있는 경우(예: 숨겨진 랙이나 장애물 모델) 클릭이 뒤쪽 객체로 통과되도록 제외합니다.
+        let parent = hit.object.parent;
+        while (parent) {
+          if (!parent.visible) return false;
+          parent = parent.parent;
+        }
+
+        if (!hit.object.visible) return false;
+
         return true;
       });
       return originalFilter ? originalFilter(visibleHits, state) : visibleHits;
@@ -504,6 +528,7 @@ export const Scene = () => {
             {cyberSpaceEnabled && isRoomNode && (
               <group userData={{ isGizmo: true }}>
                 <PivotControls
+                  userData={{ isGizmo: true }}
                   visible={csCustomSpaceSize && isRoomSelected}
                   activeAxes={csCustomSpaceSize && isRoomSelected ? [true, false, true] : [false, false, false]}
                   scale={100}

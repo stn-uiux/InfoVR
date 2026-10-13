@@ -124,6 +124,8 @@ export interface AppState {
   dragPosition: [number, number] | null;
   dragOffset: [number, number] | null;
   isEditMode: boolean;
+  isModeTransitioning: boolean;
+  modeTransitionTarget: boolean | null;
   hoveredRackId: string | null;
   importExportModalRackId: string | null;
   deviceRegistrationModalOpen: boolean;
@@ -556,6 +558,8 @@ export const useStore = create<AppState>()(
       dragPosition: null,
       dragOffset: null,
       isEditMode: false,
+      isModeTransitioning: false,
+      modeTransitionTarget: null,
       isCanvasReady: false,
       hoveredRackId: null,
       nodes: [{ nodeId: ROOT_NODE_ID, parentId: null, name: "STN", type: "root", order: 0 }],
@@ -2167,40 +2171,14 @@ export const useStore = create<AppState>()(
           getIsDirty,
           racks,
           importedModels,
+          isModeTransitioning,
         } = get();
 
-        if (enabled) {
-          // Entering Edit Mode: Snapshot current state as baseline
-          // Phase 3-A: 단일 structuredClone으로 통합
-          const editSnap = structuredClone({
-            racks,
-            importedModels,
-            nodes: get().nodes,
-            nodeEnvironments: get().nodeEnvironments,
-            layouts: get().layouts,
-            registeredDevices: get().registeredDevices
-          });
-          set({
-            baselineRacks: editSnap.racks,
-            baselineModels: editSnap.importedModels,
-            baselineNodes: editSnap.nodes,
-            baselineNodeEnvironments: editSnap.nodeEnvironments,
-            baselineLayouts: editSnap.layouts,
-            baselineRegisteredDevices: editSnap.registeredDevices,
-            baselineActiveNodeId: get().activeNodeId,
-            baselineActiveSceneNodeId: get().activeSceneNodeId,
-            undoStack: [],
-            redoStack: [],
-            isEditMode: true,
-            selectedRackId: null,
-            focusedRackId: null,
-            selectedModelId: null,
-          });
-          return;
-        }
+        // Prevent concurrent double-toggles while transitioning
+        if (isModeTransitioning) return;
 
-        // Exiting Edit Mode
-        if (getIsDirty()) {
+        // Exiting Edit Mode with unsaved changes: prompt confirmation first
+        if (!enabled && getIsDirty()) {
           set({
             showUnsavedDialog: true,
             pendingAction: { type: "editMode", value: false },
@@ -2208,28 +2186,74 @@ export const useStore = create<AppState>()(
           return;
         }
 
-        if (isDragging && draggingRackId && dragPosition) {
-          const gridX = Math.round((dragPosition[0] / GRID_SPACING) * 15) / 15;
-          const gridZ = Math.round((dragPosition[1] / GRID_SPACING) * 15) / 15;
-          endDrag(draggingRackId, [gridX, gridZ]);
-        }
-
+        // Show dimmed transition overlay immediately
         set({
-          isEditMode: false,
-          baselineRacks: null,
-          baselineModels: null,
-          baselineNodes: null,
-          baselineNodeEnvironments: null,
-          baselineLayouts: null,
-          baselineRegisteredDevices: null,
-          baselineActiveNodeId: null,
-          baselineActiveSceneNodeId: null,
-          undoStack: [],
-          redoStack: [],
-          selectedRackId: null,
-          focusedRackId: null,
-          selectedModelId: null,
+          isModeTransitioning: true,
+          modeTransitionTarget: enabled,
         });
+
+        // Slight tick to ensure dimmed overlay is painted before intensive 3D/shader changes
+        setTimeout(() => {
+          if (enabled) {
+            // Entering Edit Mode: Snapshot current state as baseline
+            const editSnap = structuredClone({
+              racks,
+              importedModels,
+              nodes: get().nodes,
+              nodeEnvironments: get().nodeEnvironments,
+              layouts: get().layouts,
+              registeredDevices: get().registeredDevices,
+            });
+            set({
+              baselineRacks: editSnap.racks,
+              baselineModels: editSnap.importedModels,
+              baselineNodes: editSnap.nodes,
+              baselineNodeEnvironments: editSnap.nodeEnvironments,
+              baselineLayouts: editSnap.layouts,
+              baselineRegisteredDevices: editSnap.registeredDevices,
+              baselineActiveNodeId: get().activeNodeId,
+              baselineActiveSceneNodeId: get().activeSceneNodeId,
+              undoStack: [],
+              redoStack: [],
+              isEditMode: true,
+              selectedRackId: null,
+              focusedRackId: null,
+              selectedModelId: null,
+            });
+          } else {
+            // Exiting Edit Mode
+            if (isDragging && draggingRackId && dragPosition) {
+              const gridX = Math.round((dragPosition[0] / GRID_SPACING) * 15) / 15;
+              const gridZ = Math.round((dragPosition[1] / GRID_SPACING) * 15) / 15;
+              endDrag(draggingRackId, [gridX, gridZ]);
+            }
+
+            set({
+              isEditMode: false,
+              baselineRacks: null,
+              baselineModels: null,
+              baselineNodes: null,
+              baselineNodeEnvironments: null,
+              baselineLayouts: null,
+              baselineRegisteredDevices: null,
+              baselineActiveNodeId: null,
+              baselineActiveSceneNodeId: null,
+              undoStack: [],
+              redoStack: [],
+              selectedRackId: null,
+              focusedRackId: null,
+              selectedModelId: null,
+            });
+          }
+
+          // Smoothly remove dimmed loading screen after 3D scene finishes updating
+          setTimeout(() => {
+            set({
+              isModeTransitioning: false,
+              modeTransitionTarget: null,
+            });
+          }, 500);
+        }, 80);
       },
 
       addDevice: (rackId, deviceData) => {
@@ -2962,11 +2986,17 @@ export const useStore = create<AppState>()(
         }
 
         if (isEditMode) pushUndoState();
-        let spawnPos: [number, number, number] = modelData.position;
+        let spawnPos: [number, number, number] = [...modelData.position];
+        const isCctv =
+          modelData.builtinType === "CCTV" ||
+          modelData.name?.toLowerCase().includes("cctv") ||
+          modelData.fileName?.toLowerCase().includes("cctv");
+
+        const targetY = isCctv ? 4.0 : (spawnPos[1] || 0);
 
         if (
           spawnPos[0] === 0 &&
-          spawnPos[1] === 0 &&
+          (spawnPos[1] === 0 || spawnPos[1] === 4.0) &&
           spawnPos[2] === 0 &&
           _cameraRef
         ) {
@@ -2981,8 +3011,12 @@ export const useStore = create<AppState>()(
               (Math.round((hitPoint.x / GRID_SPACING) * 4) / 4) * GRID_SPACING;
             const gridZ =
               (Math.round((hitPoint.z / GRID_SPACING) * 4) / 4) * GRID_SPACING;
-            spawnPos = [gridX, 0, gridZ];
+            spawnPos = [gridX, targetY, gridZ];
+          } else {
+            spawnPos = [0, targetY, 0];
           }
+        } else if (isCctv && spawnPos[1] === 0) {
+          spawnPos = [spawnPos[0], 4.0, spawnPos[2]];
         }
 
         const newId = crypto.randomUUID();
@@ -3246,6 +3280,8 @@ export const useStore = create<AppState>()(
           obstructingRackIds,
           preFocusCameraState,
           isEditMode,
+          isModeTransitioning,
+          modeTransitionTarget,
           isCanvasReady,
           _importDirty,
           customModels,
@@ -3256,13 +3292,28 @@ export const useStore = create<AppState>()(
       },
       merge: (persistedState: any, currentState: AppState) => {
         // Keep the imported initialCustomModelsData as the base source of truth,
-        // and override only if persistedState has non-empty custom models and they differ.
-        // But since we persist to project files now, we actually don't need to restore
-        // customModels from localStorage, except for backwards compatibility.
-        // To be safe, we just use the persisted state directly without deleting row properties.
-        const cleanedCustomModels = persistedState.customModels
-          ? structuredClone(persistedState.customModels)
-          : currentState.customModels;
+        // and merge with persistedState.customModels so that newly added base models
+        // (e.g. 1850 TSS-160) are never lost when stale IndexedDB state is hydrated.
+        const baseModels: CustomEquipmentModel[] = Array.isArray(initialCustomModelsData)
+          ? structuredClone(initialCustomModelsData as unknown as CustomEquipmentModel[])
+          : [];
+        let cleanedCustomModels: CustomEquipmentModel[] = baseModels;
+
+        if (Array.isArray(persistedState?.customModels)) {
+          const persistedList = persistedState.customModels as CustomEquipmentModel[];
+          const merged = baseModels.map((base) => {
+            const found = persistedList.find(
+              (p) => p.modelId === base.modelId || p.modelName === base.modelName
+            );
+            return found ? { ...base, ...found } : base;
+          });
+          for (const p of persistedList) {
+            if (!merged.some((m) => m.modelId === p.modelId || m.modelName === p.modelName)) {
+              merged.push(p);
+            }
+          }
+          cleanedCustomModels = merged;
+        }
 
         // Fix race condition where IndexedDB loads after ThemeContext and overwrites the theme.
         // We force the theme settings to match whatever currentState.csIsLightMode holds, 
