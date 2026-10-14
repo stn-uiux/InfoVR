@@ -1,4 +1,5 @@
 import type { BuiltinModelType, WallParams, PartitionParams, LightParams } from "../types";
+import { U_HEIGHT } from "../components/layout/constants";
 
 export interface BuiltinModelDef {
   type: BuiltinModelType;
@@ -15,6 +16,9 @@ export interface BuiltinModelDef {
 
 /** 가상 공간 천장 기본 높이 (미터 단위) */
 export const CYBER_SPACE_CEILING_HEIGHT = 4.0;
+
+/** 48U 표준 랙 상단 높이 (미터 단위: 48 * 0.0445 + 0.1 = 2.236m) */
+export const RACK_48U_HEIGHT = 48 * U_HEIGHT + 0.1;
 
 /** Default wall parameters */
 export const DEFAULT_WALL_PARAMS: WallParams = {
@@ -171,5 +175,13 @@ export const BUILTIN_MODELS: BuiltinModelDef[] = [
     assetUrl: "/models/cctv.glb",
     fileName: "__builtin_cctv.glb",
     defaultPosition: [0, CYBER_SPACE_CEILING_HEIGHT, 0],
+  },
+  {
+    type: "ThermoHygro",
+    label: "온습도계",
+    icon: "mdi:thermometer-water",
+    assetUrl: "", // procedural component
+    fileName: "__builtin_thermo_hygro",
+    defaultPosition: [0, RACK_48U_HEIGHT, 0],
   },
 ];

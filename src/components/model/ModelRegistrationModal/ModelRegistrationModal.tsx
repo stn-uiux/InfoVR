@@ -17,7 +17,7 @@ import { CardRegistrationForm } from "./CardRegistrationForm";
 import { EquipmentAssemblyModal } from "../EquipmentAssemblyModal";
 import { CardThumbnail } from "../../device/CardThumbnail";
 import { StnModal } from "../../ui/StnModal";
-import { cardDefinitions, equipmentModels, loadBaseEquipmentSvgRaw, getCardsForModel } from "../../../utils/cardAssets";
+import { cardDefinitions, equipmentModels, loadBaseEquipmentSvgRaw, getCardsForModel, resolveChassisSvgUrls } from "../../../utils/cardAssets";
 import { DEVICE_TEMPLATES } from "../../../utils/deviceTemplates";
 import { getDeviceViewSides, resolveDeviceImage, resolveDeviceSvgContent, isChassisModel } from "../../../utils/deviceAssets";
 import { isPortId, PORT_SELECTOR } from "../../../utils/svgUtils";
@@ -311,7 +311,8 @@ function ChassisPreviewWithOverlay({
   }, [svgRaw]);
 
   const displaySvg = useMemo(() => {
-    let modified = svgRaw
+    const resolvedRaw = resolveChassisSvgUrls(svgRaw);
+    let modified = resolvedRaw
       .replace(/width="[^"]*"/, '')
       .replace(/\sheight="[^"]*"/, '');
 
@@ -809,14 +810,14 @@ export const ModelRegistrationModal: React.FC = () => {
     setRearSvgFileName(model.rearSvgRaw ? "(기존 파일)" : "");
     setDefaultViewSide(model.defaultViewSide || "front");
 
-    let baseRaw = model.baseEquipmentViewSvgRaw || null;
+    let baseRaw = model.baseEquipmentViewSvgRaw ? resolveChassisSvgUrls(model.baseEquipmentViewSvgRaw) : null;
     let baseFileName = baseRaw ? "(기존 파일)" : "";
     if (!baseRaw && model.modelType === "card-based") {
       const eqModel = equipmentModels.find(m => m.modelName === model.modelName);
       if (eqModel && eqModel.baseSvgUrl) {
         const raw = await loadBaseEquipmentSvgRaw(eqModel.baseSvgUrl);
         if (raw) {
-          baseRaw = raw;
+          baseRaw = resolveChassisSvgUrls(raw);
           baseFileName = eqModel.baseSvgUrl;
         }
       }
@@ -2287,7 +2288,7 @@ export const ModelRegistrationModal: React.FC = () => {
                                   if (eqModel.baseSvgUrl) {
                                     const chassisSvg = await loadBaseEquipmentSvgRaw(eqModel.baseSvgUrl);
                                     if (chassisSvg) {
-                                      setBaseChassisRaw(chassisSvg);
+                                      setBaseChassisRaw(resolveChassisSvgUrls(chassisSvg));
                                       setBaseChassisFileName(eqModel.baseSvgUrl);
                                     }
                                   }

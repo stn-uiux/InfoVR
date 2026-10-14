@@ -110,10 +110,14 @@ export const Rack = memo(({
 
   // Theme-based colors
   const frameColor = isSelected
-    ? "#FFFFFF" // White highlight for both modes
-    : isDarkMode
-      ? "#2e313b" // Darker than background
-      : "#333333";
+    ? "#FFFFFF" // White highlight for selected
+    : isHovered
+      ? isDarkMode
+        ? "#616a7d" // 중간 밝기의 쿨그레이 (기본 #2e313b와 선택 #FFFFFF의 중간)
+        : "#6e727a" // 중간 밝기의 그레이 (기본 #333333과 선택 #FFFFFF의 중간)
+      : isDarkMode
+        ? "#2e313b" // Darker than background
+        : "#333333";
   const railColor = isDarkMode ? "#aab0be" : "#888";
   const rearPanelColor = isDarkMode ? "#24272e" : "#111";
 
@@ -175,59 +179,73 @@ export const Rack = memo(({
     }
   });
 
-  const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
-    if (e.button !== 0) return; // Only process left click
-    if (isObstructing) return;
+  const shouldBlockRackEvent = (e: ThreeEvent<PointerEvent | MouseEvent>): boolean => {
+    const state = useStore.getState();
+    if (state.isGizmoHovered) return true;
 
-    // Ignore pointer events if the user is interacting with the dashboard Gizmo
-    if (useStore.getState().isGizmoHovered) return;
-
-    // 1. GIZMO PRIORITY: Because PivotControls has depthTest={false}, it's visually always on top.
-    // If the ray hits a Gizmo anywhere, the user intended to click it.
-    const hitGizmo = e.intersections.some((hit) => {
+    // 1. Gizmo helper check
+    const hitGizmoHelper = e.intersections.some((hit) => {
       let obj: Object3D | null = hit.object;
       let isInner = false;
       let isGizmo = false;
       while (obj) {
         if (obj.userData?.isInnerContent) isInner = true;
-        if (obj.userData?.isGizmo || obj.userData?.isGizmoHelper) isGizmo = true;
+        if (obj.userData?.isGizmoHelper || obj.userData?.isGizmo) isGizmo = true;
         obj = obj.parent;
       }
       return isGizmo && !isInner;
     });
+    if (hitGizmoHelper) return true;
 
-    if (hitGizmo) return; // Yield to gizmo immediately
-
-    // 2. MODEL PRIORITY: Determine if the raycaster intersected an ImportedModel BEFORE hitting a solid rack part
-    let hitModel = false;
+    // 2. Model container priority check
+    // 뷰 모드에서는 오직 사용자 인터랙션이 있는 모델(CCTV, 온습도계)만 랙 호버/클릭을 우선 차단하고,
+    // 투명한 자동문이나 가벽, 책상 등의 일반 모델은 랙 이벤트를 가로막지 않도록 함
     for (const hit of e.intersections) {
-      let isModel = false;
+      if (hit.object === e.eventObject) break;
       let obj: Object3D | null = hit.object;
+      let shouldYieldToModel = false;
       while (obj) {
         if (obj.userData && obj.userData.isModelContainer) {
-          isModel = true;
+          if (state.isEditMode) {
+            shouldYieldToModel = true;
+          } else {
+            const modelId = obj.userData.modelId;
+            const model = state.importedModels.find((m) => m.id === modelId);
+            if (model) {
+              const isCctv =
+                model.builtinType === "CCTV" ||
+                model.fileName?.toLowerCase().includes("cctv") ||
+                model.name?.toLowerCase().includes("cctv");
+              const isThermoHygro =
+                model.builtinType === "ThermoHygro" ||
+                model.fileName?.toLowerCase().includes("thermo_hygro") ||
+                model.name?.toLowerCase().includes("온습도") ||
+                model.name?.toLowerCase().includes("thermo");
+              if (isCctv || isThermoHygro) {
+                shouldYieldToModel = true;
+              }
+            }
+          }
           break;
         }
         obj = obj.parent;
       }
-
-      if (isModel) {
-        hitModel = true;
-        break;
-      }
-
-      // If we hit a SOLID part of a Rack or Device BEFORE hitting a model,
-      // it means the model is hidden behind the rack.
-      // We skip SHARED_GEO.interactBox because it is an invisible bounding box.
-      if ((hit.object as Mesh).geometry !== SHARED_GEO.interactBox) {
-        break;
-      }
+      if (shouldYieldToModel) return true;
     }
 
-    if (hitModel) {
-      // Do not stop propagation and do not select rack; let the model handle it.
-      return;
-    }
+    // 3. Closest interactBox check - prevent click/hover passing through to racks behind
+    const firstRackHit = e.intersections.find(
+      (hit) => (hit.object as Mesh).geometry === SHARED_GEO.interactBox
+    );
+    if (firstRackHit && firstRackHit.object !== e.eventObject) return true;
+
+    return false;
+  };
+
+  const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
+    if (e.button !== 0) return; // Only process left click
+    if (isObstructing) return;
+    if (shouldBlockRackEvent(e)) return;
 
     e.stopPropagation();
     const { setDragging, updateDragPosition, isEditMode } =
@@ -250,6 +268,23 @@ export const Rack = memo(({
       setDragging(true, rackId, offset);
       updateDragPosition([rackWorldX, rackWorldZ]);
       document.body.style.cursor = "grabbing";
+    }
+  };
+
+  const handleHover = (e: ThreeEvent<PointerEvent>, side?: "front" | "rear") => {
+    if (shouldBlockRackEvent(e)) return;
+    e.stopPropagation();
+
+    if (side) setHoveredSide(side);
+    const state = useStore.getState();
+    const isSelected = state.selectedRackId === rackId;
+    if (!isSelected) {
+      if (state.hoveredRackId !== rackId) {
+        setHoveredRack(rackId);
+      }
+      if (!state.isDragging) {
+        document.body.style.cursor = state.isEditMode ? "grab" : "pointer";
+      }
     }
   };
 
@@ -334,7 +369,7 @@ export const Rack = memo(({
       <group
         ref={groupRef}
         visible={!isObstructing}
-        raycast={isObstructing ? () => null : undefined}
+        raycast={isObstructing ? () => null : Object3D.prototype.raycast}
         position={initialPos as unknown as Vector3}
         rotation={initialRot as unknown as Euler}
         scale={[1, 1, 1]}
@@ -504,7 +539,7 @@ export const Rack = memo(({
             {/* Front Interact Box */}
             <mesh
               visible={!(isSelected && !isEditMode && selectedRackSide === "front")}
-              raycast={isObstructing ? () => null : undefined}
+              raycast={isObstructing ? () => null : Mesh.prototype.raycast}
               geometry={SHARED_GEO.interactBox}
               scale={[width, height, depth / 2]}
               position={[0, 0, depth / 4]}
@@ -512,57 +547,18 @@ export const Rack = memo(({
               onClick={isObstructing ? undefined : (e) => {
                 if (e.delta > 15) return;
                 (e as any).stoppedByRack = true;
-                const hitGizmoHelper = e.intersections.some((hit) => {
-                  let obj: Object3D | null = hit.object;
-                  let isInner = false;
-                  let isGizmo = false;
-                  while (obj) {
-                    if (obj.userData?.isInnerContent) isInner = true;
-                    if (obj.userData?.isGizmoHelper || obj.userData?.isGizmo) isGizmo = true;
-                    obj = obj.parent;
-                  }
-                  return isGizmo && !isInner;
-                });
-                if (hitGizmoHelper) return;
-
-                const firstRackHit = e.intersections.find(
-                  (hit) => (hit.object as Mesh).geometry === SHARED_GEO.interactBox
-                );
-                if (firstRackHit && firstRackHit.object !== e.eventObject) return;
+                if (shouldBlockRackEvent(e)) return;
+                e.stopPropagation();
 
                 const state = useStore.getState();
                 const isAlreadySelected = state.selectedRackId === rackId;
                 if (!isAlreadySelected || state.selectedRackSide !== "front") {
-                  e.stopPropagation();
                   state.selectRack(rackId, "front");
                   if (!state.isEditMode) state.focusRack(rackId);
                 }
               }}
-              onPointerOver={isObstructing ? undefined : (e) => {
-                if (useStore.getState().isGizmoHovered) return;
-                const hitGizmoHelper = e.intersections.some((hit) => {
-                  let obj: Object3D | null = hit.object;
-                  let isInner = false;
-                  let isGizmo = false;
-                  while (obj) {
-                    if (obj.userData?.isInnerContent) isInner = true;
-                    if (obj.userData?.isGizmoHelper || obj.userData?.isGizmo) isGizmo = true;
-                    obj = obj.parent;
-                  }
-                  return isGizmo && !isInner;
-                });
-                if (hitGizmoHelper) return;
-
-                const state = useStore.getState();
-                const isSelected = state.selectedRackId === rackId;
-                setHoveredSide("front");
-                if (!isSelected) {
-                  setHoveredRack(rackId);
-                  if (!state.isDragging) {
-                    document.body.style.cursor = state.isEditMode ? "grab" : "pointer";
-                  }
-                }
-              }}
+              onPointerOver={isObstructing ? undefined : (e) => handleHover(e, "front")}
+              onPointerMove={isObstructing ? undefined : (e) => handleHover(e, "front")}
               onPointerOut={isObstructing ? undefined : () => {
                 setHoveredSide(null);
                 const state = useStore.getState();
@@ -580,7 +576,7 @@ export const Rack = memo(({
             {/* Rear Interact Box */}
             <mesh
               visible={!(isSelected && !isEditMode && selectedRackSide === "rear")}
-              raycast={isObstructing ? () => null : undefined}
+              raycast={isObstructing ? () => null : Mesh.prototype.raycast}
               geometry={SHARED_GEO.interactBox}
               scale={[width, height, depth / 2]}
               position={[0, 0, -depth / 4]}
@@ -588,57 +584,18 @@ export const Rack = memo(({
               onClick={isObstructing ? undefined : (e) => {
                 if (e.delta > 15) return;
                 (e as any).stoppedByRack = true;
-                const hitGizmoHelper = e.intersections.some((hit) => {
-                  let obj: Object3D | null = hit.object;
-                  let isInner = false;
-                  let isGizmo = false;
-                  while (obj) {
-                    if (obj.userData?.isInnerContent) isInner = true;
-                    if (obj.userData?.isGizmoHelper || obj.userData?.isGizmo) isGizmo = true;
-                    obj = obj.parent;
-                  }
-                  return isGizmo && !isInner;
-                });
-                if (hitGizmoHelper) return;
-
-                const firstRackHit = e.intersections.find(
-                  (hit) => (hit.object as Mesh).geometry === SHARED_GEO.interactBox
-                );
-                if (firstRackHit && firstRackHit.object !== e.eventObject) return;
+                if (shouldBlockRackEvent(e)) return;
+                e.stopPropagation();
 
                 const state = useStore.getState();
                 const isAlreadySelected = state.selectedRackId === rackId;
                 if (!isAlreadySelected || state.selectedRackSide !== "rear") {
-                  e.stopPropagation();
                   state.selectRack(rackId, "rear");
                   if (!state.isEditMode) state.focusRack(rackId);
                 }
               }}
-              onPointerOver={isObstructing ? undefined : (e) => {
-                if (useStore.getState().isGizmoHovered) return;
-                const hitGizmoHelper = e.intersections.some((hit) => {
-                  let obj: Object3D | null = hit.object;
-                  let isInner = false;
-                  let isGizmo = false;
-                  while (obj) {
-                    if (obj.userData?.isInnerContent) isInner = true;
-                    if (obj.userData?.isGizmoHelper || obj.userData?.isGizmo) isGizmo = true;
-                    obj = obj.parent;
-                  }
-                  return isGizmo && !isInner;
-                });
-                if (hitGizmoHelper) return;
-
-                const state = useStore.getState();
-                const isSelected = state.selectedRackId === rackId;
-                setHoveredSide("rear");
-                if (!isSelected) {
-                  setHoveredRack(rackId);
-                  if (!state.isDragging) {
-                    document.body.style.cursor = state.isEditMode ? "grab" : "pointer";
-                  }
-                }
-              }}
+              onPointerOver={isObstructing ? undefined : (e) => handleHover(e, "rear")}
+              onPointerMove={isObstructing ? undefined : (e) => handleHover(e, "rear")}
               onPointerOut={isObstructing ? undefined : () => {
                 setHoveredSide(null);
                 const state = useStore.getState();
@@ -656,73 +613,27 @@ export const Rack = memo(({
         ) : (
           <mesh
             visible={!(isSelected && !isEditMode)}
-            raycast={isObstructing ? () => null : undefined}
+            raycast={isObstructing ? () => null : Mesh.prototype.raycast}
             geometry={SHARED_GEO.interactBox}
             scale={[width, height, depth]}
             onPointerDown={isObstructing ? undefined : handlePointerDown}
             onClick={isObstructing ? undefined : (e) => {
               if (e.delta > 15) return; // Ignore drag
               (e as any).stoppedByRack = true;
-  
-              const hitGizmoHelper = e.intersections.some((hit) => {
-                let obj: Object3D | null = hit.object;
-                let isInner = false;
-                let isGizmo = false;
-                while (obj) {
-                  if (obj.userData?.isInnerContent) isInner = true;
-                  if (obj.userData?.isGizmoHelper || obj.userData?.isGizmo) isGizmo = true;
-                  obj = obj.parent;
-                }
-                return isGizmo && !isInner;
-              });
-              if (hitGizmoHelper) return;
-  
-              // Prevent clicks from passing through if this rack is behind another
-              const firstRackHit = e.intersections.find(
-                (hit) => (hit.object as Mesh).geometry === SHARED_GEO.interactBox
-              );
-              if (firstRackHit && firstRackHit.object !== e.eventObject) {
-                return;
-              }
-  
+              if (shouldBlockRackEvent(e)) return;
+              e.stopPropagation();
+
               const state = useStore.getState();
               const isAlreadySelected = state.selectedRackId === rackId;
-  
               if (!isAlreadySelected || state.selectedRackSide !== "front") {
-                // FIRST CLICK: Select the rack and completely stop the click from falling through!
-                e.stopPropagation();
                 state.selectRack(rackId, "front"); // default to front for unidirectional
                 if (!state.isEditMode) {
                   state.focusRack(rackId);
                 }
               }
             }}
-            onPointerOver={isObstructing ? undefined : (e) => {
-              if (useStore.getState().isGizmoHovered) return;
-              const hitGizmoHelper = e.intersections.some((hit) => {
-                let obj: Object3D | null = hit.object;
-                let isInner = false;
-                let isGizmo = false;
-                while (obj) {
-                  if (obj.userData?.isInnerContent) isInner = true;
-                  if (obj.userData?.isGizmoHelper || obj.userData?.isGizmo) isGizmo = true;
-                  obj = obj.parent;
-                }
-                return isGizmo && !isInner;
-              });
-              if (hitGizmoHelper) return;
-  
-              const state = useStore.getState();
-              const isSelected = state.selectedRackId === rackId;
-  
-              // Only capture hover for the rack if it is NOT selected
-              if (!isSelected) {
-                setHoveredRack(rackId);
-                if (!state.isDragging) {
-                  document.body.style.cursor = state.isEditMode ? "grab" : "pointer";
-                }
-              }
-            }}
+            onPointerOver={isObstructing ? undefined : (e) => handleHover(e)}
+            onPointerMove={isObstructing ? undefined : (e) => handleHover(e)}
             onPointerOut={isObstructing ? undefined : () => {
               const state = useStore.getState();
               if (state.hoveredRackId === rackId) {
@@ -757,10 +668,10 @@ export const Rack = memo(({
                   border: isDarkMode
                     ? isSelected
                       ? "1px solid #FFFFFF"
-                      : "1px solid rgba(255, 255, 255, 0.1)"
+                      : "1px solid rgba(255, 255, 255, 0.2)"
                     : isSelected
                       ? "1px solid #1a73e8"
-                      : "1px solid rgba(0, 0, 0, 0.08)",
+                      : "1px solid rgba(0, 0, 0, 0.12)",
                   boxShadow: isDarkMode
                     ? "0 4px 15px rgba(0, 0, 0, 0.4)"
                     : "0 4px 12px rgba(0, 0, 0, 0.1)",
@@ -782,8 +693,10 @@ export const Rack = memo(({
                     background: isDarkMode
                       ? isSelected
                         ? "#FFFFFF"
-                        : "#4d5261"
-                      : "#1a73e8",
+                        : "#71798e"
+                      : isSelected
+                        ? "#1a73e8"
+                        : "#6e727a",
                     display: "inline-block",
                   }}
                 />

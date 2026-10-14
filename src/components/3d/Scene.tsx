@@ -457,8 +457,6 @@ export const Scene = () => {
             <directionalLight
               position={[10, 20, 5]}
               intensity={isDarkMode ? 1.8 : 1.8}
-              castShadow
-              shadow-mapSize={[1024, 1024]}
             />
           )}
           <hemisphereLight

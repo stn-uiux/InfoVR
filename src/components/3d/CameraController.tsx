@@ -473,6 +473,19 @@ export const CameraController = () => {
           const allModels = storeState.importedModels;
 
           for (const other of allModels) {
+            // CCTV와 온습도계는 랙을 가려도 화면에서 숨기지 않음
+            const isCctv =
+              other.builtinType === "CCTV" ||
+              other.fileName?.toLowerCase().includes("cctv") ||
+              other.name?.toLowerCase().includes("cctv");
+            const isThermoHygro =
+              other.builtinType === "ThermoHygro" ||
+              other.fileName?.toLowerCase().includes("thermo_hygro") ||
+              other.name?.toLowerCase().includes("온습도") ||
+              other.name?.toLowerCase().includes("thermo");
+
+            if (isCctv || isThermoHygro) continue;
+
             const otherX = other.position[0];
             const otherZ = other.position[2];
 
@@ -481,9 +494,17 @@ export const CameraController = () => {
             const wp = other.wallParams;
             const pp = other.partitionParams;
 
-            const baseW = isWall ? (wp?.length ?? 1) : isPartition ? (pp?.length ?? 1) : (other.baseSize?.[0] ?? 1);
-            const baseH = isWall ? (wp?.height ?? 2.5) : isPartition ? (pp?.height ?? 2) : (other.baseSize?.[1] ?? 2);
-            const baseD = isWall ? (wp?.thickness ?? 0.2) : isPartition ? (pp?.thickness ?? 0.1) : (other.baseSize?.[2] ?? 1);
+            const isDoor = other.builtinType === "DoorAuto" || other.fileName?.toLowerCase().includes("door");
+            const isDesk = other.builtinType === "DeskOn" || other.builtinType === "DeskOff" || other.fileName?.toLowerCase().includes("desk");
+            const isTable = other.builtinType === "TableSmall" || other.fileName?.toLowerCase().includes("table");
+
+            const defaultW = isDoor ? 6.0 : isDesk ? 1.6 : isTable ? 1.8 : 2.0;
+            const defaultH = isDoor ? 2.8 : isDesk ? 1.0 : isTable ? 0.8 : 2.0;
+            const defaultD = isDoor ? 0.4 : isDesk ? 0.8 : isTable ? 0.9 : 1.5;
+
+            const baseW = isWall ? (wp?.length ?? 1) : isPartition ? (pp?.length ?? 1) : (other.baseSize?.[0] ?? defaultW);
+            const baseH = isWall ? (wp?.height ?? 2.5) : isPartition ? (pp?.height ?? 2) : (other.baseSize?.[1] ?? defaultH);
+            const baseD = isWall ? (wp?.thickness ?? 0.2) : isPartition ? (pp?.thickness ?? 0.1) : (other.baseSize?.[2] ?? defaultD);
 
             const width = baseW * other.scale[0];
             const height = baseH * other.scale[1];
@@ -506,13 +527,21 @@ export const CameraController = () => {
               const perpSqXZ = Math.max(0, vecToOtherXZ.lengthSq() - projSightXZ * projSightXZ);
               const perpDistSightXZ = Math.sqrt(perpSqXZ);
 
-              if (perpDistSightXZ < radius + 0.3) {
+              if (perpDistSightXZ < radius + 0.4) {
                 const ratio = Math.max(0, Math.min(1, projSightXZ / distToTargetXZ));
-                const sightY = camPosToUse.y + ratio * (targetCenterY - camPosToUse.y);
+                const sightYCenter = camPosToUse.y + ratio * (targetCenterY - camPosToUse.y);
+                const sightYBottom = camPosToUse.y + ratio * (0 - camPosToUse.y);
+                const sightYTop = camPosToUse.y + ratio * (rackHeight - camPosToUse.y);
                 const modelBottom = other.position[1];
                 const modelTop = modelBottom + height;
 
-                if (sightY < modelTop + 0.4 && camPosToUse.y < modelTop + 0.5) {
+                // 시선이 모델의 수직 범위와 교차하거나(랙 상/하단 사이), 중심 시선이 모델 상단보다 아래를 지나는 경우 장애물로 판정
+                const isSightBlocked =
+                  (sightYBottom < modelTop + 0.3 && sightYTop > modelBottom - 0.2) ||
+                  sightYCenter < modelTop + 0.4 ||
+                  camPosToUse.y < modelTop + 0.5;
+
+                if (isSightBlocked) {
                   obstructingModelIds.push(other.id);
                 }
               }

@@ -253,7 +253,8 @@ export type BuiltinModelType =
   | "TableLarge"
   | "TableSmall"
   | "DoorAuto"
-  | "CCTV";
+  | "CCTV"
+  | "ThermoHygro";
 
 // 가시성 모드 (투명 유리 vs 불투명)
 export type VisibilityMode = "transparent" | "opaque";
@@ -320,4 +321,48 @@ export interface ImportedModel {
   hasGlass?: boolean;
   /** User-defined overrides for glass materials */
   glassParams?: GlassParams;
+  /** Linked CCTV device ID (if this model is a CCTV) */
+  cctvId?: string;
+  /** Linked ThermoHygrometer device ID (if this model is a ThermoHygro) */
+  thermoHygroId?: string;
+}
+
+// 온습도계 센서 장치 인터페이스 (백엔드 연동용)
+export interface ThermoHygroDevice {
+  id: string; // 고유 ID (예: TH-001)
+  name: string; // 표시 장비명
+  location: string; // 설치 위치
+  temperature: number; // 현재 온도 (°C)
+  humidity: number; // 현재 습도 (%)
+  targetTempMin?: number; // 적정 온도 최소치 (기본 18°C)
+  targetTempMax?: number; // 적정 온도 최대치 (기본 27°C)
+  targetHumidityMin?: number; // 적정 습도 최소치 (기본 40%)
+  targetHumidityMax?: number; // 적정 습도 최대치 (기본 60%)
+  battery?: number; // 배터리 잔량 (%)
+  status: "normal" | "warning" | "danger" | "offline"; // 상태
+  modelName?: string; // 모델명
+  manufacturer?: string; // 제조사
+  ip?: string; // 통신 IP
+  installedDate?: string; // 설치일
+  lastUpdated?: string; // 최근 측정 일시
+}
+
+// CCTV 장치 인터페이스 (백엔드 연동용)
+export interface CctvDevice {
+  id: string; // 고유 ID (예: CCTV-01)
+  name: string; // 표시 장비명
+  location: string; // 설치 위치
+  ip: string; // IP 주소
+  port: number; // RTSP / 제어 포트
+  manufacturer: string; // 제조사
+  model: string; // 모델 번호
+  resolution: string; // 해상도
+  fps: number; // 프레임 레이트
+  codec?: string; // 코덱
+  status: "online" | "offline" | "warning"; // 상태
+  imageUrl?: string; // 실시간 스냅샷 또는 샘플 이미지 URL
+  videoUrl?: string; // 실시간 스트림 또는 샘플 영상 URL
+  rtspUrl?: string; // RTSP 스트리밍 주소
+  installedDate?: string; // 설치 일자
+  ptzSupport?: boolean; // PTZ 회전 제어 지원 여부
 }

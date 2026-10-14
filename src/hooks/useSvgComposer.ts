@@ -36,7 +36,7 @@ export const withComposerTask = async <T>(task: () => Promise<T>): Promise<T> =>
   }
 };
 
-import { equipmentModels, loadCardSvgRaw, loadCardSvgRawSync, loadBaseEquipmentSvgRaw } from '../utils/cardAssets';
+import { equipmentModels, loadCardSvgRaw, loadCardSvgRawSync, loadBaseEquipmentSvgRaw, resolveChassisSvgUrls } from '../utils/cardAssets';
 import { resolveDeviceSvgContent } from '../utils/deviceAssets';
 import { moduleDefinitions } from '../utils/moduleAssets';
 import { useStore } from '../store/useStore';
@@ -222,7 +222,7 @@ export function useSvgComposer(
           modelId: m.modelId,
           rackUnit: `${m.unit}U`,
           baseSvgUrl: `custom-model-base-${m.modelId}`,
-          baseEquipmentViewSvgRaw: m.modelSvgRaw,
+          baseEquipmentViewSvgRaw: m.baseEquipmentViewSvgRaw || m.modelSvgRaw,
           rearSvgRaw: m.rearSvgRaw,
           equipmentSize: m.equipmentSize || defaultTemplate?.equipmentSize,
           cardArea: m.cardArea || defaultTemplate?.cardArea,
@@ -394,13 +394,15 @@ export function useSvgComposer(
           let baseSvg: string | undefined;
           if (viewSide === "rear") {
             baseSvg = await resolveDeviceSvgContent(modelName, viewSide);
-          } else if (isModularDevice && equipModel?.baseSvgUrl && equipModel.baseSvgUrl.startsWith("custom-model-base-")) {
+          } else if (isModularDevice && equipModel?.baseSvgUrl) {
             baseSvg = await loadBaseEquipmentSvgRaw(equipModel.baseSvgUrl);
+          } else if (equipModel?.baseEquipmentViewSvgRaw) {
+            baseSvg = resolveChassisSvgUrls(equipModel.baseEquipmentViewSvgRaw);
           } else {
-            const targetModelName = isModularDevice && equipModel?.baseSvgUrl
-              ? equipModel.baseSvgUrl.replace(/\.svg$/i, "").replace(/^\[\d+U\]\s*/, "")
-              : modelName;
-            baseSvg = await resolveDeviceSvgContent(targetModelName, viewSide);
+            baseSvg = await resolveDeviceSvgContent(modelName, viewSide);
+          }
+          if (baseSvg) {
+            baseSvg = resolveChassisSvgUrls(baseSvg);
           }
           if (!baseSvg) {
             console.error("No base SVG found for modelName:", modelName, "viewSide:", viewSide);
@@ -991,18 +993,16 @@ export async function generateComposedSvgAsync(
     }));
   }
   
-  let baseSvg: string | undefined = equipModel.baseEquipmentViewSvgRaw;
+  let baseSvg: string | undefined = equipModel.baseEquipmentViewSvgRaw ? resolveChassisSvgUrls(equipModel.baseEquipmentViewSvgRaw) : undefined;
   if (!baseSvg) {
-    if (isModularDevice && equipModel.baseSvgUrl && equipModel.baseSvgUrl.startsWith("custom-model-base-")) {
+    if (isModularDevice && equipModel.baseSvgUrl) {
       baseSvg = await loadBaseEquipmentSvgRaw(equipModel.baseSvgUrl);
     } else {
-      const targetModelName = isModularDevice && equipModel.baseSvgUrl
-        ? equipModel.baseSvgUrl.replace(/\.svg$/i, "").replace(/^\[\d+U\]\s*/, "")
-        : modelName;
-      if (targetModelName) {
-        baseSvg = await resolveDeviceSvgContent(targetModelName, viewSide);
-      }
+      baseSvg = await resolveDeviceSvgContent(modelName, viewSide);
     }
+  }
+  if (baseSvg) {
+    baseSvg = resolveChassisSvgUrls(baseSvg);
   }
   if (!baseSvg) return null;
   

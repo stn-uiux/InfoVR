@@ -311,17 +311,75 @@ function initMaps() {
   for (const [path, importFn] of Object.entries(allCardSources)) {
     const fn = path.split("/").pop() ?? "";
     _cardRawModuleMap.set(fn, importFn);
+    _cardRawModuleMap.set(decodeURIComponent(fn), importFn);
   }
   for (const [path, importFn] of Object.entries(baseEquipRawModules)) {
     const fn = path.split("/").pop() ?? "";
     _baseEquipRawModuleMap.set(fn, importFn);
+    _baseEquipRawModuleMap.set(decodeURIComponent(fn), importFn);
   }
   for (const [path, mod] of Object.entries(baseEquipUrlModules)) {
     const fn = path.split("/").pop() ?? "";
     _baseEquipUrlModuleMap.set(fn, mod.default);
+    _baseEquipUrlModuleMap.set(decodeURIComponent(fn), mod.default);
+    _baseEquipUrlModuleMap.set(encodeURIComponent(fn), mod.default);
   }
 }
 initMaps();
+
+/**
+ * Base 장비 SVG URL (img 태그용 및 룩업용)
+ */
+export function getBaseEquipmentSvgUrl(baseSvgUrl: string): string | undefined {
+  if (!baseSvgUrl) return undefined;
+  let url = _baseEquipUrlModuleMap.get(baseSvgUrl);
+  if (url) return url;
+
+  const decoded = decodeURIComponent(baseSvgUrl);
+  url = _baseEquipUrlModuleMap.get(decoded);
+  if (url) return url;
+
+  const fn = decoded.split("/").pop() ?? "";
+  url = _baseEquipUrlModuleMap.get(fn);
+  if (url) return url;
+
+  const cleanFn = fn.toLowerCase().replace(/%20/g, " ");
+  for (const [key, val] of _baseEquipUrlModuleMap.entries()) {
+    const lowerKey = key.toLowerCase();
+    if (lowerKey === cleanFn || lowerKey === fn.toLowerCase()) {
+      return val;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * SVG 내부의 stale 또는 로컬 개발용 /src/assets/card/ 경로를 번들된 프로덕션 URL로 치환
+ */
+export function resolveChassisSvgUrls(svgRaw: string): string {
+  if (!svgRaw) return svgRaw;
+  let result = svgRaw;
+
+  // 치환 패턴: (href|xlink:href)=["'](?:\/src)?\/assets\/card\/([^"']+)["']
+  result = result.replace(
+    /((?:href|xlink:href)=["'])(?:(?:\/src)?\/assets\/card\/)([^"']+)(["'])/gi,
+    (match, p1, rawFileName, p3) => {
+      const decodedFn = decodeURIComponent(rawFileName);
+      const resolvedUrl = getBaseEquipmentSvgUrl(decodedFn) || getBaseEquipmentSvgUrl(rawFileName);
+      if (resolvedUrl) {
+        return `${p1}${resolvedUrl}${p3}`;
+      }
+      return match;
+    }
+  );
+
+  // SVG 태그에 xlink 네임스페이스 보장
+  if (result.includes("xlink:href=") && !result.includes("xmlns:xlink=")) {
+    result = result.replace("<svg", '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
+  }
+
+  return result;
+}
 
 /**
  * 카드 SVG raw text 로드 (인라인 렌더링용)
@@ -349,20 +407,20 @@ export async function loadCardSvgRaw(
   }
 
   if (cardFileName.toLowerCase().match(/\.(png|jpe?g)$/)) {
-    const pngUrl = _baseEquipUrlModuleMap.get(cardFileName);
+    const pngUrl = getBaseEquipmentSvgUrl(cardFileName);
     if (pngUrl) {
       const cd = _cardDefinitions.find(c => c.cardFileName === cardFileName);
       const w = cd ? cd.svgWidth : 430;
       const h = cd ? cd.svgHeight : 46;
-      const html = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
-  <image href="${pngUrl}" width="${w}" height="${h}" preserveAspectRatio="none" />
+      const html = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
+  <image href="${pngUrl}" xlink:href="${pngUrl}" width="${w}" height="${h}" preserveAspectRatio="none" />
 </svg>`;
       _cardSvgRawCache.set(cardFileName, html);
       return html;
     }
   }
 
-  const importFn = _cardRawModuleMap.get(cardFileName);
+  const importFn = _cardRawModuleMap.get(cardFileName) || _cardRawModuleMap.get(decodeURIComponent(cardFileName));
   if (importFn) {
     try {
       const mod = await importFn();
@@ -395,7 +453,8 @@ export async function loadBaseEquipmentSvgRaw(
       const { customModels } = useStore.getState();
       const model = customModels.find((m) => m.modelId === modelId);
       if (model) {
-        return model.baseEquipmentViewSvgRaw || model.modelSvgRaw;
+        const raw = model.baseEquipmentViewSvgRaw || model.modelSvgRaw;
+        return raw ? resolveChassisSvgUrls(raw) : undefined;
       }
     } catch (err) {
       console.error("Failed to load custom base equipment SVG from store:", err);
@@ -404,35 +463,28 @@ export async function loadBaseEquipmentSvgRaw(
   }
 
   if (baseSvgUrl.toLowerCase().match(/\.(png|jpe?g)$/)) {
-    const pngUrl = _baseEquipUrlModuleMap.get(baseSvgUrl);
+    const pngUrl = getBaseEquipmentSvgUrl(baseSvgUrl);
     if (pngUrl) {
       const eqModel = equipmentModels.find(m => m.baseSvgUrl === baseSvgUrl);
       const w = eqModel?.equipmentSize?.width || 984;
       const h = eqModel?.equipmentSize?.height || 200;
-      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
-  <image href="${pngUrl}" width="${w}" height="${h}" preserveAspectRatio="none" />
+      return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">
+  <image href="${pngUrl}" xlink:href="${pngUrl}" width="${w}" height="${h}" preserveAspectRatio="none" />
 </svg>`;
     }
   }
 
-  const importFn = _baseEquipRawModuleMap.get(baseSvgUrl);
+  const importFn = _baseEquipRawModuleMap.get(baseSvgUrl) || _baseEquipRawModuleMap.get(decodeURIComponent(baseSvgUrl));
   if (importFn) {
     try {
       const mod = await importFn();
-      return mod.default;
+      return resolveChassisSvgUrls(mod.default);
     } catch (err) {
       console.error("Failed to load base equipment SVG:", baseSvgUrl, err);
       return undefined;
     }
   }
   return undefined;
-}
-
-/**
- * Base 장비 SVG URL (img 태그용)
- */
-export function getBaseEquipmentSvgUrl(baseSvgUrl: string): string | undefined {
-  return _baseEquipUrlModuleMap.get(baseSvgUrl);
 }
 
 // ── 장비 모델 목록 ─────────────────────────────────────────────────────

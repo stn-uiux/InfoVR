@@ -3,12 +3,13 @@
   "roomId": "node-1791858160423-0qozazmmj",
   "roomName": "테스트베드",
   "cyberSpaceConfig": {
+    "cyberSpaceEnabled": true,
     "csCustomSpaceSize": true,
     "csRoomWidthCm": 1050,
     "csRoomLengthCm": 1200,
     "csOffsetXCm": 0,
     "csOffsetZCm": 0,
-    "csLowSpecMode": true
+    "csLowSpecMode": false
   },
   "racks": [
     {
@@ -18,25 +19,52 @@
       "rackSize": 48,
       "width": 0.6,
       "position": [
-        -1.2692914705867764,
+        -1.6759581372534427,
         0.98529702398833
       ],
       "orientation": 180,
       "devices": [
         {
           "type": "Server",
-          "title": "stn-npu-atom-max-3",
+          "title": "stn-npu-atom-max-2",
+          "size": 4,
+          "position": 25,
+          "modelName": "AS-4125GS-TNRT2",
+          "vendor": "Supermicro",
+          "deviceId": "2324a6c1-4ef5-4f3b-81f1-33fda5fc3bb8",
+          "portStates": [],
+          "insertedCards": [],
+          "insertedModules": [],
+          "itemId": "9ef3852b-1e0d-41f6-90a2-257efeeb5e27"
+        },
+        {
+          "type": "Server",
+          "title": "stn-npu-atom-max-1",
           "size": 4,
           "position": 18,
           "modelName": "AS-4125GS-TNRT2",
           "vendor": "Supermicro",
-          "deviceId": "ff03fa88-c7eb-4849-b49e-54cf5dc8359a",
+          "deviceId": "631b1d24-d74e-4780-b0b4-e3dc66e5740d",
           "portStates": [],
           "insertedCards": [],
           "insertedModules": [],
-          "itemId": "e94bc454-09d5-4ce1-92a3-f8f04e186779",
-          "rackId": "0af8c1ca-722a-4c6a-b686-b90cc658a275"
-        },
+          "itemId": "51d21b6b-7a36-46c7-a2a7-92527d9ee407"
+        }
+      ],
+      "rackDepth": 120
+    },
+    {
+      "rackId": "b0e68e19-5a2b-4a94-9d4f-b2b71c5f7750",
+      "mapId": "node-1791858160423-0qozazmmj",
+      "rackTitle": "d979540e",
+      "rackSize": 48,
+      "width": 0.6,
+      "position": [
+        -1.2692914705867762,
+        0.98529702398833
+      ],
+      "orientation": 180,
+      "devices": [
         {
           "type": "Server",
           "title": "stn-npu-atom-max-4",
@@ -48,16 +76,28 @@
           "portStates": [],
           "insertedCards": [],
           "insertedModules": [],
-          "itemId": "eb201191-ea6b-4e1c-a9cb-ce917a5343af",
-          "rackId": "0af8c1ca-722a-4c6a-b686-b90cc658a275"
+          "itemId": "18029d99-49b3-4acf-a79e-f3597ba03bb1"
+        },
+        {
+          "type": "Server",
+          "title": "stn-npu-atom-max-3",
+          "size": 4,
+          "position": 18,
+          "modelName": "AS-4125GS-TNRT2",
+          "vendor": "Supermicro",
+          "deviceId": "ff03fa88-c7eb-4849-b49e-54cf5dc8359a",
+          "portStates": [],
+          "insertedCards": [],
+          "insertedModules": [],
+          "itemId": "399edde5-558a-4de6-bcd1-aad72edf8506"
         }
       ],
       "rackDepth": 120
     },
     {
-      "rackId": "b0e68e19-5a2b-4a94-9d4f-b2b71c5f7750",
+      "rackId": "6e0d3616-840b-4711-b35f-3b35a74fe624",
       "mapId": "node-1791858160423-0qozazmmj",
-      "rackTitle": "d979540e",
+      "rackTitle": "a97b7919",
       "rackSize": 48,
       "width": 0.6,
       "position": [
@@ -77,8 +117,7 @@
           "portStates": [],
           "insertedCards": [],
           "insertedModules": [],
-          "itemId": "182b750e-5be4-4386-9922-490d8fbac13e",
-          "rackId": "b0e68e19-5a2b-4a94-9d4f-b2b71c5f7750"
+          "itemId": "fa74d8e0-c123-4d0e-b829-45bb1a98aa13"
         },
         {
           "type": "Server",
@@ -91,51 +130,7 @@
           "portStates": [],
           "insertedCards": [],
           "insertedModules": [],
-          "itemId": "f5275de0-cab6-4d44-a4bf-56b6f1c31e4d",
-          "rackId": "b0e68e19-5a2b-4a94-9d4f-b2b71c5f7750"
-        }
-      ],
-      "rackDepth": 120
-    },
-    {
-      "rackId": "6e0d3616-840b-4711-b35f-3b35a74fe624",
-      "mapId": "node-1791858160423-0qozazmmj",
-      "rackTitle": "a97b7919",
-      "rackSize": 48,
-      "width": 0.6,
-      "position": [
-        -1.6759581372534431,
-        0.98529702398833
-      ],
-      "orientation": 180,
-      "devices": [
-        {
-          "type": "Server",
-          "title": "stn-npu-atom-max-1",
-          "size": 4,
-          "position": 18,
-          "modelName": "AS-4125GS-TNRT2",
-          "vendor": "Supermicro",
-          "deviceId": "631b1d24-d74e-4780-b0b4-e3dc66e5740d",
-          "portStates": [],
-          "insertedCards": [],
-          "insertedModules": [],
-          "itemId": "bca7e817-adab-4d4f-b26a-d3664b85c1ba",
-          "rackId": "6e0d3616-840b-4711-b35f-3b35a74fe624"
-        },
-        {
-          "type": "Server",
-          "title": "stn-npu-atom-max-2",
-          "size": 4,
-          "position": 25,
-          "modelName": "AS-4125GS-TNRT2",
-          "vendor": "Supermicro",
-          "deviceId": "2324a6c1-4ef5-4f3b-81f1-33fda5fc3bb8",
-          "portStates": [],
-          "insertedCards": [],
-          "insertedModules": [],
-          "itemId": "c37648dc-7d3f-412f-b27f-6cc8972e1c67",
-          "rackId": "6e0d3616-840b-4711-b35f-3b35a74fe624"
+          "itemId": "e8f324d0-5aa5-4654-9f97-002f2f27238d"
         }
       ],
       "rackDepth": 120
@@ -8612,9 +8607,9 @@
       "fileName": "__builtin_door_auto.glb",
       "dataUrl": "/models/door_auto.glb",
       "position": [
-        0.8560726226252886,
+        0.8560726226252885,
         0,
-        3.4632593168457113
+        3.463259316845711
       ],
       "rotation": [
         0,
@@ -8622,9 +8617,9 @@
         0
       ],
       "scale": [
-        1.0422351789320787,
-        0.9999999999999999,
-        0.9999999999999998
+        1.0422351789320785,
+        1.3136857232914496,
+        0.9999999999999997
       ],
       "isMoveEnabled": true,
       "builtinType": "DoorAuto",
@@ -8904,6 +8899,118 @@
         0.599963366985321
       ],
       "hasGlass": false,
+      "type": "Server"
+    },
+    {
+      "name": "CCTV",
+      "fileName": "__builtin_cctv.glb",
+      "dataUrl": "/models/cctv.glb",
+      "position": [
+        -4.2152702913749085,
+        4,
+        -2.2276714453360213
+      ],
+      "rotation": [
+        0,
+        1.5707963267948966,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "isMoveEnabled": true,
+      "builtinType": "CCTV",
+      "id": "e3632983-74f9-447d-9776-b6be9ebaa777",
+      "baseSize": [
+        0.2799999937415123,
+        0.23482537455300562,
+        0.28000006514169873
+      ],
+      "hasGlass": false,
+      "cctvId": "CCTV-01",
+      "type": "Server"
+    },
+    {
+      "name": "온습도계",
+      "fileName": "__builtin_thermo_hygro",
+      "dataUrl": "",
+      "position": [
+        0.041062794119835586,
+        2.311,
+        2.0479455359824947
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "isMoveEnabled": true,
+      "builtinType": "ThermoHygro",
+      "id": "f4f9399a-956a-4c2a-9bc1-ee33d2d4f141",
+      "thermoHygroId": "TH-004",
+      "type": "Server"
+    },
+    {
+      "name": "온습도계",
+      "fileName": "__builtin_thermo_hygro",
+      "dataUrl": "",
+      "position": [
+        -0.2106256190418112,
+        2.311,
+        -1.0593120116311652
+      ],
+      "rotation": [
+        0,
+        3.141592653589793,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "isMoveEnabled": true,
+      "builtinType": "ThermoHygro",
+      "id": "0e4b43ff-955b-48bc-b5b9-0d71d79e12b2",
+      "thermoHygroId": "TH-006",
+      "type": "Server"
+    },
+    {
+      "name": "CCTV",
+      "fileName": "__builtin_cctv.glb",
+      "dataUrl": "/models/cctv.glb",
+      "position": [
+        4.8114565787870465,
+        4,
+        2.932314713909728
+      ],
+      "rotation": [
+        -3.141592653589793,
+        -0.6981317007977321,
+        -3.141592653589793
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "isMoveEnabled": true,
+      "builtinType": "CCTV",
+      "id": "a8b0166f-42ef-4303-b6cc-b6e77ab66250",
+      "baseSize": [
+        0.2799999937415123,
+        0.23482537455300562,
+        0.28000006514169873
+      ],
+      "hasGlass": false,
+      "cctvId": "CCTV-04",
       "type": "Server"
     }
   ],

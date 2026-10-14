@@ -42,68 +42,36 @@ export interface CameraState {
   zoom: number;
 }
 
-export interface CyberSpaceConfig {
-  cyberSpaceEnabled: boolean;
-  csIsLightMode: boolean;
-  csFloorMirror: number;
-  csFloorRoughness: number;
-  csBrightness: number;
-  csFogIntensity: number;
-  csCeilingLightIntensity: number;
-  csBloomIntensity: number;
-  csAoIntensity: number;
-  csNeonIntensity: number;
-  csCustomSpaceSize: boolean;
-  csRoomWidthCm: number;
-  csRoomLengthCm: number;
-  csOffsetXCm: number;
-  csOffsetZCm: number;
-  csWallColor: string;
-  csCeilingColor: string;
-  csFloorColor: string;
-  csFogColor: string;
-  csLowSpecMode: boolean;
-}
+export type { CyberSpaceConfig } from "../types/cyberSpace";
+export {
+  DEFAULT_CYBER_SPACE_CONFIG,
+  LIGHT_THEME_CYBER_SPACE_CONFIG,
+} from "../types/cyberSpace";
+import {
+  type CyberSpaceConfig,
+  DEFAULT_CYBER_SPACE_CONFIG,
+  LIGHT_THEME_CYBER_SPACE_CONFIG,
+} from "../types/cyberSpace";
+import { getDefaultLayoutData, applyDefaultSTNLayout } from "../utils/defaultLayout";
 
-export const DEFAULT_CYBER_SPACE_CONFIG: CyberSpaceConfig = {
-  cyberSpaceEnabled: true,
-  csIsLightMode: false,
-  csFloorMirror: 0.5,
-  csFloorRoughness: 0.7,
-  csBrightness: 1.5,
-  csFogIntensity: 1,
-  csCeilingLightIntensity: 0.6,
-  csBloomIntensity: 0.3,
-  csAoIntensity: 1.5,
-  csNeonIntensity: 4.5,
-  csCustomSpaceSize: false,
-  csRoomWidthCm: 600,
-  csRoomLengthCm: 800,
-  csOffsetXCm: 0,
-  csOffsetZCm: 0,
-  csWallColor: "#5979a3",
-  csCeilingColor: '#5676a0',
-  csFloorColor: '#294463',
-  csFogColor: '#0a1324',
-  csLowSpecMode: false,
-};
+export const resolveNodeCyberSpaceConfig = (
+  isLight: boolean,
+  nodeEnv?: Partial<CyberSpaceConfig>,
+): CyberSpaceConfig => {
+  const themeConfig = isLight ? LIGHT_THEME_CYBER_SPACE_CONFIG : DEFAULT_CYBER_SPACE_CONFIG;
+  if (!nodeEnv) return themeConfig;
 
-export const LIGHT_THEME_CYBER_SPACE_CONFIG: CyberSpaceConfig = {
-  ...DEFAULT_CYBER_SPACE_CONFIG,
-  cyberSpaceEnabled: true,
-  csIsLightMode: true,
-  csWallColor: '#eef2ff',
-  csCeilingColor: '#eef2ff',
-  csFloorColor: '#9ca3af',
-  csFogColor: '#f1f5f9',
-  csBrightness: 1.1,
-  csCeilingLightIntensity: 1.0,
-  csBloomIntensity: 0.6,
-  csAoIntensity: 3.0,
-  csNeonIntensity: 6.0,
-  csFloorMirror: 0.0,
-  csFloorRoughness: 1.0,
-  csLowSpecMode: false,
+  return {
+    ...themeConfig,
+    cyberSpaceEnabled: nodeEnv.cyberSpaceEnabled ?? themeConfig.cyberSpaceEnabled,
+    csCustomSpaceSize: nodeEnv.csCustomSpaceSize ?? themeConfig.csCustomSpaceSize,
+    csRoomWidthCm: nodeEnv.csRoomWidthCm ?? themeConfig.csRoomWidthCm,
+    csRoomLengthCm: nodeEnv.csRoomLengthCm ?? themeConfig.csRoomLengthCm,
+    csOffsetXCm: nodeEnv.csOffsetXCm ?? themeConfig.csOffsetXCm,
+    csOffsetZCm: nodeEnv.csOffsetZCm ?? themeConfig.csOffsetZCm,
+    csLowSpecMode: nodeEnv.csLowSpecMode ?? themeConfig.csLowSpecMode,
+    csIsLightMode: isLight,
+  };
 };
 
 interface CameraControlsRef {
@@ -357,6 +325,18 @@ export interface AppState {
   endModelDrag: (id: string, position: [number, number]) => void;
   toggleModelMove: (id: string) => void;
 
+  // CCTV Management
+  activeCctvLiveModelId: string | null;
+  activeCctvMappingModelId: string | null;
+  setActiveCctvLiveModelId: (id: string | null) => void;
+  setActiveCctvMappingModelId: (id: string | null) => void;
+  linkCctvToModel: (modelId: string, cctvId: string | null) => void;
+
+  // ThermoHygrometer Management
+  activeThermoHygroMappingModelId: string | null;
+  setActiveThermoHygroMappingModelId: (id: string | null) => void;
+  linkThermoHygroToModel: (modelId: string, thermoHygroId: string | null) => void;
+
   // Hierarchy Node Management
   addNode: (node: Omit<HierarchyNode, "nodeId"> & { nodeId?: string }) => string;
   renameNode: (nodeId: string, name: string) => void;
@@ -418,6 +398,7 @@ export interface AppState {
   getIsDirty: () => boolean;
   getDirtyNodeIds: () => Set<string>;
   resetAllData: () => void;
+  loadDefaultLayout: () => void;
 }
 
 // Helper to check collision using AABB (Axis-Aligned Bounding Box)
@@ -542,11 +523,13 @@ export const checkFrontClearanceViolation = (
   return false;
 };
 
+const initialDefaultData = getDefaultLayoutData();
+
 export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
-      racks: [],
-      registeredDevices: [],
+      racks: initialDefaultData.racks,
+      registeredDevices: initialDefaultData.registeredDevices,
       selectedRackId: null,
       selectedDeviceId: null,
       highlightedPortId: null,
@@ -562,13 +545,13 @@ export const useStore = create<AppState>()(
       modeTransitionTarget: null,
       isCanvasReady: false,
       hoveredRackId: null,
-      nodes: [{ nodeId: ROOT_NODE_ID, parentId: null, name: "STN", type: "root", order: 0 }],
-      activeNodeId: null,
-      activeSceneNodeId: null,
+      nodes: initialDefaultData.nodes,
+      activeNodeId: initialDefaultData.roomId,
+      activeSceneNodeId: initialDefaultData.roomId,
       pinnedNodeId: null,
       collapsedNodeIds: new Set(),
       isHierarchyCollapsed: false,
-      layouts: {},
+      layouts: initialDefaultData.layouts,
       importExportModalRackId: null,
       deviceRegistrationModalOpen: false,
       modelRegistrationModalOpen: false,
@@ -585,9 +568,17 @@ export const useStore = create<AppState>()(
 
       isGizmoHovered: false,
 
-      ...DEFAULT_CYBER_SPACE_CONFIG,
+      // CCTV Management
+      activeCctvLiveModelId: null,
+      activeCctvMappingModelId: null,
 
-      nodeEnvironments: {},
+      // ThermoHygrometer Management
+      activeThermoHygroMappingModelId: null,
+
+      ...DEFAULT_CYBER_SPACE_CONFIG,
+      ...initialDefaultData.cyberSpaceConfig,
+
+      nodeEnvironments: initialDefaultData.nodeEnvironments,
 
       setCanvasReady: (ready: boolean) => set({ isCanvasReady: ready }),
       setCyberSpaceEnabled: (enabled) => get().setCyberSpaceConfig({ cyberSpaceEnabled: enabled }),
@@ -615,12 +606,27 @@ export const useStore = create<AppState>()(
           csRoomWidthCm: state.csRoomWidthCm,
           csRoomLengthCm: state.csRoomLengthCm,
           csOffsetXCm: state.csOffsetXCm,
-          csOffsetZCm: state.csOffsetZCm
+          csOffsetZCm: state.csOffsetZCm,
         };
 
-        const newConfig = { ...themeConfig, ...preservedState };
+        const newConfig = { ...themeConfig, ...preservedState, csIsLightMode: isLight };
 
-        return { ...state, ...newConfig };
+        const activeNodeId = state.activeNodeId;
+        const newNodeEnvs = activeNodeId && state.nodeEnvironments[activeNodeId]
+          ? {
+              ...state.nodeEnvironments,
+              [activeNodeId]: {
+                ...state.nodeEnvironments[activeNodeId],
+                csWallColor: themeConfig.csWallColor,
+                csCeilingColor: themeConfig.csCeilingColor,
+                csFloorColor: themeConfig.csFloorColor,
+                csFogColor: themeConfig.csFogColor,
+                csIsLightMode: isLight,
+              },
+            }
+          : state.nodeEnvironments;
+
+        return { ...state, ...newConfig, nodeEnvironments: newNodeEnvs, csIsLightMode: isLight };
       }),
       toggleCyberSpaceTheme: () => {
         const state = get();
@@ -638,7 +644,7 @@ export const useStore = create<AppState>()(
       deletedDefaultTemplates: [],
       customCards: [],
 
-      importedModels: [],
+      importedModels: initialDefaultData.importedModels,
       selectedModelId: null,
       draggingModelId: null,
       modelDragPosition: null,
@@ -660,14 +666,14 @@ export const useStore = create<AppState>()(
       settingsModalTab: 'accounts',
       setSettingsModalTab: (tab) => set({ settingsModalTab: tab }),
 
-      baselineRacks: null,
-      baselineModels: null,
-      baselineNodes: null,
-      baselineRegisteredDevices: null,
-      baselineNodeEnvironments: null,
-      baselineLayouts: null,
-      baselineActiveNodeId: null,
-      baselineActiveSceneNodeId: null,
+      baselineRacks: structuredClone(initialDefaultData.racks),
+      baselineModels: structuredClone(initialDefaultData.importedModels),
+      baselineNodes: structuredClone(initialDefaultData.nodes),
+      baselineRegisteredDevices: structuredClone(initialDefaultData.registeredDevices),
+      baselineNodeEnvironments: structuredClone(initialDefaultData.nodeEnvironments),
+      baselineLayouts: structuredClone(initialDefaultData.layouts),
+      baselineActiveNodeId: initialDefaultData.roomId,
+      baselineActiveSceneNodeId: initialDefaultData.roomId,
       undoStack: [],
       redoStack: [],
       showUnsavedDialog: false,
@@ -825,6 +831,10 @@ export const useStore = create<AppState>()(
         });
       },
 
+      loadDefaultLayout: () => {
+        applyDefaultSTNLayout(set, get);
+      },
+
 
 
       pushUndoState: () => {
@@ -948,11 +958,7 @@ export const useStore = create<AppState>()(
             });
 
             const nodeEnv = (targetNodeId && get().nodeEnvironments[targetNodeId]) || {};
-            const cyberSpaceConfig = {
-              ...(get().csIsLightMode ? LIGHT_THEME_CYBER_SPACE_CONFIG : DEFAULT_CYBER_SPACE_CONFIG),
-              ...nodeEnv,
-              csIsLightMode: get().csIsLightMode
-            };
+            const cyberSpaceConfig = resolveNodeCyberSpaceConfig(get().csIsLightMode, nodeEnv);
 
             set({
               ...cyberSpaceConfig,
@@ -1143,11 +1149,7 @@ export const useStore = create<AppState>()(
 
         // Fetch Node-specific CyberSpace Environment or Default
         const nodeEnv = (nodeId && get().nodeEnvironments[nodeId]) || {};
-        const cyberSpaceConfig = {
-          ...(get().csIsLightMode ? LIGHT_THEME_CYBER_SPACE_CONFIG : DEFAULT_CYBER_SPACE_CONFIG),
-          ...nodeEnv,
-          csIsLightMode: get().csIsLightMode
-        };
+        const cyberSpaceConfig = resolveNodeCyberSpaceConfig(get().csIsLightMode, nodeEnv);
 
         set({
           ...cyberSpaceConfig,
@@ -2528,11 +2530,7 @@ export const useStore = create<AppState>()(
 
         // Fetch Node-specific CyberSpace Environment or Default
         const nodeEnv = (activeNodeId && get().nodeEnvironments[activeNodeId]) || {};
-        const cyberSpaceConfig = {
-          ...(get().csIsLightMode ? LIGHT_THEME_CYBER_SPACE_CONFIG : DEFAULT_CYBER_SPACE_CONFIG),
-          ...nodeEnv,
-          csIsLightMode: get().csIsLightMode
-        };
+        const cyberSpaceConfig = resolveNodeCyberSpaceConfig(get().csIsLightMode, nodeEnv);
 
         set((state) => ({
           ...cyberSpaceConfig,
@@ -3024,13 +3022,18 @@ export const useStore = create<AppState>()(
           ...modelData,
           id: newId,
           position: spawnPos,
-          isMoveEnabled: modelData.isMoveEnabled ?? false,
+          isMoveEnabled: modelData.isMoveEnabled !== undefined ? modelData.isMoveEnabled : true,
         };
 
         set((state) => {
           const updatedModels: ImportedModel[] = [...state.importedModels, model];
           return {
             importedModels: updatedModels,
+            selectedModelId: newId,
+            selectedRackId: null,
+            focusedRackId: null,
+            selectedDeviceId: null,
+            hoveredDevice: null,
             layouts: activeNodeId
               ? {
                 ...state.layouts,
@@ -3201,6 +3204,59 @@ export const useStore = create<AppState>()(
         });
       },
 
+      setActiveCctvLiveModelId: (id) => set({ activeCctvLiveModelId: id }),
+      setActiveCctvMappingModelId: (id) => set({ activeCctvMappingModelId: id }),
+      linkCctvToModel: (modelId, cctvId) => {
+        const { isEditMode, pushUndoState, activeNodeId } = get();
+        if (isEditMode) pushUndoState();
+        set((state) => {
+          const updatedModels = state.importedModels.map((m) =>
+            m.id === modelId ? { ...m, cctvId: cctvId ?? undefined } : m,
+          );
+          return {
+            importedModels: updatedModels,
+            layouts: activeNodeId
+              ? {
+                  ...state.layouts,
+                  [activeNodeId]: {
+                    ...(state.layouts[activeNodeId] || {
+                      racks: [],
+                      importedModels: [],
+                    }),
+                    importedModels: updatedModels,
+                  },
+                }
+              : state.layouts,
+          };
+        });
+      },
+
+      setActiveThermoHygroMappingModelId: (id) => set({ activeThermoHygroMappingModelId: id }),
+      linkThermoHygroToModel: (modelId, thermoHygroId) => {
+        const { isEditMode, pushUndoState, activeNodeId } = get();
+        if (isEditMode) pushUndoState();
+        set((state) => {
+          const updatedModels = state.importedModels.map((m) =>
+            m.id === modelId ? { ...m, thermoHygroId: thermoHygroId ?? undefined } : m,
+          );
+          return {
+            importedModels: updatedModels,
+            layouts: activeNodeId
+              ? {
+                  ...state.layouts,
+                  [activeNodeId]: {
+                    ...(state.layouts[activeNodeId] || {
+                      racks: [],
+                      importedModels: [],
+                    }),
+                    importedModels: updatedModels,
+                  },
+                }
+              : state.layouts,
+          };
+        });
+      },
+
       reparentNode: (nodeId, newParentId) => {
         const { nodes, isEditMode, pushUndoState } = get();
 
@@ -3305,7 +3361,20 @@ export const useStore = create<AppState>()(
             const found = persistedList.find(
               (p) => p.modelId === base.modelId || p.modelName === base.modelName
             );
-            return found ? { ...base, ...found } : base;
+            if (!found) return base;
+            // If persisted model has stale /src/ URLs in baseEquipmentViewSvgRaw or modelSvgRaw, use base model's clean version
+            const cleanBaseRaw = (found.baseEquipmentViewSvgRaw && found.baseEquipmentViewSvgRaw.includes("/src/"))
+              ? base.baseEquipmentViewSvgRaw
+              : (found.baseEquipmentViewSvgRaw || base.baseEquipmentViewSvgRaw);
+            const cleanModelSvg = (found.modelSvgRaw && found.modelSvgRaw.includes("/src/"))
+              ? base.modelSvgRaw
+              : (found.modelSvgRaw || base.modelSvgRaw);
+            return {
+              ...base,
+              ...found,
+              baseEquipmentViewSvgRaw: cleanBaseRaw,
+              modelSvgRaw: cleanModelSvg,
+            };
           });
           for (const p of persistedList) {
             if (!merged.some((m) => m.modelId === p.modelId || m.modelName === p.modelName)) {
@@ -3318,9 +3387,6 @@ export const useStore = create<AppState>()(
         // Fix race condition where IndexedDB loads after ThemeContext and overwrites the theme.
         // We force the theme settings to match whatever currentState.csIsLightMode holds, 
         // while allowing other persisted size configurations to be restored.
-        const themeConfig = currentState.csIsLightMode
-          ? LIGHT_THEME_CYBER_SPACE_CONFIG
-          : DEFAULT_CYBER_SPACE_CONFIG;
 
         const sizeConfig = {
           cyberSpaceEnabled: persistedState.cyberSpaceEnabled ?? currentState.cyberSpaceEnabled,
@@ -3331,17 +3397,61 @@ export const useStore = create<AppState>()(
           csOffsetZCm: persistedState.csOffsetZCm ?? currentState.csOffsetZCm,
         };
 
+        // Check if persisted state has any room nodes.
+        // If not, this is an initial visit or an empty workspace; load layout_STN.json automatically!
+        const hasPersistedRooms =
+          Array.isArray(persistedState?.nodes) &&
+          persistedState.nodes.some((n: any) => n.type === "room");
+
+        if (!hasPersistedRooms) {
+          const defaultData = getDefaultLayoutData(cleanedCustomModels, currentState.csIsLightMode);
+          return {
+            ...currentState,
+            ...persistedState,
+            ...defaultData.cyberSpaceConfig,
+            isEditMode: false,
+            isCanvasReady: false,
+            isSyncingPorts: false,
+            pendingImportFile: null,
+            activeNodeId: defaultData.roomId,
+            activeSceneNodeId: defaultData.roomId,
+            customModels: cleanedCustomModels,
+            racks: structuredClone(defaultData.racks),
+            importedModels: structuredClone(defaultData.importedModels),
+            nodes: structuredClone(defaultData.nodes),
+            registeredDevices: structuredClone(defaultData.registeredDevices),
+            nodeEnvironments: structuredClone(defaultData.nodeEnvironments),
+            layouts: structuredClone(defaultData.layouts),
+            baselineRacks: structuredClone(defaultData.racks),
+            baselineModels: structuredClone(defaultData.importedModels),
+            baselineNodes: structuredClone(defaultData.nodes),
+            baselineRegisteredDevices: structuredClone(defaultData.registeredDevices),
+            baselineNodeEnvironments: structuredClone(defaultData.nodeEnvironments),
+            baselineLayouts: structuredClone(defaultData.layouts),
+            baselineActiveNodeId: defaultData.roomId,
+            baselineActiveSceneNodeId: defaultData.roomId,
+            _importDirty: false,
+          };
+        }
+
+        const firstRoom = (persistedState.nodes as any[])?.find((n) => n.type === "room");
+        const resolvedActiveRoomId = firstRoom ? firstRoom.nodeId : null;
+        const restoredNodeEnv = resolvedActiveRoomId ? persistedState.nodeEnvironments?.[resolvedActiveRoomId] : undefined;
+        const restoredCyberSpaceConfig = resolveNodeCyberSpaceConfig(currentState.csIsLightMode, {
+          ...sizeConfig,
+          ...restoredNodeEnv,
+        });
+
         return {
           ...currentState,
           ...persistedState,
-          ...themeConfig,
-          ...sizeConfig,
+          ...restoredCyberSpaceConfig,
           isEditMode: false,
           isCanvasReady: false,
           isSyncingPorts: false,
           pendingImportFile: null,
-          activeNodeId: null,
-          activeSceneNodeId: null,
+          activeNodeId: resolvedActiveRoomId,
+          activeSceneNodeId: resolvedActiveRoomId,
           customModels: cleanedCustomModels,
           racks: persistedState.baselineRacks ? structuredClone(persistedState.baselineRacks) : (persistedState.racks ? structuredClone(persistedState.racks) : []),
           importedModels: persistedState.baselineModels ? structuredClone(persistedState.baselineModels) : (persistedState.importedModels ? structuredClone(persistedState.importedModels) : []),

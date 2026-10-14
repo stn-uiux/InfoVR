@@ -1,4 +1,17 @@
 /* COMM-inspired Design System */
+@font-face {
+  font-family: "D7MI";
+  src: url("/font/fonts-DSEG_v046/DSEG7-Classic/DSEG7Classic-Italic.woff") format("woff");
+}
+@font-face {
+  font-family: "D14MI";
+  src: url("/font/fonts-DSEG_v046/DSEG14-Classic/DSEG14Classic-Italic.woff") format("woff");
+}
+@font-face {
+  font-family: "D7MBI";
+  src: url("/font/fonts-DSEG_v046/DSEG7-Classic/DSEG7Classic-BoldItalic.woff") format("woff");
+}
+
 /* Light Mode First Theme */
 :root,
 [data-theme=light] {

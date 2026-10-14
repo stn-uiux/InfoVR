@@ -5,7 +5,7 @@ import { EffectComposer, Bloom, N8AO, Vignette } from '@react-three/postprocessi
 import * as THREE from 'three';
 import { SpotLightWithTarget } from './SpotLightWithTarget';
 import { calculateDynamicRoomSize } from "../../utils/rackGeometry";
-import { useStore } from "../../store/useStore";
+import { useStore, DEFAULT_CYBER_SPACE_CONFIG, LIGHT_THEME_CYBER_SPACE_CONFIG } from "../../store/useStore";
 
 // Shared Materials & Colors
 const CEILING_LIGHT = new THREE.Color(1.0, 1.0, 1.0).multiplyScalar(1.5);
@@ -308,10 +308,24 @@ export function CyberSpaceEnvironment() {
     csCustomSpaceSize
   );
 
+  // Fallback to light theme colors when csIsLightMode is true to prevent dark room colors from rendering
+  const effectiveFloorColor = csIsLightMode && (csFloorColor === DEFAULT_CYBER_SPACE_CONFIG.csFloorColor || csFloorColor === "#294463")
+    ? LIGHT_THEME_CYBER_SPACE_CONFIG.csFloorColor
+    : csFloorColor;
+  const effectiveWallColor = csIsLightMode && (csWallColor === DEFAULT_CYBER_SPACE_CONFIG.csWallColor || csWallColor === "#5979a3")
+    ? LIGHT_THEME_CYBER_SPACE_CONFIG.csWallColor
+    : csWallColor;
+  const effectiveCeilingColor = csIsLightMode && (csCeilingColor === DEFAULT_CYBER_SPACE_CONFIG.csCeilingColor || csCeilingColor === "#5676a0")
+    ? LIGHT_THEME_CYBER_SPACE_CONFIG.csCeilingColor
+    : csCeilingColor;
+  const effectiveFogColor = csIsLightMode && (csFogColor === DEFAULT_CYBER_SPACE_CONFIG.csFogColor || csFogColor === "#0a1324")
+    ? LIGHT_THEME_CYBER_SPACE_CONFIG.csFogColor
+    : csFogColor;
+
   return (
     <>
       <group visible={!isEditMode}>
-        <SceneEnvironment fogColor={csFogColor} fogIntensity={csFogIntensity} />
+        <SceneEnvironment fogColor={effectiveFogColor} fogIntensity={csFogIntensity} />
 
         {/* 가상 공간이 꺼져 있을 때 Environment 조명 추가 */}
         {!cyberSpaceEnabled && (
@@ -343,13 +357,7 @@ export function CyberSpaceEnvironment() {
               position={[0, 20, 0]}
               intensity={1.4 * csBrightness}
               color="#ffffff"
-              castShadow
-              shadow-mapSize={[2048, 2048]}
-              shadow-bias={-0.001}
-              shadow-normalBias={0.04}
-            >
-              <orthographicCamera attach="shadow-camera" args={[-50, 50, 50, -50, 0.1, 100]} />
-            </directionalLight>
+            />
             <directionalLight position={[-10, 15, -10]} intensity={0.2 * csBrightness} color="#f0f8ff" />
             {cyberSpaceEnabled && (
               <Suspense fallback={null}>
@@ -363,13 +371,7 @@ export function CyberSpaceEnvironment() {
               position={[0, 20, 0]}
               intensity={1.4 * csBrightness}
               color="#ffffff"
-              castShadow
-              shadow-mapSize={[2048, 2048]}
-              shadow-bias={-0.001}
-              shadow-normalBias={0.04}
-            >
-              <orthographicCamera attach="shadow-camera" args={[-50, 50, 50, -50, 0.1, 100]} />
-            </directionalLight>
+            />
             <directionalLight position={[-10, 15, -10]} intensity={0.2 * csBrightness} color="#f0f8ff" />
             {cyberSpaceEnabled && (
               <Suspense fallback={null}>
@@ -390,16 +392,16 @@ export function CyberSpaceEnvironment() {
             </mesh>
 
             {csLowSpecMode ? (
-              <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+              <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
                 <planeGeometry args={[roomWidth - 0.02, roomLength - 0.02]} />
                 <meshStandardMaterial
-                  color={csFloorColor}
+                  color={effectiveFloorColor}
                   roughness={csFloorRoughness}
                   metalness={csIsLightMode ? 0.0 : 0.4}
                 />
               </mesh>
             ) : (
-              <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+              <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
                 <planeGeometry args={[roomWidth - 0.02, roomLength - 0.02]} />
                 <MeshReflectorMaterial
                   blur={[400, 400]}
@@ -410,7 +412,7 @@ export function CyberSpaceEnvironment() {
                   depthScale={1.2}
                   minDepthThreshold={0.4}
                   maxDepthThreshold={1.4}
-                  color={csFloorColor}
+                  color={effectiveFloorColor}
                   metalness={csIsLightMode ? 0.0 : 0.4}
                   mirror={csFloorMirror}
                 />
@@ -434,8 +436,8 @@ export function CyberSpaceEnvironment() {
               roomLengthCm={roomLength * 100}
               ceilingLightIntensity={csCeilingLightIntensity}
               neonIntensity={csNeonIntensity}
-              wallColor={csWallColor}
-              ceilingColor={csCeilingColor}
+              wallColor={effectiveWallColor}
+              ceilingColor={effectiveCeilingColor}
               isLightMode={csIsLightMode}
             />
           </group>

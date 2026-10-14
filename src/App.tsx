@@ -38,6 +38,10 @@ const ModelRegistrationModal = React.lazy(() =>
 );
 import { MyPageModal } from "./components/account/MyPageModal";
 import { AccountPermissionsModal } from "./components/account/AccountPermissionsModal";
+import { CctvMappingModal } from "./components/cctv/CctvMappingModal";
+import { CctvLiveModal } from "./components/cctv/CctvLiveModal";
+import { ThermoHygroMappingModal } from "./components/thermo-hygro/ThermoHygroMappingModal";
+import "./css/cctv.css";
 import { useTheme } from "./contexts/ThemeContext";
 import { useStore } from "./store/useStore";
 import { useComposerTaskProgress } from "./hooks/useSvgComposer";
@@ -124,29 +128,171 @@ const DeviceDeleteConfirmModal = () => {
   );
 };
 
-/* ---------- Docs Dropdown Component ---------- */
-const DocsDropdown = () => {
+/* ---------- Docs Dropdown Component (숨김 처리) ---------- */
+// const DocsDropdown = () => {
+//   const [isOpen, setIsOpen] = useState(false);
+//   return (
+//     <div className="docs-dropdown-container">
+//       ...
+//     </div>
+//   );
+// };
+
+/* ---------- Import/Export Dropdown Component (우측 하단) ---------- */
+const ImportExportDropdown = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const excelInputRef = useRef<HTMLInputElement>(null);
+  const jsonInputRef = useRef<HTMLInputElement>(null);
+
+  const nodes = useStore((s) => s.nodes);
+  const activeNodeId = useStore((s) => s.activeNodeId);
+  const setImportExportModalRackId = useStore((s) => s.setImportExportModalRackId);
+  const setDeviceRegistrationModalOpen = useStore((s) => s.setDeviceRegistrationModalOpen);
+  const setPendingImportFile = useStore((s) => s.setPendingImportFile);
+
+  const activeNode = nodes.find((n) => n.nodeId === activeNodeId);
+  const isRoomNode = activeNode?.type === "room";
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener("mousedown", handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, [isOpen]);
+
+  const handleExcelExport = () => {
+    setIsOpen(false);
+    setDeviceRegistrationModalOpen(false);
+    setImportExportModalRackId("all");
+  };
+
+  const handleExcelImportClick = () => {
+    setIsOpen(false);
+    if (excelInputRef.current) {
+      excelInputRef.current.value = "";
+      excelInputRef.current.click();
+    }
+  };
+
+  const handleExcelFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPendingImportFile(file);
+      setDeviceRegistrationModalOpen(false);
+      setImportExportModalRackId("all");
+    }
+  };
+
+  const handleJsonExport = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsOpen(false);
+    if (activeNodeId) {
+      exportRoomLayoutJson(activeNodeId, useStore.getState());
+    }
+  };
+
+  const handleJsonImportClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsOpen(false);
+    if (jsonInputRef.current) {
+      jsonInputRef.current.value = "";
+      jsonInputRef.current.click();
+    }
+  };
+
+  const handleJsonFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && activeNodeId) {
+      importRoomLayoutJson(activeNodeId, file, useStore.getState());
+    }
+  };
 
   return (
-    <div className="docs-dropdown-container">
+    <div ref={containerRef} className="docs-dropdown-container">
       {isOpen && (
-        <div className="docs-dropdown-menu">
-          <div className="docs-dropdown-header">관련 문서 (Docs)</div>
-          <a href="/docs/infoVR_feature_summary.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:document-one-page-24-regular" /> 기능명세서</a>
-          <a href="/docs/infoVR_ui_design_spec.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:design-ideas-24-regular" /> 화면 설계서</a>
-          <a href="/docs/progress_report.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:document-checkmark-24-regular" /> 진행보고서</a>
-          <a href="/docs/infoVR_wbs.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:calendar-ltr-24-regular" /> 개발 WBS</a>
-          <a href="/docs/infoVR_deployment_roadmap.html" target="_blank" rel="noreferrer" className="docs-dropdown-link"><Icon icon="fluent:rocket-24-regular" /> 배포 로드맵</a>
+        <div className="docs-dropdown-menu" style={{ minWidth: "185px", padding: "8px" }}>
+          <button
+            type="button"
+            className="docs-dropdown-item-btn"
+            onClick={handleExcelExport}
+            disabled={!isRoomNode}
+            title={!isRoomNode ? "전산실을 선택해주세요" : "Excel 파일로 내보내기"}
+          >
+            <Icon icon="material-symbols:upload" style={{ fontSize: "18px", color: "#22c55e" }} />
+            <span>Excel 내보내기</span>
+          </button>
+          <button
+            type="button"
+            className="docs-dropdown-item-btn"
+            onClick={handleExcelImportClick}
+            disabled={!isRoomNode}
+            title={!isRoomNode ? "전산실을 선택해주세요" : "Excel 파일에서 가져오기"}
+          >
+            <Icon icon="material-symbols:download" style={{ fontSize: "18px", color: "#22c55e" }} />
+            <span>Excel 가져오기</span>
+          </button>
+
+          <div style={{ height: "1px", background: "var(--color-border, #3f3f46)", margin: "4px 0" }} />
+
+          <button
+            type="button"
+            className="docs-dropdown-item-btn"
+            onClick={handleJsonExport}
+            disabled={!isRoomNode}
+            title={!isRoomNode ? "전산실을 선택해주세요" : "JSON 레이아웃으로 내보내기"}
+          >
+            <Icon icon="material-symbols:upload" style={{ fontSize: "18px", color: "#3b82f6" }} />
+            <span>JSON 내보내기</span>
+          </button>
+          <button
+            type="button"
+            className="docs-dropdown-item-btn"
+            onClick={handleJsonImportClick}
+            disabled={!isRoomNode}
+            title={!isRoomNode ? "전산실을 선택해주세요" : "JSON 레이아웃에서 가져오기"}
+          >
+            <Icon icon="material-symbols:download" style={{ fontSize: "18px", color: "#3b82f6" }} />
+            <span>JSON 가져오기</span>
+          </button>
         </div>
       )}
+
+      {/* Hidden File Inputs */}
+      <input
+        type="file"
+        ref={excelInputRef}
+        style={{ display: "none" }}
+        accept=".xlsx"
+        onChange={handleExcelFileChange}
+      />
+      <input
+        type="file"
+        ref={jsonInputRef}
+        style={{ display: "none" }}
+        accept=".json"
+        onChange={handleJsonFileChange}
+      />
+
       <button
+        type="button"
         className="comm-btn comm-btn-md comm-btn-secondary docs-dropdown-btn"
         onClick={() => setIsOpen(!isOpen)}
+        title="데이터 관리"
       >
-        <Icon icon="fluent:document-multiple-24-regular" style={{ fontSize: "16px" }} />
-        관련 문서
-        <Icon icon={isOpen ? "fluent:chevron-down-24-regular" : "fluent:chevron-up-24-regular"} style={{ marginLeft: "8px" }} />
+        <Icon icon="mdi:import-export" style={{ fontSize: "18px" }} />
+        데이터 관리
+        <Icon
+          icon={isOpen ? "mdi:chevron-down" : "mdi:chevron-up"}
+          style={{ marginLeft: "6px", fontSize: "18px" }}
+        />
       </button>
     </div>
   );
@@ -281,26 +427,6 @@ function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [undo, redo, saveChanges]);
 
-  const toolbarImportInputRef = useRef<HTMLInputElement>(null);
-  const layoutImportInputRef = useRef<HTMLInputElement>(null);
-
-  const handleLayoutImportClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    layoutImportInputRef.current?.click();
-  };
-
-  const handleLayoutImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const activeNodeId = useStore.getState().activeNodeId;
-      if (activeNodeId) {
-        importRoomLayoutJson(activeNodeId, file, useStore.getState());
-      }
-    }
-    if (layoutImportInputRef.current) {
-      layoutImportInputRef.current.value = "";
-    }
-  };
 
   const isModalOpen =
     deviceRegistrationModalOpen ||
@@ -314,6 +440,14 @@ function App() {
 
   // 3D 렌더링 및 썸네일 합성 등의 작업이 진행 중인지 여부
   const is3DLoading = !isCanvasReady || active || pendingComposerTasks > 0;
+
+  // 최초 진입 시 room 노드가 없으면 layout_STN.json 자동 로드
+  useEffect(() => {
+    const state = useStore.getState();
+    if (!state.nodes.some((n) => n.type === "room")) {
+      state.loadDefaultLayout();
+    }
+  }, []);
 
   // 최초 진입 로딩이 완료되었는지 추적 (한 번 true가 되면 다시 false로 돌아가지 않음)
   const [initialLoadDone, setInitialLoadDone] = useState(false);
@@ -342,22 +476,6 @@ function App() {
     loadState(sampleRacks, undefined, sampleRegisteredDevices, sampleNodes);
   };
 
-  const handleToolbarImportClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (toolbarImportInputRef.current) {
-      toolbarImportInputRef.current.value = "";
-      toolbarImportInputRef.current.click();
-    }
-  };
-
-  const handleToolbarImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setPendingImportFile(file);
-      setDeviceRegistrationModalOpen(false);
-      setImportExportModalRackId("all");
-    }
-  };
 
   return (
     <div className="comm-app-container">
@@ -376,6 +494,44 @@ function App() {
         {/* Logo Area */}
         <div className="comm-logo-container">
           <img src={logoSrc} alt="InfoVR Logo" style={{ height: "32px", cursor: "pointer" }} onClick={() => navigate("/")} />
+          {/* Mode Status Indicator Badge */}
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "5px 12px",
+              borderRadius: "20px",
+              fontSize: "12px",
+              fontWeight: 800,
+              letterSpacing: "0.03em",
+              lineHeight: 1,
+              userSelect: "none",
+              background: isEditMode
+                ? "rgba(16, 185, 129, 0.16)"
+                : "rgba(59, 130, 246, 0.16)",
+              border: `1px solid ${
+                isEditMode
+                  ? "rgba(16, 185, 129, 0.4)"
+                  : "rgba(59, 130, 246, 0.4)"
+              }`,
+              color: isEditMode ? "#34d399" : "#60a5fa",
+            }}
+          >
+            <span
+              style={{
+                width: "7px",
+                height: "7px",
+                borderRadius: "50%",
+                background: isEditMode ? "#34d399" : "#60a5fa",
+                boxShadow: isEditMode
+                  ? "0 0 6px rgba(52, 211, 153, 0.8)"
+                  : "0 0 6px rgba(96, 165, 250, 0.8)",
+                display: "inline-block",
+              }}
+            />
+            <span>{isEditMode ? "EDIT MODE" : "VIEW MODE"}</span>
+          </div>
         </div>
 
 
@@ -473,75 +629,6 @@ function App() {
               모델 관리
             </button>
 
-            <div className="comm-toolbar-divider" />
-
-            {/* Unified Room Operations */}
-            <div className="comm-toolbar-group" style={{ gap: "4px" }}>
-              <span className="comm-toolbar-label" style={{ fontSize: "11px", opacity: 0.8 }}>Excel:</span>
-              <button
-                className="comm-btn comm-btn-md comm-btn-secondary comm-btn-icon"
-                onClick={() => {
-                  setDeviceRegistrationModalOpen(false);
-                  setImportExportModalRackId("all");
-                }}
-                disabled={!isRoomNode}
-                style={{ opacity: isRoomNode ? 1 : 0.5, cursor: isRoomNode ? "pointer" : "not-allowed" }}
-                title="Excel 내보내기"
-              >
-                <Icon icon="material-symbols:upload" style={{ fontSize: "18px" }} />
-              </button>
-              <button
-                className="comm-btn comm-btn-md comm-btn-secondary comm-btn-icon"
-                title="Excel 가져오기"
-                onClick={handleToolbarImportClick}
-                disabled={!isRoomNode}
-                style={{ opacity: isRoomNode ? 1 : 0.5, cursor: isRoomNode ? "pointer" : "not-allowed" }}
-              >
-                <Icon icon="material-symbols:download" style={{ fontSize: "18px" }} />
-              </button>
-              <input
-                type="file"
-                ref={toolbarImportInputRef}
-                className="comm-hidden"
-                accept=".xlsx"
-                onChange={handleToolbarImportFile}
-              />
-
-              <div className="comm-toolbar-divider" style={{ height: "16px", margin: "0 6px" }} />
-
-              <span className="comm-toolbar-label" style={{ fontSize: "11px", opacity: 0.8 }}>JSON:</span>
-              <button
-                className="comm-btn comm-btn-md comm-btn-secondary comm-btn-icon"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const activeNodeId = useStore.getState().activeNodeId;
-                  if (activeNodeId) {
-                    exportRoomLayoutJson(activeNodeId, useStore.getState());
-                  }
-                }}
-                disabled={!isRoomNode}
-                style={{ opacity: isRoomNode ? 1 : 0.5, cursor: isRoomNode ? "pointer" : "not-allowed" }}
-                title="JSON 내보내기"
-              >
-                <Icon icon="material-symbols:upload" style={{ fontSize: "18px" }} />
-              </button>
-              <button
-                className="comm-btn comm-btn-md comm-btn-secondary comm-btn-icon"
-                title="JSON 가져오기"
-                onClick={handleLayoutImportClick}
-                disabled={!isRoomNode}
-                style={{ opacity: isRoomNode ? 1 : 0.5, cursor: isRoomNode ? "pointer" : "not-allowed" }}
-              >
-                <Icon icon="material-symbols:download" style={{ fontSize: "18px" }} />
-              </button>
-              <input
-                type="file"
-                ref={layoutImportInputRef}
-                className="comm-hidden"
-                accept=".json"
-                onChange={handleLayoutImportFile}
-              />
-            </div>
 
             <div
               className="comm-toolbar-divider"
@@ -602,52 +689,7 @@ function App() {
               <button
                 className="comm-btn comm-btn-md comm-btn-secondary"
                 onClick={() => {
-                  const state = useStore.getState();
-                  const rootNode = state.nodes.find(n => n.parentId === null);
-                  if (rootNode) {
-                    const siblings = state.nodes.filter(n => n.parentId === rootNode.nodeId);
-                    const newId = state.addNode({
-                      parentId: rootNode.nodeId,
-                      name: layoutSTN.roomName || "STN테스트베드",
-                      type: "room",
-                      order: siblings.length
-                    });
-
-                    // Replace room layout with layoutSTN
-                    const newRacks = (layoutSTN.racks || []).map((r: any) => {
-                      const newRackId = crypto.randomUUID();
-                      return {
-                        ...r,
-                        rackId: newRackId,
-                        mapId: newId,
-                        devices: (r.devices || []).map((d: any) => ({
-                          ...d,
-                          itemId: crypto.randomUUID(),
-                          rackId: newRackId,
-                          type: resolveDeviceType(d.modelName, d.type, state.customModels),
-                        }))
-                      };
-                    });
-                    const newModels = (layoutSTN.importedModels || []).map((m: any) => ({
-                      ...m,
-                      id: crypto.randomUUID(),
-                      type: resolveDeviceType(m.modelName, m.type, state.customModels),
-                    }));
-                    const newDevices = (layoutSTN.registeredDevices || []).map((d: any) => ({
-                      ...d,
-                      deviceGroupId: newId,
-                      type: resolveDeviceType(d.modelName, d.type, state.customModels),
-                    }));
-
-                    state.setActiveNode(newId);
-                    state.expandNodePath(newId);
-
-                    state.replaceRoomLayout(newId, newRacks, newModels, newDevices, layoutSTN.roomName);
-
-                    if (layoutSTN.cyberSpaceConfig) {
-                      state.setCyberSpaceConfig(layoutSTN.cyberSpaceConfig);
-                    }
-                  }
+                  useStore.getState().loadDefaultLayout();
                 }}
                 title="STN테스트베드 전산실 만들기"
               >
@@ -680,30 +722,25 @@ function App() {
             </>
           )}
 
-          {/* Edit Mode Toggle */}
-          <div
-            className={`stn-mode-indicator ${isEditMode ? "active" : ""} ${isModeTransitioning ? "disabled" : ""}`}
-            style={isModeTransitioning ? { opacity: 0.7, pointerEvents: "none" } : undefined}
+          {/* Edit Mode Toggle Button */}
+          <button
+            type="button"
+            className={`comm-btn comm-btn-md ${isEditMode ? "comm-btn-secondary" : "comm-btn-primary"}`}
+            style={
+              isModeTransitioning
+                ? { opacity: 0.7, pointerEvents: "none" }
+                : undefined
+            }
+            disabled={isModeTransitioning}
             onClick={() => setIsEditMode(!isEditMode)}
           >
-            <div
-              className={`comm-status-dot ${isEditMode ? "comm-status-dot-active" : "comm-status-dot-inactive"}`}
+            <Icon
+              icon={isEditMode ? "mdi:logout" : "material-symbols:edit"}
+              width="18"
+              height="18"
             />
-            <span
-              style={{
-                fontWeight: 700,
-                fontSize: "var(--font-size-sm)",
-                lineHeight: 1,
-                color: isEditMode
-                  ? "var(--severity-success-text)"
-                  : "var(--text-secondary)",
-                display: "flex",
-                alignItems: "center",
-              }}
-            >
-              {isEditMode ? "Edit Mode: ON" : "Edit Mode: OFF"}
-            </span>
-          </div>
+            <span>{isEditMode ? "나가기" : "편집"}</span>
+          </button>
 
           {/* <CyberSpaceToggle /> */}
           <ThemeToggle />
@@ -762,11 +799,21 @@ function App() {
       <AccountPermissionsModal />
       <UnsavedChangesDialog />
 
+      {/* CCTV Modals */}
+      <CctvMappingModal />
+      <CctvLiveModal />
+
+      {/* ThermoHygrometer Modal */}
+      <ThermoHygroMappingModal />
+
       {/* 2D UI Overlay - Fit to Models (Fixed next to Gizmo) */}
       <FitToModelsButton />
 
-      {/* Docs Links (Always visible) */}
-      <DocsDropdown />
+      {/* Docs Links (숨김 처리) */}
+      {/* <DocsDropdown /> */}
+
+      {/* Import/Export Dropdown (우측 하단) */}
+      <ImportExportDropdown />
 
       <DeviceTooltip />
       <Toast />

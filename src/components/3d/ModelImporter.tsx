@@ -14,6 +14,7 @@ import {
   DEFAULT_PARTITION_PARAMS,
   DEFAULT_LIGHT_PARAMS,
   DEFAULT_GLASS_PARAMS,
+  RACK_48U_HEIGHT,
 } from "../../utils/builtinModels";
 import type { BuiltinModelDef } from "../../utils/builtinModels";
 import {
@@ -25,7 +26,7 @@ import {
   type ImportPreview,
 } from "../../utils/modelStorage";
 import { HierarchyTree } from "../layout/HierarchyTree";
-import { calculateDynamicRoomSize } from "../../utils/rackGeometry";
+import { calculateDynamicRoomSize, findThermoHygroRackSnap } from "../../utils/rackGeometry";
 /** Read a File as a base64 data URL */
 const fileToDataUrl = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -163,67 +164,112 @@ export const ModelImporter = () => {
         state.showToast("전산실을 먼저 선택해주세요.", "error");
         return;
       }
+      let newId: string | null = null;
       if (def.type === "Wall") {
-        addImportedModel({
+        newId = addImportedModel({
           name: "Wall",
           fileName: def.fileName,
           dataUrl: "",
           position: [0, 0, 0],
           rotation: [0, 0, 0],
           scale: [1, 1, 1],
-          isMoveEnabled: false,
+          isMoveEnabled: true,
           builtinType: "Wall",
           wallParams: { ...DEFAULT_WALL_PARAMS },
         });
       } else if (def.type === "Partition") {
-        addImportedModel({
+        newId = addImportedModel({
           name: "Partition",
           fileName: def.fileName,
           dataUrl: "",
           position: [0, 0, 0],
           rotation: [0, 0, 0],
           scale: [1, 1, 1],
-          isMoveEnabled: false,
+          isMoveEnabled: true,
           builtinType: "Partition",
           partitionParams: { ...DEFAULT_PARTITION_PARAMS },
         });
       } else if (def.type === "Clock") {
-        addImportedModel({
+        newId = addImportedModel({
           name: "Clock",
           fileName: def.fileName,
           dataUrl: "",
           position: [0, 0, 0],
           rotation: [0, 0, 0],
           scale: [1, 1, 1],
-          isMoveEnabled: false,
+          isMoveEnabled: true,
           builtinType: "Clock",
         });
       } else if (def.type === "Light") {
-        addImportedModel({
+        newId = addImportedModel({
           name: "Light",
           fileName: def.fileName,
           dataUrl: "",
           position: [5, 10, 5],
           rotation: [0, 0, 0],
           scale: [1, 1, 1],
-          isMoveEnabled: false,
+          isMoveEnabled: true,
           builtinType: "Light",
           lightParams: { ...DEFAULT_LIGHT_PARAMS },
         });
+      } else if (def.type === "ThermoHygro") {
+        const state = useStore.getState();
+        const selectedRackId = state.selectedRackId;
+        const targetRack =
+          (selectedRackId ? state.racks.find((r) => r.rackId === selectedRackId) : undefined) ||
+          state.racks.find((r) => !state.activeNodeId || r.mapId === state.activeNodeId);
+
+        let initialPos: [number, number, number] = def.defaultPosition
+          ? [...def.defaultPosition]
+          : [0, RACK_48U_HEIGHT, 0];
+        let initialRot: [number, number, number] = [0, 0, 0];
+
+        if (targetRack) {
+          const rackX = targetRack.position[0] * 1.5;
+          const rackY = targetRack.rackSize * 0.0445 + 0.1;
+          const rackZ = targetRack.position[1] * 1.5;
+          const snap = findThermoHygroRackSnap(
+            [rackX, rackY, rackZ],
+            [targetRack],
+            state.activeNodeId,
+            0.35,
+            0.13,
+            0.04,
+            999
+          );
+          if (snap) {
+            initialPos = snap.position;
+            initialRot = snap.rotation;
+          }
+        }
+
+        newId = addImportedModel({
+          name: "온습도계",
+          fileName: def.fileName,
+          dataUrl: "",
+          position: initialPos,
+          rotation: initialRot,
+          scale: [1, 1, 1],
+          isMoveEnabled: true,
+          builtinType: "ThermoHygro",
+        });
       } else {
-        addImportedModel({
+        newId = addImportedModel({
           name: def.label,
           fileName: def.fileName,
           dataUrl: def.assetUrl,
           position: def.defaultPosition ? [...def.defaultPosition] : [0, 0, 0],
           rotation: [0, 0, 0],
           scale: [1, 1, 1],
-          isMoveEnabled: false,
+          isMoveEnabled: true,
           builtinType: def.type,
         });
       }
+      if (newId) {
+        selectModel(newId);
+      }
     },
-    [addImportedModel],
+    [addImportedModel, selectModel],
   );
 
   type PanelType = "hierarchy" | "serverRoomEnv" | "project" | "builtin" | "imported" | null;
@@ -365,15 +411,18 @@ export const ModelImporter = () => {
         const dataUrl = await fileToDataUrl(file);
         const baseName = file.name.replace(/\.(glb|gltf)$/i, "");
 
-        addImportedModel({
+        const newId = addImportedModel({
           name: baseName,
           fileName: file.name,
           dataUrl,
           position: [0, 0, 0],
           rotation: [0, 0, 0],
           scale: [1, 1, 1],
-          isMoveEnabled: false,
+          isMoveEnabled: true,
         });
+        if (newId) {
+          selectModel(newId);
+        }
       } catch {
         setError("Failed to read file.");
         setTimeout(() => setError(null), 4000);
@@ -381,7 +430,7 @@ export const ModelImporter = () => {
         setIsLoading(false);
       }
     },
-    [addImportedModel],
+    [addImportedModel, selectModel],
   );
 
   const handleFileChange = useCallback(
@@ -1761,6 +1810,180 @@ const ModelProperties = ({
             </div>
           );
         })()}
+
+      {/* CCTV Specific Mapping Control */}
+      {(model.builtinType === "CCTV" ||
+        model.fileName?.toLowerCase().includes("cctv") ||
+        model.name?.toLowerCase().includes("cctv")) && (
+        <div
+          className="comm-mb-16"
+          style={{
+            padding: "12px",
+            background: "rgba(59, 130, 246, 0.08)",
+            border: "1px solid rgba(59, 130, 246, 0.25)",
+            borderRadius: "8px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: "8px",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "12px",
+                fontWeight: 700,
+                color: "#60a5fa",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
+            >
+              <Icon icon="mdi:cctv" width="16" height="16" />
+              CCTV 연동 장비
+            </span>
+            {model.cctvId ? (
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  color: "#4ade80",
+                  background: "rgba(34, 197, 94, 0.15)",
+                  padding: "2px 6px",
+                  borderRadius: "4px",
+                }}
+              >
+                {model.cctvId}
+              </span>
+            ) : (
+              <span
+                style={{
+                  fontSize: "11px",
+                  color: "rgba(255, 255, 255, 0.4)",
+                }}
+              >
+                미연동
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            className="comm-btn"
+            style={{
+              width: "100%",
+              height: "32px",
+              fontSize: "12px",
+              fontWeight: 600,
+              background: "#2563eb",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "6px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "6px",
+              cursor: "pointer",
+            }}
+            onClick={() =>
+              useStore.getState().setActiveCctvMappingModelId(model.id)
+            }
+          >
+            <Icon icon="mdi:link" width="14" height="14" />
+            {model.cctvId ? "CCTV 연동 장비 변경" : "CCTV 연동 장비 선택"}
+          </button>
+        </div>
+      )}
+
+      {/* ThermoHygrometer Mapping Section (온습도계 전용) */}
+      {(model.builtinType === "ThermoHygro" ||
+        model.name?.toLowerCase().includes("온습도") ||
+        model.name?.toLowerCase().includes("thermo")) && (
+        <div
+          style={{
+            marginTop: "16px",
+            padding: "12px",
+            background: "rgba(56, 189, 248, 0.08)",
+            border: "1px solid rgba(56, 189, 248, 0.25)",
+            borderRadius: "8px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: "8px",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "12px",
+                fontWeight: 600,
+                color: "#38bdf8",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
+            >
+              <Icon icon="mdi:thermometer-water" width="16" height="16" />
+              온습도계 연동 장비
+            </span>
+            {model.thermoHygroId ? (
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  color: "#38bdf8",
+                  background: "rgba(56, 189, 248, 0.15)",
+                  padding: "2px 6px",
+                  borderRadius: "4px",
+                }}
+              >
+                {model.thermoHygroId}
+              </span>
+            ) : (
+              <span
+                style={{
+                  fontSize: "11px",
+                  color: "rgba(255, 255, 255, 0.4)",
+                }}
+              >
+                미연동
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            className="comm-btn"
+            style={{
+              width: "100%",
+              height: "32px",
+              fontSize: "12px",
+              fontWeight: 600,
+              background: "#0284c7",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "6px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "6px",
+              cursor: "pointer",
+            }}
+            onClick={() =>
+              useStore.getState().setActiveThermoHygroMappingModelId(model.id)
+            }
+          >
+            <Icon icon="mdi:link" width="14" height="14" />
+            {model.thermoHygroId
+              ? "온습도계 연동 장비 변경"
+              : "온습도계 연동 장비 선택"}
+          </button>
+        </div>
+      )}
 
       <div
         className="comm-mt-24 comm-flex-col-10"

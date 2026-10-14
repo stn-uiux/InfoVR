@@ -1,7 +1,8 @@
-import { useEffect, useRef, useMemo, Suspense } from "react";
-import { type ThreeEvent, useThree } from "@react-three/fiber";
-import { useGLTF, Html, Billboard, PivotControls } from "@react-three/drei";
-import { Box3, Euler, Matrix4, Mesh, Object3D, Quaternion, Vector3 } from 'three';
+import { useEffect, useLayoutEffect, useRef, useMemo, useState, Suspense } from "react";
+import { type ThreeEvent, useThree, useFrame } from "@react-three/fiber";
+import { useGLTF, Html, Billboard, PivotControls, Edges } from "@react-three/drei";
+import { Box3, Euler, Group, Matrix4, Mesh, Object3D, Quaternion, Vector3 } from 'three';
+import { Icon } from "@iconify/react";
 import { useStore } from "../../store/useStore";
 import type { ImportedModel, LightParams } from "../../types";
 import {
@@ -10,8 +11,13 @@ import {
   DEFAULT_LIGHT_PARAMS,
 } from "../../utils/builtinModels";
 import { DigitalClock } from "../layout/DigitalClock";
+import { ThermoHygrometer } from "./ThermoHygrometer";
+import { getThermoHygroById, getThermoHygroStatusMeta } from "../../utils/thermoHygroService";
+import { getCctvById } from "../../utils/cctvService";
+import { useTheme } from "../../contexts/ThemeContext";
 import { getNodeSensorData } from "../layout/DashboardWidgets";
 import { GltfErrorBoundary } from "./GltfErrorBoundary";
+import { findThermoHygroRackSnap, type ThermoHygroSnapTarget } from "../../utils/rackGeometry";
 
 interface ToggleableControls {
   enabled: boolean;
@@ -20,6 +26,299 @@ interface ToggleableControls {
 interface ImportedModelMeshProps {
   model: ImportedModel;
 }
+
+/* ------------------------------------------------------------------ */
+/*  Droplet gauge SVG for hover popover                               */
+/* ------------------------------------------------------------------ */
+const DropletGaugeSvg: React.FC<{ humidity: number; id: string }> = ({ humidity, id }) => {
+  const humVal = typeof humidity === "number" ? humidity : 45.2;
+  const humPct = Math.max(0, Math.min(100, humVal)) / 100;
+
+  let fillH: number;
+  if (humPct <= 0.5) {
+    fillH = 11 * Math.pow(humPct / 0.5, 0.95);
+  } else {
+    fillH = 11 + 19 * Math.pow((humPct - 0.5) / 0.5, 1.05);
+  }
+  const fillY = 31 - fillH;
+
+  const clipId = `popover-drop-clip-${id}`;
+  const gradId = `popover-drop-grad-${id}`;
+
+  return (
+    <svg
+      width="18"
+      height="25"
+      viewBox="0 0 24 32"
+      style={{ overflow: "visible", flexShrink: 0 }}
+      aria-hidden="true"
+    >
+      <defs>
+        <clipPath id={clipId}>
+          <path d="M 12 1 C 15.5 8, 23 14, 23 20 A 11 11 0 0 1 1 20 C 1 14, 8.5 8, 12 1 Z" />
+        </clipPath>
+        <linearGradient id={gradId} x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0%" stopColor="#0284c7" />
+          <stop offset="50%" stopColor="#0ea5e9" />
+          <stop offset="100%" stopColor="#38bdf8" />
+        </linearGradient>
+      </defs>
+      {/* Background */}
+      <path
+        d="M 12 1 C 15.5 8, 23 14, 23 20 A 11 11 0 0 1 1 20 C 1 14, 8.5 8, 12 1 Z"
+        fill="rgba(15, 23, 42, 0.85)"
+      />
+      {/* Liquid Fill */}
+      <g clipPath={`url(#${clipId})`}>
+        <rect
+          x="0"
+          y={fillY}
+          width="24"
+          height={fillH + 4}
+          fill={`url(#${gradId})`}
+        />
+        {humPct > 0.05 && humPct < 0.95 && (
+          <path
+            d={`M 1 ${fillY} Q 12 ${fillY - 1.5} 23 ${fillY}`}
+            stroke="#e0f2fe"
+            strokeWidth="1.2"
+            fill="none"
+            opacity="0.85"
+          />
+        )}
+      </g>
+      {/* Outer Border */}
+      <path
+        d="M 12 1 C 15.5 8, 23 14, 23 20 A 11 11 0 0 1 1 20 C 1 14, 8.5 8, 12 1 Z"
+        fill="none"
+        stroke="#38bdf8"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+};
+
+/* ------------------------------------------------------------------ */
+/*  Smart screen-aware hover popover for ThermoHygrometer             */
+/* ------------------------------------------------------------------ */
+interface ThermoHygroHoverOverlayProps {
+  model: ImportedModel;
+  linkedSensor: any;
+  statusMeta: {
+    label: string;
+    bg: string;
+    color: string;
+    borderColor: string;
+  };
+  effectiveTemp: number;
+  effectiveHum: number;
+}
+
+const ThermoHygroHoverOverlay: React.FC<ThermoHygroHoverOverlayProps> = ({
+  model,
+  linkedSensor,
+  statusMeta,
+  effectiveTemp,
+  effectiveHum,
+}) => {
+  const vCenter = useMemo(() => new Vector3(), []);
+  const vTop = useMemo(() => new Vector3(), []);
+  const vBottom = useMemo(() => new Vector3(), []);
+
+  const calculatePosition = (
+    el: Object3D,
+    camera: any,
+    size: { width: number; height: number }
+  ): [number, number] => {
+    el.updateWorldMatrix(true, false);
+    const mat = el.matrixWorld;
+
+    vCenter.set(0, 0, 0).applyMatrix4(mat).project(camera);
+    vTop.set(0, 0.075, 0).applyMatrix4(mat).project(camera);
+    vBottom.set(0, -0.075, 0).applyMatrix4(mat).project(camera);
+
+    const screenX = ((vCenter.x + 1) / 2) * size.width;
+    const topScreenY = ((-vTop.y + 1) / 2) * size.height;
+    const bottomScreenY = ((-vBottom.y + 1) / 2) * size.height;
+
+    const sensorTopY = Math.min(topScreenY, bottomScreenY);
+    const sensorBottomY = Math.max(topScreenY, bottomScreenY);
+
+    const popoverEl = document.getElementById(`thermo-popover-${model.id}`);
+    const width = popoverEl?.offsetWidth || 300;
+    const height = popoverEl?.offsetHeight || 190;
+
+    let minScreenTop = 65;
+    const maxScreenBottom = size.height - 16;
+    let minScreenLeft = 16;
+    let maxScreenRight = size.width - 16;
+
+    // 1. Top header offset check
+    const topHeader = document.querySelector(
+      ".comm-toolbar, .app-header, .top-nav, header, [class*='header'], [class*='navbar'], [class*='toolbar']"
+    ) as HTMLElement | null;
+    if (topHeader && topHeader.offsetHeight > 0) {
+      const rect = topHeader.getBoundingClientRect();
+      if (rect.bottom > 0 && rect.bottom < 150) {
+        minScreenTop = Math.max(minScreenTop, rect.bottom + 12);
+      }
+    }
+
+    // 2. Right panel check
+    const rightPanel = document.querySelector(".stn-side-panel") as HTMLElement | null;
+    if (rightPanel && rightPanel.offsetWidth > 0) {
+      const rect = rightPanel.getBoundingClientRect();
+      if (rect.left > size.width / 2 && rect.left < maxScreenRight) {
+        maxScreenRight = Math.min(maxScreenRight, rect.left - 12);
+      }
+    }
+
+    // 3. Left sidebar check
+    const leftSidebar = document.querySelector(
+      ".comm-sidebar, .sidebar-container"
+    ) as HTMLElement | null;
+    if (leftSidebar && leftSidebar.offsetWidth > 0) {
+      const rect = leftSidebar.getBoundingClientRect();
+      if (rect.right > minScreenLeft && rect.right < size.width / 2) {
+        minScreenLeft = Math.max(minScreenLeft, rect.right + 12);
+      }
+    }
+
+    const GAP = 14;
+    const wouldClipTop = sensorTopY - GAP - height < minScreenTop;
+    const isBottom = wouldClipTop;
+
+    if (popoverEl) {
+      const nextPlacement = isBottom ? "bottom" : "top";
+      if (popoverEl.getAttribute("data-placement") !== nextPlacement) {
+        popoverEl.setAttribute("data-placement", nextPlacement);
+      }
+    }
+
+    let targetTop: number;
+    if (isBottom) {
+      targetTop = sensorBottomY + GAP;
+      if (targetTop + height > maxScreenBottom) {
+        targetTop = maxScreenBottom - height;
+      }
+      if (targetTop < minScreenTop) {
+        targetTop = minScreenTop;
+      }
+    } else {
+      targetTop = sensorTopY - GAP - height;
+      if (targetTop < minScreenTop) {
+        targetTop = minScreenTop;
+      }
+      if (targetTop + height > maxScreenBottom) {
+        targetTop = maxScreenBottom - height;
+      }
+    }
+
+    let targetLeft = screenX - width / 2;
+    if (targetLeft + width > maxScreenRight) {
+      targetLeft = maxScreenRight - width;
+    }
+    if (targetLeft < minScreenLeft) {
+      targetLeft = minScreenLeft;
+    }
+
+    return [Math.round(targetLeft), Math.round(targetTop)];
+  };
+
+  return (
+    <Html
+      calculatePosition={calculatePosition}
+      zIndexRange={[100, 200]}
+      style={{ pointerEvents: "none" }}
+    >
+      <div
+        id={`thermo-popover-${model.id}`}
+        className="thermo-hygro-popover"
+        data-placement="top"
+      >
+        <div className="thermo-popover-header">
+          <span className="thermo-popover-icon">
+            <Icon icon="mdi:thermometer-water" width="18" height="18" />
+          </span>
+          {(() => {
+            const displayId = linkedSensor?.id || model.thermoHygroId || (model.name?.startsWith("TH-") ? model.name : undefined);
+            return displayId ? (
+              <span className="thermo-popover-id">{displayId}</span>
+            ) : null;
+          })()}
+          <span className="thermo-popover-title">
+            {linkedSensor?.name || model.name || "온습도계"}
+          </span>
+          <span
+            className="thermo-popover-badge"
+            style={{
+              background: statusMeta.bg,
+              color: statusMeta.color,
+              border: `1px solid ${statusMeta.borderColor}`,
+            }}
+          >
+            {statusMeta.label}
+          </span>
+            </div>
+            <div className="thermo-popover-metrics">
+              {/* 1. 온도 영역 (온도값 + 하단 타겟 정보/바) */}
+              <div className="thermo-metric-col temp">
+                <span className="thermo-metric-lbl">온도</span>
+                <div className="thermo-metric-val">
+                  {effectiveTemp.toFixed(1)}
+                  <span className="thermo-metric-unit">°C</span>
+                </div>
+                <div className="thermo-target-info">
+                  <span className="thermo-target-lbl">TARGET :</span>
+                  <span className="thermo-target-val">18.0 ~ 27.0 °C</span>
+                </div>
+                <div className="thermo-target-bar-track">
+                  <div className="thermo-target-bar-opt temp-opt" />
+                  <div
+                    className="thermo-target-bar-dot temp-dot"
+                    style={{
+                      left: `${Math.max(0, Math.min(100, ((effectiveTemp - 10) / 25) * 100))}%`,
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="thermo-popover-vdiv" />
+
+              {/* 2. 습도 영역 (물방울 게이지 + 습도값 + 하단 타겟 정보/바) */}
+              <div className="thermo-metric-col hum">
+                <span className="thermo-metric-lbl">습도</span>
+                <div className="thermo-metric-val hum-val-row">
+                  <DropletGaugeSvg humidity={effectiveHum} id={model.id} />
+                  <span>{effectiveHum.toFixed(1)}</span>
+                  <span className="thermo-metric-unit">%</span>
+                </div>
+                <div className="thermo-target-info">
+                  <span className="thermo-target-lbl">TARGET :</span>
+                  <span className="thermo-target-val">40.0 ~ 60.0 %</span>
+                </div>
+                <div className="thermo-target-bar-track">
+                  <div className="thermo-target-bar-opt hum-opt" />
+                  <div
+                    className="thermo-target-bar-dot hum-dot"
+                    style={{
+                      left: `${Math.max(0, Math.min(100, effectiveHum))}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="thermo-popover-footer">
+              <span>📍 {linkedSensor?.location || "랙 48U 상단"}</span>
+              {linkedSensor?.battery !== undefined && (
+                <span>🔋 {linkedSensor.battery}%</span>
+              )}
+            </div>
+          </div>
+        </Html>
+      );
+    };
+
 /* ------------------------------------------------------------------ */
 /*  Wall mesh — procedural box with parametric dimensions              */
 /* ------------------------------------------------------------------ */
@@ -286,8 +585,8 @@ const GltfMesh = ({
     let foundGlass = false;
     clone.traverse((child) => {
       if ((child as Mesh).isMesh) {
-        child.castShadow = true;
-        child.receiveShadow = true;
+        child.castShadow = !isCeilingMounted;
+        child.receiveShadow = !isCeilingMounted;
         
         const mesh = child as Mesh;
         if (mesh.material) {
@@ -305,11 +604,14 @@ const GltfMesh = ({
     return { clone, size: [size.x, size.y, size.z] as [number, number, number], hasGlass: foundGlass };
   }, [gltfScene]);
 
+  const onLoadedRef = useRef(onLoaded);
+  onLoadedRef.current = onLoaded;
+
   useEffect(() => {
-    if (clonedData?.size && onLoaded) {
-      onLoaded(clonedData.size, clonedData.hasGlass);
+    if (clonedData?.size && onLoadedRef.current) {
+      onLoadedRef.current(clonedData.size, clonedData.hasGlass);
     }
-  }, [clonedData, onLoaded]);
+  }, [clonedData]);
 
   // Apply glassParams dynamically
   useEffect(() => {
@@ -346,7 +648,6 @@ const GltfMesh = ({
 export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
   const selectedModelId = useStore((s) => s.selectedModelId);
   const isEditMode = useStore((s) => s.isEditMode);
-  const isObstructing = useStore((s) => s.obstructingModelIds.includes(model.id));
   const isSelected = selectedModelId === model.id;
   const isMoveEnabled = model.isMoveEnabled ?? false;
 
@@ -358,10 +659,58 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
     model.builtinType === "CCTV" ||
     model.fileName?.toLowerCase().includes("cctv") ||
     model.name?.toLowerCase().includes("cctv");
+  const isThermoHygro =
+    model.builtinType === "ThermoHygro" ||
+    model.fileName?.toLowerCase().includes("thermo_hygro") ||
+    model.name?.toLowerCase().includes("온습도") ||
+    model.name?.toLowerCase().includes("thermo");
 
-  // Sensor data for DigitalClock — synced with dashboard overview
+  // 온습도계와 CCTV는 랙을 가려도 화면에서 절대 사라지지 않음
+  const isModelObstructing = useStore((s) => s.obstructingModelIds.includes(model.id));
+  const isObstructing = (!isCctv && !isThermoHygro) && isModelObstructing;
+
+  const [isHovered, setIsHovered] = useState(false);
+  const innerGroupRef = useRef<Group>(null);
+  const invalidate = useThree((s) => s.invalidate);
+
+  // Re-render immediately on hover change
+  useEffect(() => {
+    invalidate();
+  }, [isHovered, invalidate]);
+
+  // Sensor data for DigitalClock & ThermoHygrometer
   const activeNodeId = useStore((s) => s.activeNodeId);
+  const racks = useStore((s) => s.racks);
   const sensorData = activeNodeId ? getNodeSensorData(activeNodeId) : undefined;
+
+  // Snap target state when dragging thermo-hygrometer near racks
+  const [activeSnap, setActiveSnap] = useState<ThermoHygroSnapTarget | null>(null);
+  const activeSnapRef = useRef<ThermoHygroSnapTarget | null>(null);
+
+  // Linked ThermoHygrometer device from store / mock database
+  const linkedSensor = useMemo(() => {
+    return model.thermoHygroId ? getThermoHygroById(model.thermoHygroId) : undefined;
+  }, [model.thermoHygroId]);
+
+  // Theme for 3D overlay tags
+  const { theme } = useTheme();
+  const isDarkMode = theme === "dark";
+
+  // Linked CCTV device from store / mock database
+  const linkedCctv = useMemo(() => {
+    return model.cctvId ? getCctvById(model.cctvId) : undefined;
+  }, [model.cctvId]);
+  const cctvId = linkedCctv?.id || (model.name?.startsWith("CCTV") ? model.name : undefined);
+  const cctvTitle = linkedCctv?.name || model.name || "CCTV";
+
+  const effectiveTemp = linkedSensor
+    ? linkedSensor.temperature
+    : (sensorData?.temperature ?? 23.4);
+  const effectiveHum = linkedSensor
+    ? linkedSensor.humidity
+    : (sensorData?.humidity ?? 45.2);
+  const effectiveStatus = linkedSensor ? linkedSensor.status : "normal";
+  const statusMeta = getThermoHygroStatusMeta(effectiveStatus);
 
   const updateModel = useStore((s) => s.updateModel);
   const setModelDragging = useStore((s) => s.setModelDragging);
@@ -421,6 +770,16 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
     const { isEditMode: editMode, selectRack, selectModel } = useStore.getState();
 
     if (!editMode) {
+      if (isCctv) {
+        e.stopPropagation();
+        useStore.getState().setActiveCctvLiveModelId(model.id);
+        return;
+      }
+      if (isThermoHygro) {
+        e.stopPropagation();
+        useStore.getState().setActiveThermoHygroMappingModelId(model.id);
+        return;
+      }
       selectRack(null);
       return;
     }
@@ -429,32 +788,25 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
     selectModel(model.id);
   };
 
-  // Visual feedback
-  const highlightColor = isMoveEnabled ? "#4ade80" : "#f97316";
-  const highlightOpacity = isMoveEnabled ? 0.6 : 0.35;
-
   const wp = model.wallParams ?? DEFAULT_WALL_PARAMS;
   const pp = model.partitionParams ?? DEFAULT_PARTITION_PARAMS;
 
-  const hlArgs: [number, number, number] = isWall
-    ? [wp.length + 0.1, wp.height + 0.1, wp.thickness + 0.1]
-    : isPartition
-      ? [pp.length + 0.1, pp.height + 0.1, pp.thickness + 0.1]
-      : isClock
-        ? [1.3, 0.95, 0.15]
-        : isLight
-          ? [1.4, 0.3, 0.8]
-          : [1.1, 1.1, 1.1];
+  // Hover outline bounding box for CCTV and ThermoHygrometer (장비 호버 효과와 동일한 #5ee0ff 아웃라인)
+  const hoverOutlineArgs: [number, number, number] | null = isThermoHygro
+    ? [0.354, 0.134, 0.044]
+    : isCctv
+      ? [
+          (model.baseSize?.[0] ?? 0.28) * 1.03,
+          (model.baseSize?.[1] ?? 0.235) * 1.03,
+          (model.baseSize?.[2] ?? 0.28) * 1.03,
+        ]
+      : null;
 
-  const hlCenter: [number, number, number] = isWall
-    ? [0, wp.height / 2, 0]
-    : isPartition
-      ? [0, pp.height / 2, 0]
-      : isClock
-        ? [0, 0.85 / 2, 0]
-        : isLight
-          ? [0, 0.03, 0]
-          : [0, 0, 0];
+  const hoverOutlinePos: [number, number, number] = isThermoHygro
+    ? [0, 0, 0]
+    : isCctv
+      ? [0, -(model.baseSize?.[1] ?? 0.235) / 2, 0]
+      : [0, 0, 0];
 
   // matrix used by PivotControls — derived from live pose ref while dragging
   const matrix = useMemo(() => {
@@ -472,7 +824,8 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
 
   const innerContent = (
     <group
-      userData={{ isInnerContent: true }}
+      ref={innerGroupRef}
+      userData={{ isInnerContent: true, modelId: model.id }}
       raycast={isObstructing ? () => null : undefined}
       onClick={isObstructing ? undefined : handleClick}
       onPointerOver={(e) => {
@@ -494,10 +847,18 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
         e.stopPropagation();
         if (isEditMode) {
           document.body.style.cursor = isMoveEnabled ? "grab" : "pointer";
+        } else if (isCctv || isThermoHygro) {
+          document.body.style.cursor = "pointer";
+        }
+        if (isCctv || isThermoHygro) {
+          setIsHovered(true);
         }
       }}
       onPointerMove={(e) => {
         if (isObstructing) return;
+        if ((isCctv || isThermoHygro) && !isHovered) {
+          setIsHovered(true);
+        }
         if (useStore.getState().isGizmoHovered) return;
         const hitGizmoHelper = e.intersections.some((hit) => {
           let obj: Object3D | null = hit.object;
@@ -514,13 +875,15 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
 
         e.stopPropagation();
       }}
-      onPointerOut={() => {
+      onPointerOut={(e) => {
+        e.stopPropagation();
         if (
           document.body.style.cursor === "grab" ||
           document.body.style.cursor === "pointer"
         ) {
           document.body.style.cursor = "auto";
         }
+        setIsHovered(false);
       }}
     >
       {/* Render appropriate mesh */}
@@ -532,6 +895,14 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
         <DigitalClock
           temperature={sensorData?.temperature ?? undefined}
           humidity={sensorData?.humidity ?? undefined}
+        />
+      ) : isThermoHygro ? (
+        <ThermoHygrometer
+          sensorId={linkedSensor?.id ?? "TH-001"}
+          sensorName={linkedSensor?.name}
+          temperature={effectiveTemp}
+          humidity={effectiveHum}
+          status={effectiveStatus}
         />
       ) : isLight ? (
         <LightMesh model={model} />
@@ -573,9 +944,11 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
                   ? 1.25
                   : isLight
                     ? 0.6
-                    : isCctv
-                      ? -(model.baseSize?.[1] ?? 0.25) - 0.2
-                      : 1.4,
+                    : isThermoHygro
+                      ? 0.15
+                      : isCctv
+                        ? -(model.baseSize?.[1] ?? 0.25) - 0.2
+                        : 1.4,
             0,
           ]}
         >
@@ -605,6 +978,86 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
           </Html>
         </Billboard>
       )}
+
+      {/* Equipment-style Hover Outline for CCTV and ThermoHygro */}
+      {isHovered && hoverOutlineArgs && (
+        <mesh position={hoverOutlinePos} raycast={() => null}>
+          <boxGeometry args={hoverOutlineArgs} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+          <Edges
+            scale={1.0}
+            threshold={15}
+            color="#5ee0ff"
+            lineWidth={4}
+            raycast={() => null}
+          />
+        </mesh>
+      )}
+
+      {/* View Mode Hover Popover (멀리서도 선명하게 온습도 정보 표출 - 화면 잘림 방지 및 자동 상/하 플립) */}
+      {!isEditMode && isThermoHygro && isHovered && (
+        <ThermoHygroHoverOverlay
+          model={model}
+          linkedSensor={linkedSensor}
+          statusMeta={statusMeta}
+          effectiveTemp={effectiveTemp}
+          effectiveHum={effectiveHum}
+        />
+      )}
+
+      {/* CCTV Hover Tag (랙 호버 태그와 동일한 고품질 플로팅 태그) */}
+      {!isEditMode && isCctv && isHovered && (
+        <Billboard position={[0, -(model.baseSize?.[1] ?? 0.25) - 0.16, 0]} visible={isHovered}>
+          <Html center zIndexRange={[50, 100]} style={{ pointerEvents: "none" }}>
+            <div
+              style={{
+                background: isDarkMode
+                  ? "rgba(23, 24, 28, 0.88)"
+                  : "rgba(255, 255, 255, 0.92)",
+                color: isDarkMode ? "#ebedef" : "#202226",
+                padding: "4px 12px",
+                borderRadius: "16px",
+                fontSize: "12px",
+                fontWeight: 600,
+                border: isDarkMode
+                  ? "1px solid rgba(255, 255, 255, 0.2)"
+                  : "1px solid rgba(0, 0, 0, 0.12)",
+                boxShadow: isDarkMode
+                  ? "0 4px 15px rgba(0, 0, 0, 0.45)"
+                  : "0 4px 12px rgba(0, 0, 0, 0.1)",
+                whiteSpace: "nowrap",
+                backdropFilter: "blur(8px)",
+                pointerEvents: "none",
+                userSelect: "none",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                fontFamily: "Inter, system-ui, sans-serif",
+              }}
+            >
+              <span
+                style={{
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  background: linkedCctv?.status === "offline" ? "#ef4444" : "#10b981",
+                  display: "inline-block",
+                  boxShadow: linkedCctv?.status === "offline" ? "0 0 6px #ef4444" : "0 0 6px #10b981",
+                }}
+              />
+              {cctvId && (
+                <>
+                  <span style={{ color: "#60a5fa", fontFamily: "monospace", fontWeight: 700 }}>
+                    {cctvId}
+                  </span>
+                  <span style={{ opacity: 0.4 }}>|</span>
+                </>
+              )}
+              <span>{cctvTitle}</span>
+            </div>
+          </Html>
+        </Billboard>
+      )}
     </group>
   );
 
@@ -614,55 +1067,136 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
       visible={!isObstructing}
       raycast={isObstructing ? () => null : undefined}
     >
+      {/* 랙 자석 스냅 가이드 (온습도계를 랙 모서리 가까이 가져갔을 때 표시) */}
+      {isThermoHygro && activeSnap && (
+        <group position={activeSnap.position} rotation={activeSnap.rotation}>
+          {/* 스냅 위치 타겟 박스 (아웃라인 및 은은한 글로우) */}
+          <mesh>
+            <boxGeometry args={[0.354, 0.134, 0.044]} />
+            <meshBasicMaterial color="#00f0ff" wireframe transparent opacity={0.9} />
+          </mesh>
+          <mesh>
+            <boxGeometry args={[0.35, 0.13, 0.04]} />
+            <meshBasicMaterial color="#00f0ff" transparent opacity={0.2} />
+          </mesh>
+          {/* 자석 스냅 플로팅 툴팁 안내 */}
+          <Billboard position={[0, 0.18, 0]}>
+            <Html center distanceFactor={10} pointerEvents="none">
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "4px 9px",
+                  background: "rgba(15, 23, 42, 0.94)",
+                  border: "1px solid #00f0ff",
+                  boxShadow: "0 0 14px rgba(0, 240, 255, 0.45)",
+                  borderRadius: "6px",
+                  color: "#e2e8f0",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  whiteSpace: "nowrap",
+                  userSelect: "none",
+                  backdropFilter: "blur(6px)",
+                }}
+              >
+                <span style={{ fontSize: "13px" }}>🧲</span>
+                <span style={{ color: "#38bdf8" }}>{activeSnap.rackTitle || "랙"}</span>
+                <span>상단 {activeSnap.side === "left" ? "좌측끝" : "우측끝"} 스냅 (1cm)</span>
+              </div>
+            </Html>
+          </Billboard>
+        </group>
+      )}
+
       {shouldTransform ? (
         <group userData={{ isGizmo: true }}>
           <PivotControls
             userData={{ isGizmo: true }}
             matrix={matrix}
-            anchor={isCctv ? [0, 1, 0] : [0, -1, 0]}
-          depthTest={false}
-          fixed
-          scale={75}
-          lineWidth={2.5}
-          disableSliders={false}
-          onDragStart={() => {
-            isDragging.current = true;
-            // Imperatively disable OrbitControls IMMEDIATELY to prevent
-            // camera movement competing with PivotControls drag (XZ slider).
-            // React state update (setModelDragging) only takes effect next render,
-            // by which time OrbitControls has already captured the pointer.
-            if (controls) (controls as unknown as ToggleableControls).enabled = false;
-            setModelDragging(model.id);
-          }}
-          onDrag={(m) => {
-            // Decompose the matrix and apply directly to group (NO store update here)
-            const p = new Vector3();
-            const r = new Quaternion();
-            const s = new Vector3();
-            m.decompose(p, r, s);
-            const euler = new Euler().setFromQuaternion(r);
+            anchor={isThermoHygro ? [0, 0, 0] : isCctv ? [0, 1, 0] : [0, -1, 0]}
+            depthTest={false}
+            fixed
+            scale={75}
+            lineWidth={2.5}
+            disableSliders={false}
+            onDragStart={() => {
+              isDragging.current = true;
+              activeSnapRef.current = null;
+              setActiveSnap(null);
+              // Imperatively disable OrbitControls IMMEDIATELY to prevent
+              // camera movement competing with PivotControls drag (XZ slider).
+              // React state update (setModelDragging) only takes effect next render,
+              // by which time OrbitControls has already captured the pointer.
+              if (controls) (controls as unknown as ToggleableControls).enabled = false;
+              setModelDragging(model.id);
+            }}
+            onDrag={(m) => {
+              // Decompose the matrix and apply directly to group (NO store update here)
+              const p = new Vector3();
+              const r = new Quaternion();
+              const s = new Vector3();
+              m.decompose(p, r, s);
+              const euler = new Euler().setFromQuaternion(r);
 
-            livePose.current = {
-              position: [p.x, p.y, p.z],
-              rotation: [euler.x, euler.y, euler.z],
-              scale: [s.x, s.y, s.z],
-            };
-            // PivotControls handles its own rendering; no need to mutate groupRef here
-          }}
-          onDragEnd={() => {
-            isDragging.current = false;
-            // Re-enable OrbitControls imperatively before state update
-            if (controls) (controls as unknown as ToggleableControls).enabled = true;
-            setModelDragging(null);
-            // Commit final pose to store ONCE on drag end
-            updateModel(model.id, {
-              position: livePose.current.position,
-              rotation: livePose.current.rotation,
-              scale: livePose.current.scale,
-            });
-          }}
-        >
-          {innerContent}
+              if (isThermoHygro) {
+                const snap = findThermoHygroRackSnap([p.x, p.y, p.z], racks, activeNodeId);
+                if (snap) {
+                  livePose.current = {
+                    position: snap.position,
+                    rotation: snap.rotation,
+                    scale: [s.x, s.y, s.z],
+                  };
+                  if (
+                    activeSnapRef.current?.rackId !== snap.rackId ||
+                    activeSnapRef.current?.side !== snap.side
+                  ) {
+                    activeSnapRef.current = snap;
+                    setActiveSnap(snap);
+                  }
+                  return;
+                } else {
+                  if (activeSnapRef.current !== null) {
+                    activeSnapRef.current = null;
+                    setActiveSnap(null);
+                  }
+                }
+              }
+
+              livePose.current = {
+                position: [p.x, p.y, p.z],
+                rotation: [euler.x, euler.y, euler.z],
+                scale: [s.x, s.y, s.z],
+              };
+            }}
+            onDragEnd={() => {
+              isDragging.current = false;
+              // Re-enable OrbitControls imperatively before state update
+              if (controls) (controls as unknown as ToggleableControls).enabled = true;
+              setModelDragging(null);
+
+              const finalPos =
+                isThermoHygro && activeSnapRef.current
+                  ? activeSnapRef.current.position
+                  : livePose.current.position;
+              const finalRot =
+                isThermoHygro && activeSnapRef.current
+                  ? activeSnapRef.current.rotation
+                  : livePose.current.rotation;
+              const finalScale = livePose.current.scale;
+
+              activeSnapRef.current = null;
+              setActiveSnap(null);
+
+              // Commit final pose to store ONCE on drag end
+              updateModel(model.id, {
+                position: finalPos,
+                rotation: finalRot,
+                scale: finalScale,
+              });
+            }}
+          >
+            {innerContent}
           </PivotControls>
         </group>
       ) : (
