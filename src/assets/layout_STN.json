@@ -9,7 +9,12 @@
     "csRoomLengthCm": 1200,
     "csOffsetXCm": 0,
     "csOffsetZCm": 0,
-    "csLowSpecMode": false
+    "csLowSpecMode": true,
+    "csWallColor": "#eef2ff",
+    "csCeilingColor": "#eef2ff",
+    "csFloorColor": "#9ca3af",
+    "csFogColor": "#f1f5f9",
+    "csIsLightMode": true
   },
   "racks": [
     {
@@ -8630,7 +8635,13 @@
         0.3158921822472578
       ],
       "hasGlass": true,
-      "type": "Server"
+      "type": "Server",
+      "glassParams": {
+        "color": "#aaccff",
+        "roughness": 0.1,
+        "metalness": 0.89,
+        "opacity": 0.13
+      }
     },
     {
       "name": "데스크 ON",
