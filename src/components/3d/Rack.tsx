@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback, forwardRef, Suspense, memo, useDeferredValue } from "react";
 import { useTexture, Billboard, Html, Edges } from "@react-three/drei";
 import { type ThreeEvent, useThree, useFrame } from "@react-three/fiber";
-import { BoxGeometry, CanvasTexture, Color, DoubleSide, Euler, Mesh, MeshStandardMaterial, Object3D, Plane, RepeatWrapping, Vector3, Group, MathUtils } from 'three';
+import { BoxGeometry, CanvasTexture, Color, DoubleSide, BackSide, Euler, Mesh, MeshStandardMaterial, Object3D, Plane, RepeatWrapping, Vector3, Group, MathUtils } from 'three';
 import { useStore } from "../../store/useStore";
 import { getEffectiveCards } from "../../utils/sampleUtils";
 import type { AppState } from "../../store/useStore";
@@ -648,6 +648,33 @@ export const Rack = memo(({
             }}
           >
             <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+          </mesh>
+        )}
+
+        {/* 선택된 랙 내부 빈 공간 클릭 시 뒤쪽 랙으로 광선이 관통하여 원치 않게 선택되는 문제 방어 */}
+        {isSelected && !isEditMode && (
+          <mesh
+            position={[0, 0, 0]}
+            onClick={(e) => {
+              if (e.delta > 15) return; // 드래그 무시
+              (e as unknown as { stoppedByRack: boolean }).stoppedByRack = true;
+              e.stopPropagation();
+            }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+            }}
+            onPointerOver={(e) => {
+              e.stopPropagation();
+              if (document.body.style.cursor === "pointer") {
+                document.body.style.cursor = "auto";
+              }
+            }}
+            onPointerMove={(e) => {
+              e.stopPropagation();
+            }}
+          >
+            <boxGeometry args={[width - 0.02, height - 0.02, depth - 0.02]} />
+            <meshBasicMaterial side={BackSide} transparent opacity={0} depthWrite={false} />
           </mesh>
         )}
 
