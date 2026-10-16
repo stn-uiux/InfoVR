@@ -337,6 +337,11 @@ export interface AppState {
   setActiveThermoHygroMappingModelId: (id: string | null) => void;
   linkThermoHygroToModel: (modelId: string, thermoHygroId: string | null) => void;
 
+  // Device Labels Tooltip (CCTV / 온습도계 이름표 툴팁 토글)
+  showDeviceLabels: boolean;
+  setShowDeviceLabels: (show: boolean) => void;
+  toggleShowDeviceLabels: () => void;
+
   // Hierarchy Node Management
   addNode: (node: Omit<HierarchyNode, "nodeId"> & { nodeId?: string }) => string;
   renameNode: (nodeId: string, name: string) => void;
@@ -574,6 +579,9 @@ export const useStore = create<AppState>()(
 
       // ThermoHygrometer Management
       activeThermoHygroMappingModelId: null,
+
+      // Device Labels Tooltip (CCTV / 온습도계 상시 이름표)
+      showDeviceLabels: true,
 
       ...DEFAULT_CYBER_SPACE_CONFIG,
       ...initialDefaultData.cyberSpaceConfig,
@@ -3257,6 +3265,9 @@ export const useStore = create<AppState>()(
         });
       },
 
+      setShowDeviceLabels: (show) => set({ showDeviceLabels: show }),
+      toggleShowDeviceLabels: () => set((state) => ({ showDeviceLabels: !state.showDeviceLabels })),
+
       reparentNode: (nodeId, newParentId) => {
         const { nodes, isEditMode, pushUndoState } = get();
 
@@ -3342,6 +3353,10 @@ export const useStore = create<AppState>()(
           _importDirty,
           customModels,
           isSyncingPorts,
+          showDeviceLabels,
+          activeCctvLiveModelId,
+          activeCctvMappingModelId,
+          activeThermoHygroMappingModelId,
           ...rest
         } = state;
         return rest;
@@ -3409,6 +3424,7 @@ export const useStore = create<AppState>()(
             ...currentState,
             ...persistedState,
             ...defaultData.cyberSpaceConfig,
+            showDeviceLabels: true,
             isEditMode: false,
             isCanvasReady: false,
             isSyncingPorts: false,
@@ -3446,6 +3462,7 @@ export const useStore = create<AppState>()(
           ...currentState,
           ...persistedState,
           ...restoredCyberSpaceConfig,
+          showDeviceLabels: true,
           isEditMode: false,
           isCanvasReady: false,
           isSyncingPorts: false,

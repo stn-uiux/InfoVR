@@ -1,5 +1,39 @@
-import { useMemo, useEffect, useState, forwardRef } from "react";
-import { CanvasTexture, Mesh, SRGBColorSpace, Color } from "three";
+import { useMemo, useEffect, useState, useRef, forwardRef } from "react";
+import { CanvasTexture, Mesh, SRGBColorSpace, Color, AdditiveBlending } from "three";
+import { useThree } from "@react-three/fiber";
+
+// 수평 라인 네온 글로우 텍스처 (온습도계 상단 라인 발광 전용)
+const thermoLineGlowTexture = (() => {
+  if (typeof document === "undefined") return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 64;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  // 1. 수직 방향 부드러운 가우시안/선형 페이드아웃 (중심 고휘도 백색 -> 외곽 페이드)
+  const vGrad = ctx.createLinearGradient(0, 0, 0, 64);
+  vGrad.addColorStop(0, "rgba(255, 255, 255, 0)");
+  vGrad.addColorStop(0.2, "rgba(255, 255, 255, 0.45)");
+  vGrad.addColorStop(0.5, "rgba(255, 255, 255, 1.0)");
+  vGrad.addColorStop(0.8, "rgba(255, 255, 255, 0.45)");
+  vGrad.addColorStop(1, "rgba(255, 255, 255, 0)");
+  ctx.fillStyle = vGrad;
+  ctx.fillRect(0, 0, 512, 64);
+
+  // 2. 수평 양끝 자연스러운 라운드 페이드아웃 (빛이 양끝에서 부드럽게 감쇄)
+  ctx.globalCompositeOperation = "destination-in";
+  const hGrad = ctx.createLinearGradient(0, 0, 512, 0);
+  hGrad.addColorStop(0, "rgba(255, 255, 255, 0)");
+  hGrad.addColorStop(0.03, "rgba(255, 255, 255, 1)");
+  hGrad.addColorStop(0.97, "rgba(255, 255, 255, 1)");
+  hGrad.addColorStop(1, "rgba(255, 255, 255, 0)");
+  ctx.fillStyle = hGrad;
+  ctx.fillRect(0, 0, 512, 64);
+
+  const tex = new CanvasTexture(canvas);
+  return tex;
+})();
 
 interface ThermoHygrometerProps {
   sensorId?: string;
@@ -22,10 +56,49 @@ export const ThermoHygrometer = forwardRef<Mesh, ThermoHygrometerProps>(
       status = "normal",
       color = "#181e29",
       dimensions = [0.35, 0.13, 0.04],
-      emissiveIntensity = 0.25,
+      emissiveIntensity = 0.65,
     },
     ref,
   ) => {
+    const invalidate = useThree((s) => s.invalidate);
+    const coreLineRef = useRef<Mesh>(null);
+    const glowPlaneRef = useRef<Mesh>(null);
+
+    const statusLineColor = useMemo(() => {
+      if (status === "danger") return "#ef4444";
+      if (status === "warning") return "#f59e0b";
+      if (status === "offline") return "#475569";
+      return "#00f0ff"; // 고휘도 사이언 네온
+    }, [status]);
+
+    // 기기 고유 ID 기반 시작 딜레이 오프셋
+    const delayOffset = useMemo(() => {
+      let hash = 0;
+      for (let i = 0; i < sensorId.length; i++) {
+        hash = (hash + sensorId.charCodeAt(i) * (i + 1)) % 1000;
+      }
+      return Math.floor((hash / 1000) * 650);
+    }, [sensorId]);
+
+    // 650ms 주기 상단 라인 점멸 & 발광 (React 리렌더링 없이 Three.js Mesh.visible 직접 토글)
+    useEffect(() => {
+      let isLit = true;
+      let timer: NodeJS.Timeout;
+      const startTimer = setTimeout(() => {
+        timer = setInterval(() => {
+          isLit = !isLit;
+          if (coreLineRef.current) coreLineRef.current.visible = isLit;
+          if (glowPlaneRef.current) glowPlaneRef.current.visible = isLit;
+          invalidate();
+        }, 650);
+      }, delayOffset);
+
+      return () => {
+        clearTimeout(startTimer);
+        if (timer) clearInterval(timer);
+      };
+    }, [invalidate, delayOffset]);
+
     // 760 x 280 canvas: perfectly balanced margins without text overflowing
     const canvasWidth = 760;
     const canvasHeight = 280;
@@ -439,17 +512,55 @@ export const ThermoHygrometer = forwardRef<Mesh, ThermoHygrometerProps>(
             map={baseTexture}
             emissiveMap={baseTexture}
             emissive={new Color(0xffffff)}
-            emissiveIntensity={0.65}
+            emissiveIntensity={emissiveIntensity}
             roughness={0.8}
             metalness={0.0}
           />
         </mesh>
 
-        {/* 4. Top Accent Trim */}
-        <mesh position={[0, dimensions[1] / 2 - 0.003, dimensions[2] / 2 + 0.003]}>
-          <boxGeometry args={[dimensions[0] * 0.96, 0.004, 0.004]} />
-          <meshStandardMaterial color="#38bdf8" roughness={0.3} metalness={0.8} />
+        {/* 4. Top Status Line (상단 라인 자체만 깔끔하게 점멸 및 발광) */}
+        {/* 4-1. 꺼져 있을 때의 기본 슬롯 (어두운 베이스 트림) */}
+        <mesh
+          position={[0, dimensions[1] / 2 - 0.003, dimensions[2] / 2 + 0.003]}
+          raycast={() => null}
+        >
+          <boxGeometry args={[dimensions[0] * 0.96, 0.004, 0.003]} />
+          <meshStandardMaterial color="#0f172a" roughness={0.7} metalness={0.5} />
         </mesh>
+
+        {/* 4-2. 켜졌을 때 라인 자체가 네온 컬러로 선명하게 빛나는 코어 바 */}
+        <mesh
+          ref={coreLineRef}
+          position={[0, dimensions[1] / 2 - 0.003, dimensions[2] / 2 + 0.0032]}
+          raycast={() => null}
+        >
+          <boxGeometry args={[dimensions[0] * 0.96, 0.0042, 0.0032]} />
+          <meshBasicMaterial
+            color={statusLineColor}
+            toneMapped={false}
+          />
+        </mesh>
+
+        {/* 4-3. 라인 테두리 바로 위 1.5mm만 은은하게 감싸는 슬림 엣지 글로우 (화면이나 랙으로 번지지 않음) */}
+        {thermoLineGlowTexture && (
+          <mesh
+            ref={glowPlaneRef}
+            position={[0, dimensions[1] / 2 - 0.003, dimensions[2] / 2 + 0.005]}
+            raycast={() => null}
+          >
+            <planeGeometry args={[dimensions[0] * 0.96, 0.007]} />
+            <meshBasicMaterial
+              map={thermoLineGlowTexture}
+              color={statusLineColor}
+              transparent
+              opacity={0.8}
+              blending={AdditiveBlending}
+              toneMapped={false}
+              depthTest={false}
+              depthWrite={false}
+            />
+          </mesh>
+        )}
 
         {/* 5. Back Mount Plate / Bracket */}
         <mesh position={[0, 0, -dimensions[2] / 2 - 0.005]}>

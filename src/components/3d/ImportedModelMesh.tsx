@@ -1,7 +1,19 @@
-import { useEffect, useLayoutEffect, useRef, useMemo, useState, Suspense } from "react";
+import { useEffect, useRef, useMemo, useState, Suspense } from "react";
 import { type ThreeEvent, useThree, useFrame } from "@react-three/fiber";
 import { useGLTF, Html, Billboard, PivotControls, Edges } from "@react-three/drei";
-import { Box3, Euler, Group, Matrix4, Mesh, Object3D, Quaternion, Vector3 } from 'three';
+import {
+  AdditiveBlending,
+  Box3,
+  CanvasTexture,
+  Euler,
+  Group,
+  Matrix4,
+  Mesh,
+  Object3D,
+  Quaternion,
+  Raycaster,
+  Vector3,
+} from 'three';
 import { Icon } from "@iconify/react";
 import { useStore } from "../../store/useStore";
 import type { ImportedModel, LightParams } from "../../types";
@@ -18,6 +30,11 @@ import { useTheme } from "../../contexts/ThemeContext";
 import { getNodeSensorData } from "../layout/DashboardWidgets";
 import { GltfErrorBoundary } from "./GltfErrorBoundary";
 import { findThermoHygroRackSnap, type ThermoHygroSnapTarget } from "../../utils/rackGeometry";
+import { racksContainerRef } from "./racksOcclusionRef";
+
+const _occlusionRayDir = new Vector3();
+const _occlusionTargetPos = new Vector3();
+const _occlusionRaycaster = new Raycaster();
 
 interface ToggleableControls {
   enabled: boolean;
@@ -27,297 +44,7 @@ interface ImportedModelMeshProps {
   model: ImportedModel;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Droplet gauge SVG for hover popover                               */
-/* ------------------------------------------------------------------ */
-const DropletGaugeSvg: React.FC<{ humidity: number; id: string }> = ({ humidity, id }) => {
-  const humVal = typeof humidity === "number" ? humidity : 45.2;
-  const humPct = Math.max(0, Math.min(100, humVal)) / 100;
 
-  let fillH: number;
-  if (humPct <= 0.5) {
-    fillH = 11 * Math.pow(humPct / 0.5, 0.95);
-  } else {
-    fillH = 11 + 19 * Math.pow((humPct - 0.5) / 0.5, 1.05);
-  }
-  const fillY = 31 - fillH;
-
-  const clipId = `popover-drop-clip-${id}`;
-  const gradId = `popover-drop-grad-${id}`;
-
-  return (
-    <svg
-      width="18"
-      height="25"
-      viewBox="0 0 24 32"
-      style={{ overflow: "visible", flexShrink: 0 }}
-      aria-hidden="true"
-    >
-      <defs>
-        <clipPath id={clipId}>
-          <path d="M 12 1 C 15.5 8, 23 14, 23 20 A 11 11 0 0 1 1 20 C 1 14, 8.5 8, 12 1 Z" />
-        </clipPath>
-        <linearGradient id={gradId} x1="0" y1="1" x2="0" y2="0">
-          <stop offset="0%" stopColor="#0284c7" />
-          <stop offset="50%" stopColor="#0ea5e9" />
-          <stop offset="100%" stopColor="#38bdf8" />
-        </linearGradient>
-      </defs>
-      {/* Background */}
-      <path
-        d="M 12 1 C 15.5 8, 23 14, 23 20 A 11 11 0 0 1 1 20 C 1 14, 8.5 8, 12 1 Z"
-        fill="rgba(15, 23, 42, 0.85)"
-      />
-      {/* Liquid Fill */}
-      <g clipPath={`url(#${clipId})`}>
-        <rect
-          x="0"
-          y={fillY}
-          width="24"
-          height={fillH + 4}
-          fill={`url(#${gradId})`}
-        />
-        {humPct > 0.05 && humPct < 0.95 && (
-          <path
-            d={`M 1 ${fillY} Q 12 ${fillY - 1.5} 23 ${fillY}`}
-            stroke="#e0f2fe"
-            strokeWidth="1.2"
-            fill="none"
-            opacity="0.85"
-          />
-        )}
-      </g>
-      {/* Outer Border */}
-      <path
-        d="M 12 1 C 15.5 8, 23 14, 23 20 A 11 11 0 0 1 1 20 C 1 14, 8.5 8, 12 1 Z"
-        fill="none"
-        stroke="#38bdf8"
-        strokeWidth="1.8"
-      />
-    </svg>
-  );
-};
-
-/* ------------------------------------------------------------------ */
-/*  Smart screen-aware hover popover for ThermoHygrometer             */
-/* ------------------------------------------------------------------ */
-interface ThermoHygroHoverOverlayProps {
-  model: ImportedModel;
-  linkedSensor: any;
-  statusMeta: {
-    label: string;
-    bg: string;
-    color: string;
-    borderColor: string;
-  };
-  effectiveTemp: number;
-  effectiveHum: number;
-}
-
-const ThermoHygroHoverOverlay: React.FC<ThermoHygroHoverOverlayProps> = ({
-  model,
-  linkedSensor,
-  statusMeta,
-  effectiveTemp,
-  effectiveHum,
-}) => {
-  const vCenter = useMemo(() => new Vector3(), []);
-  const vTop = useMemo(() => new Vector3(), []);
-  const vBottom = useMemo(() => new Vector3(), []);
-
-  const calculatePosition = (
-    el: Object3D,
-    camera: any,
-    size: { width: number; height: number }
-  ): [number, number] => {
-    el.updateWorldMatrix(true, false);
-    const mat = el.matrixWorld;
-
-    vCenter.set(0, 0, 0).applyMatrix4(mat).project(camera);
-    vTop.set(0, 0.075, 0).applyMatrix4(mat).project(camera);
-    vBottom.set(0, -0.075, 0).applyMatrix4(mat).project(camera);
-
-    const screenX = ((vCenter.x + 1) / 2) * size.width;
-    const topScreenY = ((-vTop.y + 1) / 2) * size.height;
-    const bottomScreenY = ((-vBottom.y + 1) / 2) * size.height;
-
-    const sensorTopY = Math.min(topScreenY, bottomScreenY);
-    const sensorBottomY = Math.max(topScreenY, bottomScreenY);
-
-    const popoverEl = document.getElementById(`thermo-popover-${model.id}`);
-    const width = popoverEl?.offsetWidth || 300;
-    const height = popoverEl?.offsetHeight || 190;
-
-    let minScreenTop = 65;
-    const maxScreenBottom = size.height - 16;
-    let minScreenLeft = 16;
-    let maxScreenRight = size.width - 16;
-
-    // 1. Top header offset check
-    const topHeader = document.querySelector(
-      ".comm-toolbar, .app-header, .top-nav, header, [class*='header'], [class*='navbar'], [class*='toolbar']"
-    ) as HTMLElement | null;
-    if (topHeader && topHeader.offsetHeight > 0) {
-      const rect = topHeader.getBoundingClientRect();
-      if (rect.bottom > 0 && rect.bottom < 150) {
-        minScreenTop = Math.max(minScreenTop, rect.bottom + 12);
-      }
-    }
-
-    // 2. Right panel check
-    const rightPanel = document.querySelector(".stn-side-panel") as HTMLElement | null;
-    if (rightPanel && rightPanel.offsetWidth > 0) {
-      const rect = rightPanel.getBoundingClientRect();
-      if (rect.left > size.width / 2 && rect.left < maxScreenRight) {
-        maxScreenRight = Math.min(maxScreenRight, rect.left - 12);
-      }
-    }
-
-    // 3. Left sidebar check
-    const leftSidebar = document.querySelector(
-      ".comm-sidebar, .sidebar-container"
-    ) as HTMLElement | null;
-    if (leftSidebar && leftSidebar.offsetWidth > 0) {
-      const rect = leftSidebar.getBoundingClientRect();
-      if (rect.right > minScreenLeft && rect.right < size.width / 2) {
-        minScreenLeft = Math.max(minScreenLeft, rect.right + 12);
-      }
-    }
-
-    const GAP = 14;
-    const wouldClipTop = sensorTopY - GAP - height < minScreenTop;
-    const isBottom = wouldClipTop;
-
-    if (popoverEl) {
-      const nextPlacement = isBottom ? "bottom" : "top";
-      if (popoverEl.getAttribute("data-placement") !== nextPlacement) {
-        popoverEl.setAttribute("data-placement", nextPlacement);
-      }
-    }
-
-    let targetTop: number;
-    if (isBottom) {
-      targetTop = sensorBottomY + GAP;
-      if (targetTop + height > maxScreenBottom) {
-        targetTop = maxScreenBottom - height;
-      }
-      if (targetTop < minScreenTop) {
-        targetTop = minScreenTop;
-      }
-    } else {
-      targetTop = sensorTopY - GAP - height;
-      if (targetTop < minScreenTop) {
-        targetTop = minScreenTop;
-      }
-      if (targetTop + height > maxScreenBottom) {
-        targetTop = maxScreenBottom - height;
-      }
-    }
-
-    let targetLeft = screenX - width / 2;
-    if (targetLeft + width > maxScreenRight) {
-      targetLeft = maxScreenRight - width;
-    }
-    if (targetLeft < minScreenLeft) {
-      targetLeft = minScreenLeft;
-    }
-
-    return [Math.round(targetLeft), Math.round(targetTop)];
-  };
-
-  return (
-    <Html
-      calculatePosition={calculatePosition}
-      zIndexRange={[100, 200]}
-      style={{ pointerEvents: "none" }}
-    >
-      <div
-        id={`thermo-popover-${model.id}`}
-        className="thermo-hygro-popover"
-        data-placement="top"
-      >
-        <div className="thermo-popover-header">
-          <span className="thermo-popover-icon">
-            <Icon icon="mdi:thermometer-water" width="18" height="18" />
-          </span>
-          {(() => {
-            const displayId = linkedSensor?.id || model.thermoHygroId || (model.name?.startsWith("TH-") ? model.name : undefined);
-            return displayId ? (
-              <span className="thermo-popover-id">{displayId}</span>
-            ) : null;
-          })()}
-          <span className="thermo-popover-title">
-            {linkedSensor?.name || model.name || "온습도계"}
-          </span>
-          <span
-            className="thermo-popover-badge"
-            style={{
-              background: statusMeta.bg,
-              color: statusMeta.color,
-              border: `1px solid ${statusMeta.borderColor}`,
-            }}
-          >
-            {statusMeta.label}
-          </span>
-            </div>
-            <div className="thermo-popover-metrics">
-              {/* 1. 온도 영역 (온도값 + 하단 타겟 정보/바) */}
-              <div className="thermo-metric-col temp">
-                <span className="thermo-metric-lbl">온도</span>
-                <div className="thermo-metric-val">
-                  {effectiveTemp.toFixed(1)}
-                  <span className="thermo-metric-unit">°C</span>
-                </div>
-                <div className="thermo-target-info">
-                  <span className="thermo-target-lbl">TARGET :</span>
-                  <span className="thermo-target-val">18.0 ~ 27.0 °C</span>
-                </div>
-                <div className="thermo-target-bar-track">
-                  <div className="thermo-target-bar-opt temp-opt" />
-                  <div
-                    className="thermo-target-bar-dot temp-dot"
-                    style={{
-                      left: `${Math.max(0, Math.min(100, ((effectiveTemp - 10) / 25) * 100))}%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="thermo-popover-vdiv" />
-
-              {/* 2. 습도 영역 (물방울 게이지 + 습도값 + 하단 타겟 정보/바) */}
-              <div className="thermo-metric-col hum">
-                <span className="thermo-metric-lbl">습도</span>
-                <div className="thermo-metric-val hum-val-row">
-                  <DropletGaugeSvg humidity={effectiveHum} id={model.id} />
-                  <span>{effectiveHum.toFixed(1)}</span>
-                  <span className="thermo-metric-unit">%</span>
-                </div>
-                <div className="thermo-target-info">
-                  <span className="thermo-target-lbl">TARGET :</span>
-                  <span className="thermo-target-val">40.0 ~ 60.0 %</span>
-                </div>
-                <div className="thermo-target-bar-track">
-                  <div className="thermo-target-bar-opt hum-opt" />
-                  <div
-                    className="thermo-target-bar-dot hum-dot"
-                    style={{
-                      left: `${Math.max(0, Math.min(100, effectiveHum))}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="thermo-popover-footer">
-              <span>📍 {linkedSensor?.location || "랙 48U 상단"}</span>
-              {linkedSensor?.battery !== undefined && (
-                <span>🔋 {linkedSensor.battery}%</span>
-              )}
-            </div>
-          </div>
-        </Html>
-      );
-    };
 
 /* ------------------------------------------------------------------ */
 /*  Wall mesh — procedural box with parametric dimensions              */
@@ -552,13 +279,13 @@ import type { GlassParams } from "../../types";
 /* ------------------------------------------------------------------ */
 /*  GLB mesh — loads from dataUrl (base64 or public URL)               */
 /* ------------------------------------------------------------------ */
-const GltfMesh = ({ 
-  url, 
+const GltfMesh = ({
+  url,
   onLoaded,
   glassParams,
   isCeilingMounted
-}: { 
-  url: string; 
+}: {
+  url: string;
   onLoaded?: (size: [number, number, number], hasGlass: boolean) => void;
   glassParams?: GlassParams;
   isCeilingMounted?: boolean;
@@ -587,7 +314,7 @@ const GltfMesh = ({
       if ((child as Mesh).isMesh) {
         child.castShadow = !isCeilingMounted;
         child.receiveShadow = !isCeilingMounted;
-        
+
         const mesh = child as Mesh;
         if (mesh.material) {
           const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
@@ -643,6 +370,217 @@ const GltfMesh = ({
 };
 
 /* ------------------------------------------------------------------ */
+/*  CCTV Blinking Red LED (REC status indicator in View Mode)         */
+/* ------------------------------------------------------------------ */
+// 중심부의 선명한 초고휘도 LED 코어 텍스처 (중앙 핫스팟 + 블레이징 레드)
+const cctvLedTexture = (() => {
+  if (typeof document === "undefined") return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grad.addColorStop(0, "#ffffff"); // 정중앙 초고휘도 백색 광점 (눈부심 효과)
+  grad.addColorStop(0.2, "#ffffff");
+  grad.addColorStop(0.38, "#ff3b5c"); // 고휘도 네온 핫핑크 레드
+  grad.addColorStop(0.65, "#ff002e"); // 선명하고 진한 블레이징 레드
+  grad.addColorStop(0.85, "rgba(255, 0, 46, 0.65)");
+  grad.addColorStop(1, "rgba(255, 0, 46, 0)");
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(64, 64, 64, 0, Math.PI * 2);
+  ctx.fill();
+
+  return new CanvasTexture(canvas);
+})();
+
+// 사방으로 부드럽게 퍼지는 자체 발광 네온 글로우 아우라 텍스처 (코로나)
+const cctvGlowAuraTexture = (() => {
+  if (typeof document === "undefined") return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grad.addColorStop(0, "rgba(255, 70, 95, 1.0)");
+  grad.addColorStop(0.25, "rgba(255, 0, 40, 0.88)");
+  grad.addColorStop(0.55, "rgba(255, 0, 30, 0.5)");
+  grad.addColorStop(0.8, "rgba(230, 0, 20, 0.18)");
+  grad.addColorStop(1, "rgba(200, 0, 0, 0)");
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(64, 64, 64, 0, Math.PI * 2);
+  ctx.fill();
+
+  return new CanvasTexture(canvas);
+})();
+
+// 원거리에서도 시원하게 느껴지는 대형 대기 발광 광배 & 렌즈 플레어 스파크 텍스처
+const cctvFlareTexture = (() => {
+  if (typeof document === "undefined") return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  // 1. 부드러운 대형 방사형 블룸 글로우
+  const grad = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+  grad.addColorStop(0, "rgba(255, 90, 115, 0.95)");
+  grad.addColorStop(0.2, "rgba(255, 20, 50, 0.65)");
+  grad.addColorStop(0.48, "rgba(255, 0, 35, 0.28)");
+  grad.addColorStop(0.78, "rgba(240, 0, 25, 0.08)");
+  grad.addColorStop(1, "rgba(200, 0, 0, 0)");
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(128, 128, 128, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. 가로/세로 렌즈 플레어 스파크 (실제 카메라 REC 라이트 특유의 빛 갈라짐 효과)
+  const flareH = ctx.createLinearGradient(0, 128, 256, 128);
+  flareH.addColorStop(0, "rgba(255, 50, 70, 0)");
+  flareH.addColorStop(0.5, "rgba(255, 230, 240, 0.85)");
+  flareH.addColorStop(1, "rgba(255, 50, 70, 0)");
+  ctx.fillStyle = flareH;
+  ctx.fillRect(0, 126, 256, 4);
+
+  const flareV = ctx.createLinearGradient(128, 0, 128, 256);
+  flareV.addColorStop(0, "rgba(255, 50, 70, 0)");
+  flareV.addColorStop(0.5, "rgba(255, 230, 240, 0.85)");
+  flareV.addColorStop(1, "rgba(255, 50, 70, 0)");
+  ctx.fillStyle = flareV;
+  ctx.fillRect(126, 0, 4, 256);
+
+  return new CanvasTexture(canvas);
+})();
+
+const CctvBlinkingLed: React.FC<{ model: ImportedModel }> = ({ model }) => {
+  const invalidate = useThree((s) => s.invalidate);
+  const coreMeshRef = useRef<Mesh>(null);
+  const glowMeshRef = useRef<Mesh>(null);
+  const flareMeshRef = useRef<Mesh>(null);
+  const lightRef = useRef<any>(null);
+
+  const height = model.baseSize?.[1] ?? 0.235;
+
+  // CCTV 고유 ID 기반 시작 딜레이 오프셋 (다수의 CCTV가 자연스럽게 엇갈려 깜빡임)
+  const delayOffset = useMemo(() => {
+    let hash = 0;
+    for (let i = 0; i < model.id.length; i++) {
+      hash = (hash + model.id.charCodeAt(i) * (i + 1)) % 1000;
+    }
+    return Math.floor((hash / 1000) * 550);
+  }, [model.id]);
+
+  // React state 대신 Three.js Mesh.visible 직접 제어로 무한 setState 루프 완전 방지
+  // frameloop="demand" 환경에서도 깜빡임이 즉시 화면에 그려지도록 invalidate 호출
+  useEffect(() => {
+    let isLit = true;
+    let timer: NodeJS.Timeout;
+    const startTimer = setTimeout(() => {
+      timer = setInterval(() => {
+        isLit = !isLit;
+        if (coreMeshRef.current) coreMeshRef.current.visible = isLit;
+        if (glowMeshRef.current) glowMeshRef.current.visible = isLit;
+        if (flareMeshRef.current) flareMeshRef.current.visible = isLit;
+        if (lightRef.current) lightRef.current.visible = isLit;
+        invalidate();
+      }, 550);
+    }, delayOffset);
+
+    return () => {
+      clearTimeout(startTimer);
+      if (timer) clearInterval(timer);
+    };
+  }, [invalidate, delayOffset]);
+
+  // LED 3D 위치: CCTV 하단 렌즈 표면 바로 앞 (3D 모델 내부에 묻히지 않도록 최적화)
+  const ledPosition: [number, number, number] = useMemo(() => {
+    return [0, -height * 0.88, 0.025];
+  }, [height]);
+
+  return (
+    <group position={ledPosition} raycast={() => null}>
+      {/* CCTV 자체 하우징 표면에 은은하게 반사되는 마이크로 로컬 조명 (벽/천장 오염 없는 38cm 단거리) */}
+      <pointLight
+        ref={lightRef}
+        position={[0, 0, 0.04]}
+        color="#ff1133"
+        intensity={3.2}
+        distance={0.38}
+        decay={2}
+      />
+
+      <Billboard>
+        {/* 1. 꺼져 있을 때의 기본 LED 소켓 (어두운 암적색 미니 베이스) */}
+        <mesh renderOrder={9996} raycast={() => null}>
+          <planeGeometry args={[0.012, 0.012]} />
+          <meshBasicMaterial
+            color="#2a0006"
+            transparent
+            opacity={0.4}
+            depthTest={false}
+            depthWrite={false}
+          />
+        </mesh>
+
+        {/* 2. 원거리에서도 시원하게 퍼지는 대형 대기 발광 플레어 / 블룸 (13cm 광배) */}
+        {cctvFlareTexture && (
+          <mesh ref={flareMeshRef} renderOrder={9997} raycast={() => null}>
+            <planeGeometry args={[0.13, 0.13]} />
+            <meshBasicMaterial
+              map={cctvFlareTexture}
+              transparent
+              opacity={0.88}
+              blending={AdditiveBlending}
+              toneMapped={false}
+              depthTest={false}
+              depthWrite={false}
+            />
+          </mesh>
+        )}
+
+        {/* 3. 켜졌을 때 사방으로 진하게 번지는 네온 글로우 코로나 (5.5cm 아우라) */}
+        {cctvGlowAuraTexture && (
+          <mesh ref={glowMeshRef} renderOrder={9998} raycast={() => null}>
+            <planeGeometry args={[0.055, 0.055]} />
+            <meshBasicMaterial
+              map={cctvGlowAuraTexture}
+              transparent
+              opacity={0.95}
+              blending={AdditiveBlending}
+              toneMapped={false}
+              depthTest={false}
+              depthWrite={false}
+            />
+          </mesh>
+        )}
+
+        {/* 4. 눈부시게 빛나는 중심 초고휘도 LED 코어 핫스팟 (2.4cm) */}
+        {cctvLedTexture && (
+          <mesh ref={coreMeshRef} renderOrder={9999} raycast={() => null}>
+            <planeGeometry args={[0.024, 0.024]} />
+            <meshBasicMaterial
+              map={cctvLedTexture}
+              transparent
+              opacity={1.0}
+              blending={AdditiveBlending}
+              toneMapped={false}
+              depthTest={false}
+              depthWrite={false}
+            />
+          </mesh>
+        )}
+      </Billboard>
+    </group>
+  );
+};
+
+/* ------------------------------------------------------------------ */
 /*  Main component                                                     */
 /* ------------------------------------------------------------------ */
 export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
@@ -668,10 +606,63 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
   // 온습도계와 CCTV는 랙을 가려도 화면에서 절대 사라지지 않음
   const isModelObstructing = useStore((s) => s.obstructingModelIds.includes(model.id));
   const isObstructing = (!isCctv && !isThermoHygro) && isModelObstructing;
+  const showDeviceLabels = useStore((s) => s.showDeviceLabels);
 
   const [isHovered, setIsHovered] = useState(false);
   const innerGroupRef = useRef<Group>(null);
   const invalidate = useThree((s) => s.invalidate);
+  const thermoNametagRef = useRef<HTMLDivElement | null>(null);
+  const cctvNametagRef = useRef<HTMLDivElement | null>(null);
+
+  // Rack-specific occlusion check: ONLY racks occlude the device nametags
+  useFrame(({ camera }) => {
+    if (isEditMode || (!isCctv && !isThermoHygro)) return;
+    const div = isCctv ? cctvNametagRef.current : thermoNametagRef.current;
+    if (!div) return;
+
+    const racksGroup = racksContainerRef.current;
+    if (!racksGroup || racksGroup.children.length === 0) {
+      if (div.style.display === "none") {
+        div.style.display = "flex";
+      }
+      return;
+    }
+
+    const modelHeight = model.baseSize?.[1] ?? (isCctv ? 0.25 : 0.15);
+    const nametagOffset = isCctv ? 0.22 : 0.38;
+
+    // 1. Raycast to the Device Object itself
+    _occlusionTargetPos.set(model.position[0], model.position[1] + modelHeight / 2, model.position[2]);
+    const distToDevice = camera.position.distanceTo(_occlusionTargetPos);
+    _occlusionRayDir.subVectors(_occlusionTargetPos, camera.position).normalize();
+    _occlusionRaycaster.set(camera.position, _occlusionRayDir);
+    _occlusionRaycaster.far = Math.max(0.05, distToDevice - 0.05);
+    const deviceHits = _occlusionRaycaster.intersectObjects(racksGroup.children, true);
+
+    let isOccluded = deviceHits.length > 0;
+
+    // 2. If device itself is not hit, also check if a tall rack blocks the nametag anchor
+    if (!isOccluded) {
+      _occlusionTargetPos.set(
+        model.position[0],
+        model.position[1] + modelHeight / 2 + nametagOffset,
+        model.position[2]
+      );
+      const distToNametag = camera.position.distanceTo(_occlusionTargetPos);
+      _occlusionRayDir.subVectors(_occlusionTargetPos, camera.position).normalize();
+      _occlusionRaycaster.set(camera.position, _occlusionRayDir);
+      _occlusionRaycaster.far = Math.max(0.05, distToNametag - 0.05);
+      const nametagHits = _occlusionRaycaster.intersectObjects(racksGroup.children, true);
+      if (nametagHits.length > 0) {
+        isOccluded = true;
+      }
+    }
+
+    const targetDisplay = isOccluded ? "none" : "flex";
+    if (div.style.display !== targetDisplay) {
+      div.style.display = targetDisplay;
+    }
+  });
 
   // Re-render immediately on hover change
   useEffect(() => {
@@ -701,7 +692,17 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
     return model.cctvId ? getCctvById(model.cctvId) : undefined;
   }, [model.cctvId]);
   const cctvId = linkedCctv?.id || (model.name?.startsWith("CCTV") ? model.name : undefined);
-  const cctvTitle = linkedCctv?.name || model.name || "CCTV";
+  const displayCctvNo =
+    cctvId ||
+    model.name?.match(/(?:CCTV[-\s]?\d+|\d+)/i)?.[0] ||
+    "CCTV";
+
+  const displaySensorId =
+    linkedSensor?.id ||
+    model.thermoHygroId ||
+    model.name?.match(/(?:TH[-\s]?\d+|온습도계\s*\d+|\d+)/i)?.[0] ||
+    model.name ||
+    "TH-01";
 
   const effectiveTemp = linkedSensor
     ? linkedSensor.temperature
@@ -780,6 +781,19 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
         useStore.getState().setActiveThermoHygroMappingModelId(model.id);
         return;
       }
+
+      // 뷰 모드 일반 모델(유리 자동문, 가벽, 기둥, 책상 등):
+      // 광선 관통 경로에 랙 인터랙션 박스가 있는지 확인
+      const hasRackBehind = e.intersections.some(
+        (hit) =>
+          (hit.object as any).stoppedByRack ||
+          hit.object.userData?.isRackInteractBox
+      );
+      if (hasRackBehind) {
+        // 뒤쪽 랙으로 클릭 이벤트가 투과되어 랙이 선택될 수 있도록 선택 해제하지 않고 전달
+        return;
+      }
+
       selectRack(null);
       return;
     }
@@ -796,10 +810,10 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
     ? [0.354, 0.134, 0.044]
     : isCctv
       ? [
-          (model.baseSize?.[0] ?? 0.28) * 1.03,
-          (model.baseSize?.[1] ?? 0.235) * 1.03,
-          (model.baseSize?.[2] ?? 0.28) * 1.03,
-        ]
+        (model.baseSize?.[0] ?? 0.28) * 1.03,
+        (model.baseSize?.[1] ?? 0.235) * 1.03,
+        (model.baseSize?.[2] ?? 0.28) * 1.03,
+      ]
       : null;
 
   const hoverOutlinePos: [number, number, number] = isThermoHygro
@@ -817,7 +831,7 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
       new Vector3(...model.scale),
     );
     return m;
-   
+
   }, [model.position, model.rotation, model.scale]);
 
   const shouldTransform = isSelected && isEditMode && isMoveEnabled;
@@ -844,21 +858,20 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
         });
         if (hitGizmoHelper) return;
 
-        e.stopPropagation();
         if (isEditMode) {
+          e.stopPropagation();
           document.body.style.cursor = isMoveEnabled ? "grab" : "pointer";
         } else if (isCctv || isThermoHygro) {
+          e.stopPropagation();
           document.body.style.cursor = "pointer";
-        }
-        if (isCctv || isThermoHygro) {
           setIsHovered(true);
+        } else {
+          // 뷰 모드 일반 모델(유리문, 가벽 등): 뒤쪽에 있는 랙으로 호버 이벤트가 전달되도록
+          // e.stopPropagation()을 호출하지 않습니다.
         }
       }}
       onPointerMove={(e) => {
         if (isObstructing) return;
-        if ((isCctv || isThermoHygro) && !isHovered) {
-          setIsHovered(true);
-        }
         if (useStore.getState().isGizmoHovered) return;
         const hitGizmoHelper = e.intersections.some((hit) => {
           let obj: Object3D | null = hit.object;
@@ -873,15 +886,30 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
         });
         if (hitGizmoHelper) return;
 
-        e.stopPropagation();
+        if (isEditMode || isCctv || isThermoHygro) {
+          e.stopPropagation();
+        }
       }}
       onPointerOut={(e) => {
-        e.stopPropagation();
-        if (
-          document.body.style.cursor === "grab" ||
-          document.body.style.cursor === "pointer"
-        ) {
-          document.body.style.cursor = "auto";
+        if (isEditMode || isCctv || isThermoHygro) {
+          e.stopPropagation();
+          if (
+            document.body.style.cursor === "grab" ||
+            document.body.style.cursor === "pointer"
+          ) {
+            document.body.style.cursor = "auto";
+          }
+        } else {
+          // 뷰 모드 일반 모델에서 벗어날 때: 현재 호버 중인 랙이나 장비가 없다면 커서 복구
+          const state = useStore.getState();
+          if (!state.hoveredRackId && !state.hoveredDevice) {
+            if (
+              document.body.style.cursor === "grab" ||
+              document.body.style.cursor === "pointer"
+            ) {
+              document.body.style.cursor = "auto";
+            }
+          }
         }
         setIsHovered(false);
       }}
@@ -909,8 +937,8 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
       ) : (
         <GltfErrorBoundary key={model.id}>
           <Suspense fallback={null}>
-            <GltfMesh 
-              url={model.dataUrl} 
+            <GltfMesh
+              url={model.dataUrl}
               glassParams={model.glassParams}
               isCeilingMounted={isCctv}
               onLoaded={(size, hasGlass) => {
@@ -928,6 +956,11 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
             />
           </Suspense>
         </GltfErrorBoundary>
+      )}
+
+      {/* 뷰모드 전용: CCTV 깜빡이는 작고 빨간 녹화(REC) LED 불빛 */}
+      {!isEditMode && isCctv && (
+        <CctvBlinkingLed model={model} />
       )}
 
       {/* Selection highlight box (Removed per user request) */}
@@ -992,71 +1025,6 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
             raycast={() => null}
           />
         </mesh>
-      )}
-
-      {/* View Mode Hover Popover (멀리서도 선명하게 온습도 정보 표출 - 화면 잘림 방지 및 자동 상/하 플립) */}
-      {!isEditMode && isThermoHygro && isHovered && (
-        <ThermoHygroHoverOverlay
-          model={model}
-          linkedSensor={linkedSensor}
-          statusMeta={statusMeta}
-          effectiveTemp={effectiveTemp}
-          effectiveHum={effectiveHum}
-        />
-      )}
-
-      {/* CCTV Hover Tag (랙 호버 태그와 동일한 고품질 플로팅 태그) */}
-      {!isEditMode && isCctv && isHovered && (
-        <Billboard position={[0, -(model.baseSize?.[1] ?? 0.25) - 0.16, 0]} visible={isHovered}>
-          <Html center zIndexRange={[50, 100]} style={{ pointerEvents: "none" }}>
-            <div
-              style={{
-                background: isDarkMode
-                  ? "rgba(23, 24, 28, 0.88)"
-                  : "rgba(255, 255, 255, 0.92)",
-                color: isDarkMode ? "#ebedef" : "#202226",
-                padding: "4px 12px",
-                borderRadius: "16px",
-                fontSize: "12px",
-                fontWeight: 600,
-                border: isDarkMode
-                  ? "1px solid rgba(255, 255, 255, 0.2)"
-                  : "1px solid rgba(0, 0, 0, 0.12)",
-                boxShadow: isDarkMode
-                  ? "0 4px 15px rgba(0, 0, 0, 0.45)"
-                  : "0 4px 12px rgba(0, 0, 0, 0.1)",
-                whiteSpace: "nowrap",
-                backdropFilter: "blur(8px)",
-                pointerEvents: "none",
-                userSelect: "none",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                fontFamily: "Inter, system-ui, sans-serif",
-              }}
-            >
-              <span
-                style={{
-                  width: "6px",
-                  height: "6px",
-                  borderRadius: "50%",
-                  background: linkedCctv?.status === "offline" ? "#ef4444" : "#10b981",
-                  display: "inline-block",
-                  boxShadow: linkedCctv?.status === "offline" ? "0 0 6px #ef4444" : "0 0 6px #10b981",
-                }}
-              />
-              {cctvId && (
-                <>
-                  <span style={{ color: "#60a5fa", fontFamily: "monospace", fontWeight: 700 }}>
-                    {cctvId}
-                  </span>
-                  <span style={{ opacity: 0.4 }}>|</span>
-                </>
-              )}
-              <span>{cctvTitle}</span>
-            </div>
-          </Html>
-        </Billboard>
       )}
     </group>
   );
@@ -1206,6 +1174,224 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
           scale={model.scale}
         >
           {innerContent}
+        </group>
+      )}
+
+      {/* 온습도계 상시 이름표 어노테이션 (기기 3D 오브젝트를 가리지 않도록 상단에 살짝 떨어져서 항상 고정) */}
+      {!isEditMode && isThermoHygro && (showDeviceLabels || isHovered) && (
+        <group
+          position={[
+            model.position[0],
+            model.position[1] + (model.baseSize?.[1] ?? 0.15) / 2 + 0.38,
+            model.position[2],
+          ]}
+        >
+          <Html center zIndexRange={[50, 0]} style={{ pointerEvents: "none" }}>
+            <div
+              ref={thermoNametagRef}
+              onClick={(e) => {
+                e.stopPropagation();
+                useStore.getState().setActiveThermoHygroMappingModelId(model.id);
+              }}
+              className="device-nametag-wrapper thermo"
+              title="클릭하여 온습도계 상세 정보 보기"
+              style={{
+                pointerEvents: showDeviceLabels ? "auto" : "none",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                userSelect: "none",
+                cursor: "pointer",
+                transition: "transform 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "scale(1.08)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "scale(1)";
+              }}
+            >
+              {/* 메인 뱃지 */}
+              <div
+                className="device-nametag-badge thermo"
+                style={{
+                  background: isDarkMode
+                    ? "rgba(15, 23, 42, 0.94)"
+                    : "rgba(255, 255, 255, 0.96)",
+                  color: isDarkMode ? "#ebedef" : "#202226",
+                  padding: "4px 9px",
+                  borderRadius: "10px",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  border: `1.5px solid ${statusMeta.color || "#06b6d4"}`,
+                  boxShadow: isDarkMode
+                    ? `0 0 14px ${statusMeta.color || "#06b6d4"}60, 0 4px 12px rgba(0, 0, 0, 0.5)`
+                    : `0 0 10px ${statusMeta.color || "#06b6d4"}40, 0 4px 10px rgba(0, 0, 0, 0.12)`,
+                  whiteSpace: "nowrap",
+                  backdropFilter: "blur(8px)",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "2px",
+                  fontFamily: "Inter, system-ui, sans-serif",
+                }}
+              >
+                {/* 1행: 온습도계 번호 (오프라인 지원 mdi:thermometer-water 아이콘 포함) */}
+                <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                  <span
+                    style={{
+                      width: "6px",
+                      height: "6px",
+                      borderRadius: "50%",
+                      background: statusMeta.color || "#10b981",
+                      display: "inline-block",
+                      boxShadow: `0 0 6px ${statusMeta.color || "#10b981"}`,
+                    }}
+                  />
+                  <Icon
+                    icon="mdi:thermometer-water"
+                    style={{
+                      width: "14px",
+                      height: "14px",
+                      color: statusMeta.color || "#06b6d4",
+                      flexShrink: 0,
+                    }}
+                  />
+                  <span style={{ color: statusMeta.color || "#06b6d4", fontWeight: 800, fontSize: "11px", letterSpacing: "0.2px" }}>
+                    {displaySensorId}
+                  </span>
+                </div>
+                {/* 2행: 줄바꿈 후 온습도 정보 */}
+                <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "10.5px", fontWeight: 700 }}>
+                  <span style={{ color: "#38bdf8" }}>{effectiveTemp.toFixed(1)}°C</span>
+                  <span style={{ opacity: 0.35, fontSize: "9px" }}>/</span>
+                  <span style={{ color: "#60a5fa" }}>{effectiveHum.toFixed(1)}%</span>
+                </div>
+              </div>
+
+              {/* 기기 방향을 가리키는 얇은 어노테이션 핀 스템 */}
+              <div
+                style={{
+                  width: "1.5px",
+                  height: "10px",
+                  background: `linear-gradient(to bottom, ${statusMeta.color || "#06b6d4"}, rgba(6, 182, 212, 0.05))`,
+                }}
+              />
+              <div
+                style={{
+                  width: "4px",
+                  height: "4px",
+                  borderRadius: "50%",
+                  background: statusMeta.color || "#06b6d4",
+                  boxShadow: `0 0 6px ${statusMeta.color || "#06b6d4"}`,
+                  marginTop: "-2px",
+                }}
+              />
+            </div>
+          </Html>
+        </group>
+      )}
+
+      {/* CCTV 이름표 어노테이션 (기기 3D 오브젝트를 가리지 않도록 상단에 살짝 떨어져서 항상 고정) */}
+      {!isEditMode && isCctv && (showDeviceLabels || isHovered) && (
+        <group
+          position={[
+            model.position[0],
+            model.position[1] + (model.baseSize?.[1] ?? 0.25) / 2 + 0.22,
+            model.position[2],
+          ]}
+        >
+          <Html center zIndexRange={[50, 0]} style={{ pointerEvents: "none" }}>
+            <div
+              ref={cctvNametagRef}
+              onClick={(e) => {
+                e.stopPropagation();
+                useStore.getState().setActiveCctvLiveModelId(model.id);
+              }}
+              className="device-nametag-wrapper cctv"
+              title="클릭하여 CCTV 라이브 보기"
+              style={{
+                pointerEvents: showDeviceLabels ? "auto" : "none",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                userSelect: "none",
+                cursor: "pointer",
+                transition: "transform 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "scale(1.08)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "scale(1)";
+              }}
+            >
+              {/* 메인 뱃지 */}
+              <div
+                className="device-nametag-badge cctv"
+                style={{
+                  background: isDarkMode
+                    ? "rgba(15, 23, 42, 0.94)"
+                    : "rgba(255, 255, 255, 0.96)",
+                  color: isDarkMode ? "#ebedef" : "#202226",
+                  padding: "4px 10px",
+                  borderRadius: "14px",
+                  fontSize: "11.5px",
+                  fontWeight: 700,
+                  border: showDeviceLabels
+                    ? "1.5px solid #3b82f6"
+                    : isDarkMode
+                      ? "1px solid rgba(255, 255, 255, 0.2)"
+                      : "1px solid rgba(0, 0, 0, 0.12)",
+                  boxShadow: showDeviceLabels
+                    ? "0 0 14px rgba(59, 130, 246, 0.6), 0 4px 12px rgba(0, 0, 0, 0.45)"
+                    : isDarkMode
+                      ? "0 4px 15px rgba(0, 0, 0, 0.45)"
+                      : "0 4px 12px rgba(0, 0, 0, 0.1)",
+                  whiteSpace: "nowrap",
+                  backdropFilter: "blur(8px)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  fontFamily: "Inter, system-ui, sans-serif",
+                }}
+              >
+                <span
+                  style={{
+                    width: "6px",
+                    height: "6px",
+                    borderRadius: "50%",
+                    background: linkedCctv?.status === "offline" ? "#ef4444" : "#10b981",
+                    display: "inline-block",
+                    boxShadow: linkedCctv?.status === "offline" ? "0 0 6px #ef4444" : "0 0 6px #10b981",
+                  }}
+                />
+                <Icon icon="mdi:cctv" style={{ width: "14px", height: "14px", color: "#3b82f6" }} />
+                <span style={{ color: "#60a5fa", fontFamily: "monospace", fontWeight: 800, fontSize: "11px" }}>
+                  {displayCctvNo}
+                </span>
+              </div>
+
+              {/* 기기 방향을 가리키는 얇은 어노테이션 핀 스템 */}
+              <div
+                style={{
+                  width: "1.5px",
+                  height: "7px",
+                  background: "linear-gradient(to bottom, #3b82f6, rgba(59, 130, 246, 0.05))",
+                }}
+              />
+              <div
+                style={{
+                  width: "4px",
+                  height: "4px",
+                  borderRadius: "50%",
+                  background: "#3b82f6",
+                  boxShadow: "0 0 6px #3b82f6",
+                  marginTop: "-2px",
+                }}
+              />
+            </div>
+          </Html>
         </group>
       )}
     </group>

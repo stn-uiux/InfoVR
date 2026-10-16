@@ -2,15 +2,19 @@ import { useTheme } from "../../contexts/ThemeContext";
 import { Icon } from "@iconify/react";
 
 export const ThemeToggle = () => {
-  const { theme, toggleTheme } = useTheme();
+  const { theme, toggleTheme, isThemeTransitioning } = useTheme();
 
   return (
     <div
       className="theme-toggle"
-      onClick={toggleTheme}
+      onClick={isThemeTransitioning ? undefined : toggleTheme}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => e.key === "Enter" && toggleTheme()}
+      style={{
+        cursor: isThemeTransitioning ? "not-allowed" : "pointer",
+        opacity: isThemeTransitioning ? 0.7 : 1,
+      }}
+      onKeyDown={(e) => e.key === "Enter" && !isThemeTransitioning && toggleTheme()}
       aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
     >
       <div className="theme-toggle-knob">

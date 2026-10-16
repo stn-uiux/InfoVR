@@ -20,6 +20,7 @@ import { calculateDynamicRoomSize } from "../../utils/rackGeometry";
 import { GRID_SPACING } from "../layout/constants";
 import { useTheme } from "../../contexts/ThemeContext";
 import { GlobalFocusLights } from "./GlobalFocusLights";
+import { racksContainerRef } from "./racksOcclusionRef";
 
 /**
  * Three.js Raycasting ignores visible: false on parent groups (https://github.com/mrdoob/three.js/issues/16031).
@@ -659,9 +660,16 @@ export const Scene = () => {
         ))}
 
         {/* Racks (filtered by active group) */}
-        {groupRacks.map((rack) => (
-          <Rack key={rack.rackId} {...rack} />
-        ))}
+        <group
+          ref={(group) => {
+            racksContainerRef.current = group;
+          }}
+          name="racks-container"
+        >
+          {groupRacks.map((rack) => (
+            <Rack key={rack.rackId} {...rack} />
+          ))}
+        </group>
 
         {/* The Hidden Drag Engine */}
         <DragHandler />

@@ -15,6 +15,7 @@ import { DeviceModal } from "./components/device/DeviceModal";
 import { DeviceTooltip } from "./components/device/DeviceTooltip";
 import { InitialLoader } from "./components/layout/InitialLoader";
 import { ModeTransitionOverlay } from "./components/layout/ModeTransitionOverlay";
+import { ThemeTransitionOverlay } from "./components/layout/ThemeTransitionOverlay";
 import { SettingsDropdown } from "./components/layout/SettingsDropdown";
 const ImportExportModal = React.lazy(() =>
   import("./components/system/ImportExportModal").then((m) => ({
@@ -826,6 +827,9 @@ function App() {
 
       {/* Edit Mode Transition Dimmed Loading Overlay */}
       <ModeTransitionOverlay />
+
+      {/* Theme Transition Dimmed Loading Overlay */}
+      <ThemeTransitionOverlay />
     </div>
   );
 }
@@ -839,6 +843,8 @@ const FitToModelsButton = () => {
   const deviceRegistrationModalOpen = useStore((s) => s.deviceRegistrationModalOpen);
   const importExportModalRackId = useStore((s) => s.importExportModalRackId);
   const selectedDeviceId = useStore((s) => s.selectedDeviceId);
+  const showDeviceLabels = useStore((s) => s.showDeviceLabels);
+  const toggleShowDeviceLabels = useStore((s) => s.toggleShowDeviceLabels);
 
   if (selectedRackId) return null;
 
@@ -861,65 +867,146 @@ const FitToModelsButton = () => {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        gap: "8px",
+        gap: "14px",
         width: "80px",
       }}
     >
-      <button
-        className="comm-btn comm-btn-secondary"
-        onClick={(e) => {
-          e.stopPropagation();
-          fitToScene();
-        }}
-        title="모든 모델을 화면에 맞춤 (Fit All Models)"
-        style={{
-          width: "42px",
-          height: "42px",
-          padding: 0,
-          borderRadius: "50%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: isDarkMode ? "#2A3342" : "#ffffff",
-          border: `1px solid ${isDarkMode ? "#526484" : "#dbdfea"}`,
-          boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-          color: isDarkMode ? "#ffffff" : "#111827",
-          cursor: "pointer",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = "scale(1.05)";
-          e.currentTarget.style.borderColor = "#3b82f6";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = "scale(1)";
-          e.currentTarget.style.borderColor = isDarkMode
-            ? "#526484"
-            : "#dbdfea";
-        }}
-      >
-        <Icon icon="material-symbols:fullscreen" className="icon" style={{ width: "22px", height: "22px" }} />
-      </button>
-      <span
-        style={{
-          fontSize: "10px",
-          fontWeight: 800,
-          color: isDarkMode ? "#ffffff" : "#364a63",
-          textShadow: isDarkMode
-            ? "0 1px 2px rgba(0,0,0,0.8)"
-            : "0 1px 2px rgba(255,255,255,0.8)",
-          pointerEvents: "none",
-          background: isDarkMode
-            ? "rgba(42,51,66,0.9)"
-            : "rgba(255,255,255,0.9)",
-          padding: "2px 8px",
-          borderRadius: "12px",
-          whiteSpace: "nowrap",
-          border: `1px solid ${isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"}`,
-          letterSpacing: "0.02em",
-        }}
-      >
-        전체보기
-      </span>
+      {/* 1. 전체보기 버튼 */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
+        <button
+          className="comm-btn comm-btn-secondary"
+          onClick={(e) => {
+            e.stopPropagation();
+            fitToScene();
+          }}
+          title="모든 모델을 화면에 맞춤 (Fit All Models)"
+          style={{
+            width: "42px",
+            height: "42px",
+            padding: 0,
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: isDarkMode ? "#2A3342" : "#ffffff",
+            border: `1px solid ${isDarkMode ? "#526484" : "#dbdfea"}`,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+            color: isDarkMode ? "#ffffff" : "#111827",
+            cursor: "pointer",
+            transition: "all 0.15s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "scale(1.05)";
+            e.currentTarget.style.borderColor = "#3b82f6";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "scale(1)";
+            e.currentTarget.style.borderColor = isDarkMode
+              ? "#526484"
+              : "#dbdfea";
+          }}
+        >
+          <Icon icon="material-symbols:fullscreen" className="icon" style={{ width: "22px", height: "22px" }} />
+        </button>
+        <span
+          style={{
+            fontSize: "10px",
+            fontWeight: 800,
+            color: isDarkMode ? "#ffffff" : "#364a63",
+            textShadow: isDarkMode
+              ? "0 1px 2px rgba(0,0,0,0.8)"
+              : "0 1px 2px rgba(255,255,255,0.8)",
+            pointerEvents: "none",
+            background: isDarkMode
+              ? "rgba(42,51,66,0.9)"
+              : "rgba(255,255,255,0.9)",
+            padding: "2px 8px",
+            borderRadius: "12px",
+            whiteSpace: "nowrap",
+            border: `1px solid ${isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"}`,
+            letterSpacing: "0.02em",
+          }}
+        >
+          전체보기
+        </span>
+      </div>
+
+      {/* 2. 기기보기 버튼 (CCTV 및 온습도계 이름표 툴팁 띄우기) */}
+      {!isEditMode && (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
+          <button
+            className="comm-btn comm-btn-secondary"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleShowDeviceLabels();
+            }}
+            title={showDeviceLabels ? "기기 이름표 끄기" : "CCTV 및 온습도계 이름표 보기"}
+            style={{
+              width: "42px",
+              height: "42px",
+              padding: 0,
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: showDeviceLabels
+                ? "#2563eb"
+                : isDarkMode
+                  ? "#2A3342"
+                  : "#ffffff",
+              border: showDeviceLabels
+                ? "1.5px solid #60a5fa"
+                : `1px solid ${isDarkMode ? "#526484" : "#dbdfea"}`,
+              boxShadow: showDeviceLabels
+                ? "0 0 16px rgba(37, 99, 235, 0.6), 0 4px 12px rgba(0,0,0,0.3)"
+                : "0 4px 12px rgba(0,0,0,0.2)",
+              color: showDeviceLabels ? "#ffffff" : isDarkMode ? "#ffffff" : "#111827",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "scale(1.05)";
+              if (!showDeviceLabels) e.currentTarget.style.borderColor = "#3b82f6";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "scale(1)";
+              if (!showDeviceLabels) {
+                e.currentTarget.style.borderColor = isDarkMode ? "#526484" : "#dbdfea";
+              }
+            }}
+          >
+            <Icon icon="mdi:cctv" className="icon" style={{ width: "22px", height: "22px" }} />
+          </button>
+          <span
+            style={{
+              fontSize: "10px",
+              fontWeight: 800,
+              color: showDeviceLabels ? (isDarkMode ? "#93c5fd" : "#2563eb") : isDarkMode ? "#ffffff" : "#364a63",
+              textShadow: isDarkMode
+                ? "0 1px 2px rgba(0,0,0,0.8)"
+                : "0 1px 2px rgba(255,255,255,0.8)",
+              pointerEvents: "none",
+              background: showDeviceLabels
+                ? isDarkMode
+                  ? "rgba(37, 99, 235, 0.3)"
+                  : "rgba(37, 99, 235, 0.12)"
+                : isDarkMode
+                  ? "rgba(42,51,66,0.9)"
+                  : "rgba(255,255,255,0.9)",
+              padding: "2px 8px",
+              borderRadius: "12px",
+              whiteSpace: "nowrap",
+              border: showDeviceLabels
+                ? "1px solid rgba(96, 165, 250, 0.5)"
+                : `1px solid ${isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)"}`,
+              letterSpacing: "0.02em",
+              transition: "all 0.2s ease",
+            }}
+          >
+            기기보기
+          </span>
+        </div>
+      )}
     </div>
   );
 };

@@ -540,6 +540,7 @@ export const Rack = memo(({
             {/* Front Interact Box */}
             <mesh
               visible={!(isSelected && !isEditMode && selectedRackSide === "front")}
+              userData={{ isRackInteractBox: true, rackId, rackSide: "front" }}
               raycast={isObstructing ? () => null : Mesh.prototype.raycast}
               geometry={SHARED_GEO.interactBox}
               scale={[width, height, depth / 2]}
@@ -571,12 +572,13 @@ export const Rack = memo(({
                 }
               }}
             >
-              <meshBasicMaterial transparent opacity={hoveredSide === "front" ? 0.3 : 0} color={hoveredSide === "front" ? "var(--theme-primary, #00aaff)" : "white"} depthWrite={false} />
+              <meshBasicMaterial transparent opacity={0} depthWrite={false} />
             </mesh>
 
             {/* Rear Interact Box */}
             <mesh
               visible={!(isSelected && !isEditMode && selectedRackSide === "rear")}
+              userData={{ isRackInteractBox: true, rackId, rackSide: "rear" }}
               raycast={isObstructing ? () => null : Mesh.prototype.raycast}
               geometry={SHARED_GEO.interactBox}
               scale={[width, height, depth / 2]}
@@ -608,12 +610,13 @@ export const Rack = memo(({
                 }
               }}
             >
-              <meshBasicMaterial transparent opacity={hoveredSide === "rear" ? 0.3 : 0} color={hoveredSide === "rear" ? "var(--theme-primary, #00aaff)" : "white"} depthWrite={false} />
+              <meshBasicMaterial transparent opacity={0} depthWrite={false} />
             </mesh>
           </group>
         ) : (
           <mesh
             visible={!(isSelected && !isEditMode)}
+            userData={{ isRackInteractBox: true, rackId, rackSide: "front" }}
             raycast={isObstructing ? () => null : Mesh.prototype.raycast}
             geometry={SHARED_GEO.interactBox}
             scale={[width, height, depth]}
@@ -649,6 +652,39 @@ export const Rack = memo(({
             }}
           >
             <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+          </mesh>
+        )}
+
+        {/* 랙 호버 시 은은한 볼륨 하이라이트 및 네온 엣지 아웃라인 */}
+        {isHovered && !isSelected && (
+          <mesh
+            position={
+              isBidirectional && hoveredSide
+                ? [0, 0, hoveredSide === "rear" ? -depth / 4 : depth / 4]
+                : [0, 0, 0]
+            }
+            raycast={() => null}
+          >
+            <boxGeometry
+              args={
+                isBidirectional && hoveredSide
+                  ? [width + 0.004, height + 0.004, depth / 2 + 0.004]
+                  : [width + 0.004, height + 0.004, depth + 0.004]
+              }
+            />
+            <meshBasicMaterial
+              color={isDarkMode ? "#38bdf8" : "#2563eb"}
+              transparent
+              opacity={0.12}
+              depthWrite={false}
+            />
+            <Edges
+              scale={1.0}
+              threshold={15}
+              color={isDarkMode ? "#38bdf8" : "#2563eb"}
+              lineWidth={3}
+              raycast={() => null}
+            />
           </mesh>
         )}
 
@@ -696,13 +732,17 @@ export const Rack = memo(({
                   border: isDarkMode
                     ? isSelected
                       ? "1px solid #FFFFFF"
-                      : "1px solid rgba(255, 255, 255, 0.2)"
+                      : "1px solid rgba(56, 189, 248, 0.6)"
                     : isSelected
                       ? "1px solid #1a73e8"
-                      : "1px solid rgba(0, 0, 0, 0.12)",
+                      : "1px solid rgba(37, 99, 235, 0.5)",
                   boxShadow: isDarkMode
-                    ? "0 4px 15px rgba(0, 0, 0, 0.4)"
-                    : "0 4px 12px rgba(0, 0, 0, 0.1)",
+                    ? isSelected
+                      ? "0 4px 15px rgba(0, 0, 0, 0.4)"
+                      : "0 0 12px rgba(56, 189, 248, 0.35), 0 4px 15px rgba(0, 0, 0, 0.4)"
+                    : isSelected
+                      ? "0 4px 12px rgba(0, 0, 0, 0.1)"
+                      : "0 0 10px rgba(37, 99, 235, 0.25), 0 4px 12px rgba(0, 0, 0, 0.1)",
                   whiteSpace: "nowrap",
                   backdropFilter: "blur(8px)",
                   pointerEvents: "none",
@@ -721,10 +761,13 @@ export const Rack = memo(({
                     background: isDarkMode
                       ? isSelected
                         ? "#FFFFFF"
-                        : "#71798e"
+                        : "#38bdf8"
                       : isSelected
                         ? "#1a73e8"
-                        : "#6e727a",
+                        : "#2563eb",
+                    boxShadow: isDarkMode
+                      ? isSelected ? "none" : "0 0 6px #38bdf8"
+                      : isSelected ? "none" : "0 0 4px #2563eb",
                     display: "inline-block",
                   }}
                 />
@@ -1119,7 +1162,7 @@ const DeviceMesh = ({
               <boxGeometry args={[deviceWidth, deviceH - 0.005, validDepth]} />
               {!chassisBodyMaterials && (
                 <meshStandardMaterial
-                  color="#96a0ac"
+                  color="#666e79"
                   roughness={0.36}
                   metalness={0.7}
                 />
