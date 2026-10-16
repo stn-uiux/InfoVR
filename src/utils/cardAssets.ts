@@ -676,7 +676,7 @@ export const equipmentModels: EquipmentModel[] = [
     rackUnit: "12U",
     baseSvgUrl: "[12U] 1850-TSS-320-CARD.png",
     equipmentSize: { width: 984, height: 1152 },
-    cardArea: { x: 0, y: 0, width: 984, height: 1152, columns: 1, columnWidth: 984 },
+    cardArea: { x: 72, y: 116, width: 840, height: 920, columns: 16, columnWidth: 52.5 },
   },
   {
     modelId: "1830-pss-32",
@@ -684,7 +684,7 @@ export const equipmentModels: EquipmentModel[] = [
     rackUnit: "12U",
     baseSvgUrl: "[12U] 1830-PSS-32-CARD.png",
     equipmentSize: { width: 984, height: 1152 },
-    cardArea: { x: 0, y: 0, width: 984, height: 1152, columns: 1, columnWidth: 984 },
+    cardArea: { x: 72, y: 116, width: 840, height: 920, columns: 16, columnWidth: 52.5 },
   },
   {
     modelId: "7705-sar-8",

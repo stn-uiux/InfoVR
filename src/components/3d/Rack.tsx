@@ -12,6 +12,7 @@ import { U_HEIGHT, GRID_SPACING, DEVICE_DEPTH } from "../layout/constants";
 import { getHighestError } from "../../utils/errorHelpers";
 import { resolveDeviceImage, isChassisModel } from "../../utils/deviceAssets";
 import { DEFAULT_CHASSIS_CARDS } from "../../utils/defaultChassisCards";
+import { ChassisRecessedFaceplate } from "./ChassisRecessedFaceplate";
 
 // ─── Phase 1-A: 모듈 레벨 공유 Geometry (모든 Rack이 재사용) ───
 const SHARED_GEO = {
@@ -439,15 +440,15 @@ export const Rack = memo(({
               <meshStandardMaterial color={frameColor} roughness={0.8} />
             </mesh>
 
-            {/* Vertical Mounting Rails (Front) */}
-            <mesh position={[-width / 2 + 0.06, 0, depth / 2 - 0.12]} geometry={SHARED_GEO.frontRail} scale={[1, height - 0.08, 1]}>
+            {/* Vertical Mounting Rails (Front) - 사이드 쪽으로 밀착, 앞쪽으로 전진 배치 */}
+            <mesh position={[-width / 2 + 0.025, 0, depth / 2 - 0.045]} geometry={SHARED_GEO.frontRail} scale={[1, height - 0.08, 1]}>
               <meshStandardMaterial
                 color={railColor}
                 metalness={1}
                 roughness={0.2}
               />
             </mesh>
-            <mesh position={[width / 2 - 0.06, 0, depth / 2 - 0.12]} geometry={SHARED_GEO.frontRail} scale={[1, height - 0.08, 1]}>
+            <mesh position={[width / 2 - 0.025, 0, depth / 2 - 0.045]} geometry={SHARED_GEO.frontRail} scale={[1, height - 0.08, 1]}>
               <meshStandardMaterial
                 color={railColor}
                 metalness={1}
@@ -455,12 +456,12 @@ export const Rack = memo(({
               />
             </mesh>
 
-            {/* Vertical Support Rails (Back) */}
-            <mesh position={[-width / 2 + 0.06, 0, -depth / 2 + 0.12]} geometry={SHARED_GEO.backRail} scale={[1, height - 0.08, 1]}>
-              <meshStandardMaterial color={railColor} roughness={0.5} />
+            {/* Vertical Support Rails (Back) - 사이드 쪽으로 밀착 배치 */}
+            <mesh position={[-width / 2 + 0.025, 0, -depth / 2 + 0.08]} geometry={SHARED_GEO.backRail} scale={[1, height - 0.08, 1]}>
+              <meshStandardMaterial color={railColor} roughness={0.3} metalness={0.9} />
             </mesh>
-            <mesh position={[width / 2 - 0.06, 0, -depth / 2 + 0.12]} geometry={SHARED_GEO.backRail} scale={[1, height - 0.08, 1]}>
-              <meshStandardMaterial color={railColor} roughness={0.5} />
+            <mesh position={[width / 2 - 0.025, 0, -depth / 2 + 0.08]} geometry={SHARED_GEO.backRail} scale={[1, height - 0.08, 1]}>
+              <meshStandardMaterial color={railColor} roughness={0.3} metalness={0.9} />
             </mesh>
           </group>
         </group>
@@ -895,16 +896,22 @@ const DeviceMesh = ({
     if (!needsAnimation) {
       const bodyMat = meshRef.current?.material;
       const faceMat = faceplateRef.current?.material;
-      if (bodyMat instanceof MeshStandardMaterial) {
-        bodyMat.emissive.copy(blackColor);
-        bodyMat.emissiveIntensity = 0;
-        bodyMat.opacity = 1.0;
-      }
-      if (faceMat instanceof MeshStandardMaterial) {
-        faceMat.emissive.copy(blackColor);
-        faceMat.emissiveIntensity = 0;
-        faceMat.opacity = 1.0;
-      }
+
+      const resetMat = (m: any) => {
+        if (!m) return;
+        if (Array.isArray(m)) {
+          m.forEach(resetMat);
+        } else if (m instanceof MeshStandardMaterial) {
+          m.emissive.copy(blackColor);
+          m.emissiveIntensity = 0;
+          if (!m.userData?.isFrontTransparent) {
+            m.opacity = 1.0;
+          }
+        }
+      };
+
+      resetMat(bodyMat);
+      resetMat(faceMat);
     }
   }, [needsAnimation, blackColor]);
 
@@ -917,40 +924,36 @@ const DeviceMesh = ({
     const bodyMat = meshRef.current?.material;
     const faceMat = faceplateRef.current?.material;
 
+    const setMatEmissive = (m: any, col: Color | string, intensity: number) => {
+      if (!m) return;
+      if (Array.isArray(m)) {
+        m.forEach((sub) => setMatEmissive(sub, col, intensity));
+      } else if (m instanceof MeshStandardMaterial) {
+        if (typeof col === "string") {
+          m.emissive.set(col);
+        } else {
+          m.emissive.copy(col);
+        }
+        m.emissiveIntensity = intensity;
+      }
+    };
+
     if (hasError && errorColor) {
       const intensity =
         0.5 + Math.sin(clock.getElapsedTime() * Math.PI * 3) * 0.5;
 
-      if (bodyMat instanceof MeshStandardMaterial) {
-        bodyMat.emissive.set(errorColor);
-        bodyMat.emissiveIntensity = intensity * 0.375;
-      }
-      if (faceMat instanceof MeshStandardMaterial) {
-        faceMat.emissive.set(errorColor);
-        faceMat.emissiveIntensity = intensity * 0.875;
-      }
+      setMatEmissive(bodyMat, errorColor, intensity * 0.375);
+      setMatEmissive(faceMat, errorColor, intensity * 0.875);
     } else if (isHighlighted) {
       const pulse =
         0.5 + Math.sin(clock.getElapsedTime() * Math.PI * 1.6) * 0.5;
 
-      if (bodyMat instanceof MeshStandardMaterial) {
-        bodyMat.emissive.copy(highlightColor);
-        bodyMat.emissiveIntensity = pulse * 4;
-      }
-      if (faceMat instanceof MeshStandardMaterial) {
-        faceMat.emissive.copy(highlightColor);
-        faceMat.emissiveIntensity = pulse * 4;
-      }
+      setMatEmissive(bodyMat, highlightColor, pulse * 4);
+      setMatEmissive(faceMat, highlightColor, pulse * 4);
     } else if (isDeviceHovered) {
       // Hovered device uses outline only, not material glow.
-      if (bodyMat instanceof MeshStandardMaterial) {
-        bodyMat.emissive.copy(blackColor);
-        bodyMat.emissiveIntensity = 0;
-      }
-      if (faceMat instanceof MeshStandardMaterial) {
-        faceMat.emissive.copy(blackColor);
-        faceMat.emissiveIntensity = 0;
-      }
+      setMatEmissive(bodyMat, blackColor, 0);
+      setMatEmissive(faceMat, blackColor, 0);
     }
   });
 
@@ -978,6 +981,33 @@ const DeviceMesh = ({
   const actualDepth = Math.min(DEVICE_DEPTH, rackDepth - 0.1);
   const validDepth = Math.max(actualDepth, 0.1);
   const deviceZCenter = 0.06 - validDepth / 2;
+
+  const isChassis = isChassisModel(device.modelName || "");
+
+  const chassisBodyMaterials = useMemo(() => {
+    if (!isChassis) return null;
+    const standardMat = new MeshStandardMaterial({
+      color: "#c8d2df",
+      roughness: 0.36,
+      metalness: 0.7,
+    });
+    const frontTransparentMat = new MeshStandardMaterial({
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    });
+    frontTransparentMat.userData = { isFrontTransparent: true };
+
+    // Three.js BoxGeometry material order: [+X, -X, +Y, -Y, +Z (Front), -Z (Back)]
+    return [
+      standardMat,
+      standardMat,
+      standardMat,
+      standardMat,
+      frontTransparentMat,
+      standardMat,
+    ];
+  }, [isChassis]);
 
   return (
     <group
@@ -1053,7 +1083,7 @@ const DeviceMesh = ({
         }
 
         e.stopPropagation();
-        
+
         // R3F 렌더링 최적화/캐싱으로 인해 onPointerOver가 누락되는 경우를 대비해
         // onPointerMove에서도 hover 상태를 강제로 복구해줍니다.
         if (!isDeviceHovered) {
@@ -1085,13 +1115,15 @@ const DeviceMesh = ({
       {(() => {
         const content = (
           <>
-            <mesh ref={meshRef}>
+            <mesh ref={meshRef} material={chassisBodyMaterials || undefined}>
               <boxGeometry args={[deviceWidth, deviceH - 0.005, validDepth]} />
-              <meshStandardMaterial
-                color="#222222"
-                roughness={0.4}
-                metalness={0.7}
-              />
+              {!chassisBodyMaterials && (
+                <meshStandardMaterial
+                  color="#96a0ac"
+                  roughness={0.36}
+                  metalness={0.7}
+                />
+              )}
               {isDeviceHovered && meshRef.current?.geometry && (
                 <Edges
                   geometry={meshRef.current.geometry}
@@ -1105,21 +1137,46 @@ const DeviceMesh = ({
 
             <group position={[0, 0, validDepth / 2 + 0.001]}>
               {resolvedUrl ? (
-                <Suspense fallback={
-                  <ImageFaceplate
-                    url={thumbUrl || ""}
-                    width={deviceWidth}
-                    height={deviceH - 0.005}
-                    hasError={hasError}
-                  />
-                }>
-                  <ImageFaceplate
-                    url={resolvedUrl}
-                    width={deviceWidth}
-                    height={deviceH - 0.005}
-                    ref={faceplateRef}
-                    hasError={hasError}
-                  />
+                <Suspense
+                  fallback={
+                    isChassis ? (
+                      <ChassisRecessedFaceplate
+                        device={device}
+                        url={thumbUrl || ""}
+                        width={deviceWidth}
+                        height={deviceH - 0.005}
+                        validDepth={validDepth}
+                        hasError={hasError}
+                      />
+                    ) : (
+                      <ImageFaceplate
+                        url={thumbUrl || ""}
+                        width={deviceWidth}
+                        height={deviceH - 0.005}
+                        hasError={hasError}
+                      />
+                    )
+                  }
+                >
+                  {isChassis ? (
+                    <ChassisRecessedFaceplate
+                      device={device}
+                      url={resolvedUrl}
+                      width={deviceWidth}
+                      height={deviceH - 0.005}
+                      validDepth={validDepth}
+                      ref={faceplateRef}
+                      hasError={hasError}
+                    />
+                  ) : (
+                    <ImageFaceplate
+                      url={resolvedUrl}
+                      width={deviceWidth}
+                      height={deviceH - 0.005}
+                      ref={faceplateRef}
+                      hasError={hasError}
+                    />
+                  )}
                 </Suspense>
               ) : (
                 <DeviceFaceplate
