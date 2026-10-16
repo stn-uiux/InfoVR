@@ -190,6 +190,7 @@ function RollingChipsGrid({ chips, isPinned = false }: { chips: ChipItem[]; isPi
   const currentChips = chips.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
 
   const goToPage = (newPage: number) => {
+    setIsPaused(true);
     setFade(false);
     setTimeout(() => {
       setPage((newPage + totalPages) % totalPages);

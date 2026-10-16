@@ -7707,17 +7707,16 @@ input:checked+.slider:before {
 }
 
 .equipment-detail-chips-badge {
-  font-size: 9px;
+  font-size: 10px;
   background: rgba(56, 189, 248, 0.15);
   color: #38bdf8;
-  padding: 1px 5px;
+  padding: 1px 4px;
   border-radius: 10px;
   font-weight: 600;
-  font-family: monospace;
 }
 
 .equipment-detail-chips-pause-btn {
-  font-size: 9px;
+  font-size: 11px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 4px;
@@ -7743,7 +7742,7 @@ input:checked+.slider:before {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 13px;
   padding: 0;
 }
 
