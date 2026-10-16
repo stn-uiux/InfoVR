@@ -11,6 +11,11 @@ import type { Device, PortState } from "../../types";
 import type { CustomEquipmentModel } from "../../types/equipment";
 import { getEffectiveCards } from "../../utils/sampleUtils";
 import { getDeviceTypeLabel } from "../../utils/deviceTypes";
+import EquipmentDetail3D from "./EquipmentDetail3D";
+
+// 3D 지원 모델 목록
+const MODELS_WITH_3D = ['AS-4125GS-TNRT2'];
+
 // ─── SvgPortView ─── (SVG 프리뷰 + 포트 상호작용)
 const SvgPortView = memo(({ device, portStates, tooltipRef, editable, viewSide = "front", customModels }: {
   device: Device;
@@ -308,7 +313,12 @@ const DevicePerformanceWidget = ({ device }: { device: Device }) => {
 
 // ─── DeviceModal ───
 export const DeviceModal = ({ deviceId, onClose }: { deviceId: string; onClose: () => void }) => {
+  const [viewMode, setViewMode] = useState<'3d' | '2d'>('3d');
   const tooltipRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setViewMode('3d');
+  }, [deviceId]);
 
   // Store 셀렉터
   const { rawDevice, rackName, registeredDevice, customModels } = useStore(useShallow(useCallback((s) => {
@@ -421,32 +431,57 @@ export const DeviceModal = ({ deviceId, onClose }: { deviceId: string; onClose: 
 
           {/* Body */}
           <div className="device-modal-body">
-            <div className="device-modal-svg-area">
-              <div ref={svgContainerRef} className="device-modal-svg-wrap">
-                <div className={`device-modal-view-grid ${modalViewSides.length > 1 ? "two-sided" : ""}`}>
-                  {modalViewSides.map((side) => (
-                    <div
-                      key={side}
-                      className={`device-modal-view-panel ${defaultViewSide === side ? "is-default" : ""}`}
-                    >
-                      <div className="device-modal-view-label">
-                        <span>{side === "front" ? "앞면" : "뒷면"}</span>
-                        {defaultViewSide === side && <strong>기본</strong>}
+            {/* 3D/2D 탭: 3D 지원 모델만 표시 */}
+            {displayModel && MODELS_WITH_3D.includes(displayModel) && (
+              <div className="device-modal-view-toggle">
+                <button
+                  className={`view-toggle-btn ${viewMode === '3d' ? 'active' : ''}`}
+                  onClick={() => setViewMode('3d')}
+                >
+                  3D 내부
+                </button>
+                <button
+                  className={`view-toggle-btn ${viewMode === '2d' ? 'active' : ''}`}
+                  onClick={() => setViewMode('2d')}
+                >
+                  2D 포트
+                </button>
+              </div>
+            )}
+
+            {/* 3D View */}
+            {viewMode === '3d' && displayModel && MODELS_WITH_3D.includes(displayModel) ? (
+              <div className="device-modal-3d-area">
+                <EquipmentDetail3D className="device-modal-3d-canvas" />
+              </div>
+            ) : (
+              /* 2D View (기존) */
+              <div className="device-modal-svg-area">
+                <div ref={svgContainerRef} className="device-modal-svg-wrap">
+                  <div className={`device-modal-view-grid ${modalViewSides.length > 1 ? "two-sided" : ""}`}>
+                    {modalViewSides.map((side) => (
+                      <div
+                        key={side}
+                        className={`device-modal-view-panel ${defaultViewSide === side ? "is-default" : ""}`}
+                      >
+                        <div className="device-modal-view-label">
+                          <span>{side === "front" ? "앞면" : "뒷면"}</span>
+                          {defaultViewSide === side && <strong>기본</strong>}
+                        </div>
+                        <SvgPortView
+                          device={device}
+                          portStates={devicePortStates}
+                          tooltipRef={tooltipRef as React.RefObject<HTMLDivElement>}
+                          editable={false}
+                          viewSide={side}
+                          customModels={customModels}
+                        />
                       </div>
-                      <SvgPortView
-                        device={device}
-                        portStates={devicePortStates}
-                        tooltipRef={tooltipRef as React.RefObject<HTMLDivElement>}
-                        editable={false}
-                        viewSide={side}
-                        customModels={customModels}
-                      />
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-
+            )}
           </div>
 
           {/* Active Faults (Fixed at Bottom) */}

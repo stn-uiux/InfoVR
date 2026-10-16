@@ -422,6 +422,66 @@
   flex-shrink: 0;
 }
 
+/* ─── 3D/2D Toggle ─── */
+.device-modal-view-toggle {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 3px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-medium);
+  width: fit-content;
+}
+
+.view-toggle-btn {
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.view-toggle-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.view-toggle-btn.active {
+  background: var(--theme-primary);
+  color: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* ─── 3D Area ─── */
+.device-modal-3d-area {
+  background: radial-gradient(circle at 50% 50%, #e0e7ff 0%, #cbd5e1 60%, #94a3b8 100%);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-medium);
+  height: 480px;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+[data-theme="dark"] .device-modal-3d-area {
+  background: radial-gradient(circle at 50% 50%, #1e3a8a 0%, #0a1324 60%, #050b14 100%);
+}
+
+.device-modal-3d-canvas {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-md);
+}
+
+.device-modal-3d-canvas canvas {
+  border-radius: var(--radius-md);
+}
+
 .device-modal-svg-area {
   background-color: var(--bg-secondary);
   border-radius: var(--radius-md);
@@ -6969,6 +7029,7 @@ input:checked+.slider:before {
     opacity: 0;
     transform: scale(0.92) translateY(6px);
   }
+
   100% {
     opacity: 1;
     transform: scale(1) translateY(0);
@@ -6980,6 +7041,7 @@ input:checked+.slider:before {
     opacity: 0;
     transform: scale(0.92) translateY(-6px);
   }
+
   100% {
     opacity: 1;
     transform: scale(1) translateY(0);
@@ -7178,4 +7240,566 @@ input:checked+.slider:before {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   font-size: 11px;
   color: #94a3b8;
+}
+
+/* ==========================================================================
+   Equipment Detail 3D View (Floating Controls & Operation Guide)
+   ========================================================================== */
+
+/* Top-Right Floating Controls Bar */
+.equipment-3d-floating-controls {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Common 3D Floating Action Button */
+.equipment-3d-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(100, 116, 139, 0.35);
+  background: rgba(15, 23, 42, 0.75);
+  color: #cbd5e1;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  user-select: none;
+}
+
+[data-theme='light'] .equipment-3d-btn {
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  background: rgba(255, 255, 255, 0.85);
+  color: #334155;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.equipment-3d-btn:hover {
+  background: rgba(30, 41, 59, 0.85);
+  border-color: rgba(148, 163, 184, 0.5);
+  color: #f1f5f9;
+}
+
+[data-theme='light'] .equipment-3d-btn:hover {
+  background: rgba(241, 245, 249, 0.95);
+  border-color: rgba(148, 163, 184, 0.8);
+  color: #0f172a;
+}
+
+/* Exploded View Toggle Button */
+.equipment-3d-btn-explode.active {
+  border: 1px solid rgba(56, 189, 248, 0.8);
+  background: rgba(14, 165, 233, 0.25);
+  color: #38bdf8;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.35), 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme='light'] .equipment-3d-btn-explode.active {
+  background: rgba(14, 165, 233, 0.15);
+  box-shadow: 0 0 16px rgba(14, 165, 233, 0.25), 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.equipment-3d-btn-explode .equipment-3d-btn-icon {
+  transition: transform 0.2s ease;
+}
+
+.equipment-3d-btn-explode.active .equipment-3d-btn-icon {
+  transform: scale(1.1);
+}
+
+.equipment-3d-btn-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 8px #38bdf8;
+  display: inline-block;
+  margin-left: 2px;
+}
+
+/* Refresh / Reset Camera Button */
+.equipment-3d-btn-refresh {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  justify-content: center;
+}
+
+.equipment-3d-btn-refresh .equipment-3d-refresh-icon {
+  transition: none;
+}
+
+.equipment-3d-btn-refresh.is-spinning .equipment-3d-refresh-icon {
+  transform: rotate(360deg);
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Bottom-Left Controls Operation Guide Card */
+.equipment-3d-guide-card {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: rgba(15, 23, 42, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  user-select: none;
+}
+
+[data-theme='light'] .equipment-3d-guide-card {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+/* Guide Header */
+.equipment-3d-guide-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  letter-spacing: 0.02em;
+}
+
+[data-theme='light'] .equipment-3d-guide-header {
+  color: #64748b;
+}
+
+.equipment-3d-guide-icon {
+  flex-shrink: 0;
+}
+
+/* Guide List & Items */
+.equipment-3d-guide-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #f1f5f9;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+[data-theme='light'] .equipment-3d-guide-list {
+  color: #1e293b;
+}
+
+.equipment-3d-guide-item {
+  display: flex;
+  align-items: center;
+}
+
+.equipment-3d-guide-key {
+  font-weight: 600;
+}
+
+.equipment-3d-guide-dash {
+  opacity: 0.45;
+  font-weight: 400;
+  margin: 0 5px;
+}
+
+.equipment-3d-guide-desc {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+/* ==========================================================================
+   Equipment Detail 3D Tooltip (2D HTML Overlay Popover)
+   ========================================================================== */
+
+.equipment-detail-tooltip {
+  position: fixed;
+  z-index: 99999;
+  min-width: 180px;
+  max-width: min(360px, calc(100vw - 32px));
+  background: rgba(8, 15, 30, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #e2e8f0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(100, 116, 139, 0.35);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: none;
+  user-select: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+[data-theme='light'] .equipment-detail-tooltip {
+  background: rgba(255, 255, 255, 0.95);
+  color: #1e293b;
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.equipment-detail-tooltip.is-pinned {
+  pointer-events: auto;
+  border: 1px solid rgba(56, 189, 248, 0.6);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 0 15px rgba(56, 189, 248, 0.2);
+}
+
+.equipment-detail-tooltip.has-chips {
+  min-width: 250px;
+}
+
+.equipment-detail-tooltip.has-ram {
+  min-width: 280px;
+}
+
+/* Tooltip Header */
+.equipment-detail-tooltip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  border-bottom: 1px solid rgba(100, 116, 139, 0.3);
+  padding-bottom: 5px;
+}
+
+[data-theme='light'] .equipment-detail-tooltip-header {
+  border-bottom-color: rgba(203, 213, 225, 0.8);
+}
+
+.equipment-detail-tooltip-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.equipment-detail-tooltip-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: #f8fafc;
+}
+
+[data-theme='light'] .equipment-detail-tooltip-title {
+  color: #0f172a;
+}
+
+.equipment-detail-tooltip-badge {
+  font-size: 9px;
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-weight: 600;
+}
+
+.equipment-detail-tooltip-close {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #94a3b8;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+
+.equipment-detail-tooltip-close:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+[data-theme='light'] .equipment-detail-tooltip-close {
+  background: rgba(0, 0, 0, 0.05);
+  color: #64748b;
+}
+
+[data-theme='light'] .equipment-detail-tooltip-close:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+/* Tooltip Row & Values */
+.equipment-detail-tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.equipment-detail-tooltip-label {
+  color: #94a3b8;
+}
+
+[data-theme='light'] .equipment-detail-tooltip-label {
+  color: #64748b;
+}
+
+.equipment-detail-tooltip-value {
+  font-family: monospace;
+  background: rgba(30, 41, 59, 0.8);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #e2e8f0;
+}
+
+[data-theme='light'] .equipment-detail-tooltip-value {
+  background: rgba(241, 245, 249, 0.9);
+  color: #1e293b;
+}
+
+/* Status Row */
+.equipment-detail-tooltip-status {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(100, 116, 139, 0.2);
+}
+
+[data-theme='light'] .equipment-detail-tooltip-status {
+  border-top-color: rgba(203, 213, 225, 0.8);
+}
+
+.equipment-detail-tooltip-status-text {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+}
+
+.equipment-detail-tooltip-status-text.is-ok {
+  color: #10b981;
+}
+
+.equipment-detail-tooltip-status-text.is-error {
+  color: #ef4444;
+}
+
+.equipment-detail-tooltip-status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 5px;
+}
+
+.equipment-detail-tooltip-status-dot.is-ok {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.4);
+}
+
+.equipment-detail-tooltip-status-dot.is-error {
+  background: #ef4444;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
+}
+
+/* RAM Grid */
+.equipment-detail-ram-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  margin-top: 8px;
+  border-top: 1px solid rgba(100, 116, 139, 0.25);
+  padding-top: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.equipment-detail-ram-box {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(100, 116, 139, 0.2);
+  border-radius: 3px;
+  padding: 3px;
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+[data-theme='light'] .equipment-detail-ram-box {
+  background: rgba(241, 245, 249, 0.8);
+  border-color: rgba(203, 213, 225, 0.8);
+}
+
+.equipment-detail-ram-title {
+  font-weight: 700;
+  font-size: 8px;
+  color: #38bdf8;
+  margin-bottom: 1px;
+}
+
+.equipment-detail-ram-val {
+  font-size: 8px;
+  font-family: monospace;
+  color: #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+[data-theme='light'] .equipment-detail-ram-val {
+  color: #334155;
+}
+
+.equipment-detail-ram-bar-track {
+  width: 100%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+[data-theme='light'] .equipment-detail-ram-bar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.equipment-detail-ram-bar-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+/* Rolling Chips Grid */
+.equipment-detail-chips-wrapper {
+  margin-top: 6px;
+  border-top: 1px solid rgba(100, 116, 139, 0.25);
+  padding-top: 6px;
+}
+
+.equipment-detail-chips-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.equipment-detail-chips-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.equipment-detail-chips-badge {
+  font-size: 9px;
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  padding: 1px 5px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.equipment-detail-chips-pause-btn {
+  font-size: 9px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 1px 4px;
+  cursor: pointer;
+  margin-left: 2px;
+}
+
+.equipment-detail-chips-nav {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.equipment-detail-chips-nav-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #cbd5e1;
+  border-radius: 3px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0;
+}
+
+.equipment-detail-chips-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.equipment-detail-chips-dots {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.equipment-detail-chips-dot {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(148, 163, 184, 0.3);
+  transition: all 0.3s ease;
+}
+
+.equipment-detail-chips-dot.active {
+  width: 12px;
+  background: #38bdf8;
+}
+
+.equipment-detail-chips-dot:not(.active) {
+  width: 5px;
+}
+
+.equipment-detail-chips-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  min-height: 120px;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.equipment-detail-chip-box {
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid rgba(100, 116, 139, 0.15);
+  border-radius: 4px;
+  padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+[data-theme='light'] .equipment-detail-chip-box {
+  background: rgba(241, 245, 249, 0.85);
+  border-color: rgba(203, 213, 225, 0.8);
+}
+
+.equipment-detail-chip-title {
+  font-weight: 600;
+  font-size: 9px;
+  color: #38bdf8;
+  margin-bottom: 1px;
 }
