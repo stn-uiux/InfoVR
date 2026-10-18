@@ -321,18 +321,19 @@ export function getChassisEmptySlots(
       const defaultCols = cardArea.columns || 1;
       const colSpan = getColSpan(card.widthType, defaultCols);
 
+      const isSlotHorizontal = cardW > cardH;
+      const isVFull = card.widthType === "vfull" || (card.cardType ? card.cardType.includes("vfull") : false);
+      const isFull = (card.widthType === "full" || (card.cardType ? card.cardType.includes("-full") : false)) && !isVFull;
+
       // [FULL 카드 3D 확장: 가로 전체 채움]
-      if (card.widthType === "full") {
+      if (isFull) {
         cardX = cardArea.x;
         cardW = cardArea.width;
       } else if (colSpan > 1) {
         cardW = cardW * colSpan;
-      }
-
-      // [VFULL 카드 3D 확장: 세로 전체 채움]
-      if (card.widthType === "vfull") {
-        const isHorizontal = cardW > cardH;
-        if (isHorizontal && cardW >= cardArea.width * 0.8) {
+      } else if (isVFull) {
+        // [VFULL 카드 3D 확장: 세로 전체 채움 혹은 눕힌 경우 가로 전체 채움]
+        if (isSlotHorizontal) {
           cardX = cardArea.x;
           cardW = cardArea.width;
         } else {

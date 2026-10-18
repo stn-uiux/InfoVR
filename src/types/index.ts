@@ -339,7 +339,7 @@ export interface ThermoHygroDevice {
   targetHumidityMin?: number; // 적정 습도 최소치 (기본 40%)
   targetHumidityMax?: number; // 적정 습도 최대치 (기본 60%)
   battery?: number; // 배터리 잔량 (%)
-  status: "normal" | "warning" | "danger" | "offline"; // 상태
+  status: "normal" | "critical" | "major" | "minor" | "warning" | "offline" | "danger"; // 상태 (정상: 초록, critical: 빨강, major: 주황, minor: 노랑, warning: 파랑, 연결안됨/오프라인: 회색)
   modelName?: string; // 모델명
   manufacturer?: string; // 제조사
   ip?: string; // 통신 IP
@@ -359,7 +359,7 @@ export interface CctvDevice {
   resolution: string; // 해상도
   fps: number; // 프레임 레이트
   codec?: string; // 코덱
-  status: "online" | "offline" | "warning"; // 상태
+  status: "normal" | "critical" | "major" | "minor" | "warning" | "offline" | "online"; // 상태 (정상: 초록, critical: 빨강, major: 주황, minor: 노랑, warning: 파랑, 연결안됨/오프라인: 회색)
   imageUrl?: string; // 실시간 스냅샷 또는 샘플 이미지 URL
   videoUrl?: string; // 실시간 스트림 또는 샘플 영상 URL
   rtspUrl?: string; // RTSP 스트리밍 주소

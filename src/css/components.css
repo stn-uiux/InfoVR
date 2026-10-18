@@ -7027,6 +7027,98 @@ input:checked+.slider:before {
   box-shadow: 0 0 10px rgba(245, 158, 11, 0.6);
 }
 
+/* Data Transition Rings (Room Switch / Sample Data / STN Testbed) */
+.mode-transition-ring.data-room {
+  border-top-color: #3b82f6;
+  border-right-color: #60a5fa;
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.45);
+}
+
+.mode-transition-ring.data-sample {
+  border-top-color: #a855f7;
+  border-right-color: #c084fc;
+  box-shadow: 0 0 16px rgba(168, 85, 247, 0.45);
+}
+
+.mode-transition-ring.data-testbed {
+  border-top-color: #10b981;
+  border-right-color: #34d399;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.45);
+}
+
+.mode-transition-ring.data-save {
+  border-top-color: #3b82f6;
+  border-right-color: #60a5fa;
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.45);
+}
+
+/* Data Transition Center Icons */
+.mode-transition-center-icon.data-room-color {
+  color: #60a5fa;
+  filter: drop-shadow(0 0 8px rgba(96, 165, 250, 0.7));
+}
+
+.mode-transition-center-icon.data-sample-color {
+  color: #c084fc;
+  filter: drop-shadow(0 0 8px rgba(192, 132, 252, 0.7));
+}
+
+.mode-transition-center-icon.data-testbed-color {
+  color: #34d399;
+  filter: drop-shadow(0 0 8px rgba(52, 211, 153, 0.7));
+}
+
+.mode-transition-center-icon.data-save-color {
+  color: #60a5fa;
+  filter: drop-shadow(0 0 8px rgba(96, 165, 250, 0.7));
+}
+
+/* Data Transition Badges */
+.mode-transition-badge.data-room-badge {
+  background: rgba(59, 130, 246, 0.18);
+  color: #60a5fa;
+  border: 1px solid rgba(96, 165, 250, 0.35);
+}
+
+.mode-transition-badge.data-sample-badge {
+  background: rgba(168, 85, 247, 0.18);
+  color: #c084fc;
+  border: 1px solid rgba(192, 132, 252, 0.35);
+}
+
+.mode-transition-badge.data-testbed-badge {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+}
+
+.mode-transition-badge.data-save-badge {
+  background: rgba(59, 130, 246, 0.18);
+  color: #60a5fa;
+  border: 1px solid rgba(96, 165, 250, 0.35);
+}
+
+/* Data Transition Progress Bars */
+.mode-transition-progress-bar.data-room-bar {
+  background: linear-gradient(90deg, #3b82f6, #93c5fd);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.6);
+}
+
+.mode-transition-progress-bar.data-sample-bar {
+  background: linear-gradient(90deg, #8b5cf6, #c084fc);
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.6);
+}
+
+.mode-transition-progress-bar.data-testbed-bar {
+  background: linear-gradient(90deg, #10b981, #6ee7b7);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
+}
+
+.mode-transition-progress-bar.data-save-bar {
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.6);
+}
+
 @keyframes modeProgressAnim {
   0% {
     transform: translateX(-100%);

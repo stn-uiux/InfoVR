@@ -9,15 +9,10 @@ import logoDark from "../../assets/logo/InfoVR_dark.svg";
 export const InitialLoader = () => {
   const { active, progress, total } = useProgress();
   const [isReady, setIsReady] = useState(false);
-  const [, setHasStarted] = useState(false);
   const nodes = useStore((s) => s.nodes);
   const activeNodeId = useStore((s) => s.activeNodeId);
   const isCanvasReady = useStore((s) => s.isCanvasReady);
   const pendingComposerTasks = useComposerTaskProgress();
-
-  useEffect(() => {
-    if (total > 0 || active) setHasStarted(true);
-  }, [total, active]);
 
   // Preload all thumbnails
   useEffect(() => {

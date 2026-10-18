@@ -1,5 +1,5 @@
 import { useShallow } from "zustand/react/shallow";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useStore } from "../../store/useStore";
 import type { ErrorLevel } from "../../types";
 import {
@@ -176,11 +176,23 @@ const getErrorDescription = (severity: ErrorLevel, errorClass: string) => {
 export const DashboardWidgets = () => {
   const nodes = useStore((state) => state.nodes);
   const activeNodeId = useStore((state) => state.activeNodeId);
+  const activeSceneNodeId = useStore((state) => state.activeSceneNodeId);
   const setActiveNode = useStore((state) => state.setActiveNode);
   const selectRack = useStore((state) => state.selectRack);
   const focusRack = useStore((state) => state.focusRack);
   const selectDevice = useStore((state) => state.selectDevice);
   const [isErrorListExpanded, setIsErrorListExpanded] = useState(false);
+
+  // Determine current active room ID
+  const currentRoomId = useMemo(() => {
+    if (activeNodeId && nodes.some((n) => n.nodeId === activeNodeId && n.type === "room")) {
+      return activeNodeId;
+    }
+    return activeSceneNodeId;
+  }, [activeNodeId, activeSceneNodeId, nodes]);
+
+  const sensorWidgetRef = useRef<HTMLDivElement | null>(null);
+  const activeRowRef = useRef<HTMLDivElement | null>(null);
   // Collect ALL racks from ALL nodes
   const allRacks = useStore(
     useShallow((state) => {
@@ -298,6 +310,28 @@ export const DashboardWidgets = () => {
     // Return only nodes that exist in hierarchy
     return sensorList;
   }, [nodes]);
+
+  // Auto-scroll the sensor widget list to the currently active room
+  useEffect(() => {
+    if (!currentRoomId) return;
+
+    const timer = setTimeout(() => {
+      const container = sensorWidgetRef.current;
+      const row = activeRowRef.current;
+      if (container && row) {
+        const containerRect = container.getBoundingClientRect();
+        const rowRect = row.getBoundingClientRect();
+        const relativeTop = rowRect.top - containerRect.top + container.scrollTop;
+        const targetScrollTop = relativeTop - (container.clientHeight - rowRect.height) / 2;
+        container.scrollTo({
+          top: Math.max(0, targetScrollTop),
+          behavior: "smooth",
+        });
+      }
+    }, 80);
+
+    return () => clearTimeout(timer);
+  }, [currentRoomId, allNodeSensors]);
 
   return (
     <div className="dashboard-widgets-container">
@@ -426,11 +460,11 @@ export const DashboardWidgets = () => {
           <span className="error-panel-total">SYSTEM SENSORS</span>
         </div>
         <div className="error-panel-content">
-          <div className="comm-sensor-widget">
+          <div className="comm-sensor-widget" ref={sensorWidgetRef}>
             <div className="weather-list">
               {allNodeSensors.length > 0 ? (
                 allNodeSensors.map((node) => {
-                  const isActive = node.id === activeNodeId;
+                  const isActive = node.id === currentRoomId;
                   const temp = node.data.temperature || 0;
                   const hum = node.data.humidity || 0;
 
@@ -459,6 +493,7 @@ export const DashboardWidgets = () => {
                   return (
                     <div
                       key={node.id}
+                      ref={isActive ? activeRowRef : null}
                       className={`weather-row ${isActive ? "active" : ""}`}
                       onClick={() => setActiveNode(node.id)}
                     >

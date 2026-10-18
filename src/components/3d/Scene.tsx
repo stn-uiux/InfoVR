@@ -198,24 +198,21 @@ const SceneReadyMonitor = ({ isReadyToMonitor }: { isReadyToMonitor: boolean }) 
   }, []);
 
   useFrame((state) => {
-    // 이미 한 번 ready가 된 적이 있으면, 후속 로딩에서는 false로 되돌리지 않음
+    // 이미 한 번 ready가 된 적이 있으면, 후속 로딩에서는 상태를 건드리지 않음
     if (hasBeenReadyOnce.current) return;
 
-    // If not ready to monitor, or if ThreeJS is still actively loading textures/models, reset.
+    // If not ready to monitor, or if ThreeJS is still actively loading textures/models, reset counter.
     if (!isReadyToMonitor || activeRef.current) {
       frameCount.current = 0;
-      if (useStore.getState().isCanvasReady) {
-        setCanvasReady(false);
-      }
       return;
     }
 
     if (frameCount.current < 5) {
       frameCount.current++;
       state.invalidate();
-      if (frameCount.current === 5 && !useStore.getState().isCanvasReady) {
-        setCanvasReady(true);
+      if (frameCount.current === 5 && !hasBeenReadyOnce.current) {
         hasBeenReadyOnce.current = true;
+        setCanvasReady(true);
       }
     }
   });
@@ -308,7 +305,7 @@ export const Scene = () => {
   const selectedDeviceId = useStore((state) => state.selectedDeviceId);
   const selectedModelId = useStore((state) => state.selectedModelId);
   const { theme } = useTheme();
-  
+
   const activeNode = nodes.find(n => n.nodeId === activeNodeId);
   const isRoomNode = activeNode?.type === "room";
 
@@ -452,19 +449,14 @@ export const Scene = () => {
       {/* Only use default basic lights in Edit Mode */}
       {isEditMode && (
         <>
-          <ambientLight intensity={isDarkMode ? 1.0 : 1.0} />
+          <ambientLight intensity={isDarkMode ? 1.0 : 0.8} />
           {/* Only render default directional light if no user-placed Light model exists */}
           {!hasUserLight && (
             <directionalLight
               position={[10, 20, 5]}
-              intensity={isDarkMode ? 1.8 : 1.8}
+              intensity={isDarkMode ? 1 : 0.5}
             />
           )}
-          <hemisphereLight
-            intensity={isDarkMode ? 0.8 : 0.8}
-            color="#ffffff"
-            groundColor="#ffffff"
-          />
         </>
       )}
 

@@ -42,6 +42,14 @@ export interface CameraState {
   zoom: number;
 }
 
+export interface DataTransitionMeta {
+  type: "room" | "sample" | "testbed" | "save";
+  badge: string;
+  title: string;
+  desc: string;
+  icon: string;
+}
+
 export type { CyberSpaceConfig } from "../types/cyberSpace";
 export {
   DEFAULT_CYBER_SPACE_CONFIG,
@@ -53,6 +61,7 @@ import {
   LIGHT_THEME_CYBER_SPACE_CONFIG,
 } from "../types/cyberSpace";
 import { getDefaultLayoutData, applyDefaultSTNLayout } from "../utils/defaultLayout";
+import { sampleRacks } from "../utils/sampleData";
 
 export const resolveNodeCyberSpaceConfig = (
   isLight: boolean,
@@ -94,6 +103,12 @@ export interface AppState {
   isEditMode: boolean;
   isModeTransitioning: boolean;
   modeTransitionTarget: boolean | null;
+  isDataTransitioning: boolean;
+  dataTransitionMeta: DataTransitionMeta | null;
+  setDataTransition: (
+    transitioning: boolean,
+    meta?: DataTransitionMeta | null,
+  ) => void;
   hoveredRackId: string | null;
   importExportModalRackId: string | null;
   deviceRegistrationModalOpen: boolean;
@@ -333,7 +348,9 @@ export interface AppState {
   linkCctvToModel: (modelId: string, cctvId: string | null) => void;
 
   // ThermoHygrometer Management
+  activeThermoHygroDetailModelId: string | null;
   activeThermoHygroMappingModelId: string | null;
+  setActiveThermoHygroDetailModelId: (id: string | null) => void;
   setActiveThermoHygroMappingModelId: (id: string | null) => void;
   linkThermoHygroToModel: (modelId: string, thermoHygroId: string | null) => void;
 
@@ -403,7 +420,7 @@ export interface AppState {
   getIsDirty: () => boolean;
   getDirtyNodeIds: () => Set<string>;
   resetAllData: () => void;
-  loadDefaultLayout: () => void;
+  loadDefaultLayout: (showLoading?: boolean) => void;
 }
 
 // Helper to check collision using AABB (Axis-Aligned Bounding Box)
@@ -548,6 +565,10 @@ export const useStore = create<AppState>()(
       isEditMode: false,
       isModeTransitioning: false,
       modeTransitionTarget: null,
+      isDataTransitioning: false,
+      dataTransitionMeta: null,
+      setDataTransition: (transitioning, meta = null) =>
+        set({ isDataTransitioning: transitioning, dataTransitionMeta: meta }),
       isCanvasReady: false,
       hoveredRackId: null,
       nodes: initialDefaultData.nodes,
@@ -578,6 +599,7 @@ export const useStore = create<AppState>()(
       activeCctvMappingModelId: null,
 
       // ThermoHygrometer Management
+      activeThermoHygroDetailModelId: null,
       activeThermoHygroMappingModelId: null,
 
       // Device Labels Tooltip (CCTV / 온습도계 상시 이름표)
@@ -839,8 +861,29 @@ export const useStore = create<AppState>()(
         });
       },
 
-      loadDefaultLayout: () => {
-        applyDefaultSTNLayout(set, get);
+      loadDefaultLayout: (showLoading = true) => {
+        if (showLoading) {
+          if (get().isDataTransitioning) return;
+          set({
+            isDataTransitioning: true,
+            dataTransitionMeta: {
+              type: "testbed",
+              badge: "STN TESTBED",
+              title: "STN 테스트베드 불러오는 중...",
+              desc: "STN 테스트베드 전산실 환경을 구축하고 있습니다",
+              icon: "mdi:folder-download",
+            },
+          });
+
+          setTimeout(() => {
+            applyDefaultSTNLayout(set, get);
+            setTimeout(() => {
+              set({ isDataTransitioning: false, dataTransitionMeta: null });
+            }, 500);
+          }, 60);
+        } else {
+          applyDefaultSTNLayout(set, get);
+        }
       },
 
 
@@ -900,105 +943,129 @@ export const useStore = create<AppState>()(
 
       saveChanges: () => {
         const {
+          isDataTransitioning,
           pendingAction,
-          racks,
-          importedModels,
-          activeSceneNodeId,
-          layouts,
           expandNodePath,
+          showToast,
         } = get();
 
-        // 1. Save current state and clear flags
-        const updatedLayouts = activeSceneNodeId
-          ? {
-            ...layouts,
-            [activeSceneNodeId]: { racks, importedModels },
-          }
-          : layouts;
+        if (isDataTransitioning) return;
 
-        // Phase 3-A: 단일 structuredClone으로 baseline 스냅샷
-        const { nodes: currentNodes } = get();
-        try {
-          const snapshot = structuredClone({ racks, importedModels, nodes: currentNodes, registeredDevices: get().registeredDevices, nodeEnvironments: get().nodeEnvironments, layouts: updatedLayouts });
-          console.log("saveChanges snapshot created:", snapshot);
+        // 1. Show transition overlay immediately
+        set({
+          isDataTransitioning: true,
+          dataTransitionMeta: {
+            type: "save",
+            badge: "SAVING CHANGES",
+            title: "변경 사항 저장 중...",
+            desc: "3D 랙 구성 및 전산실 배치 데이터를 저장하고 있습니다",
+            icon: "material-symbols:save",
+          },
+        });
 
-          set({
-            layouts: updatedLayouts,
-            baselineRacks: snapshot.racks,
-            baselineModels: snapshot.importedModels,
-            baselineNodes: snapshot.nodes,
-            baselineRegisteredDevices: snapshot.registeredDevices,
-            baselineNodeEnvironments: snapshot.nodeEnvironments,
-            baselineLayouts: snapshot.layouts,
-            baselineActiveNodeId: get().activeNodeId,
-            baselineActiveSceneNodeId: get().activeSceneNodeId,
-            undoStack: [],
-            redoStack: [],
-            showUnsavedDialog: false,
-            pendingAction: null,
-            _importDirty: false,
-          });
-          console.log("saveChanges set complete.");
-        } catch (e) {
-          console.error("saveChanges error:", e);
-        }
+        // 2. Perform save after slight tick to allow loading overlay to render smoothly
+        setTimeout(() => {
+          const { racks, importedModels, activeSceneNodeId, layouts, nodes: currentNodes } = get();
 
-        // 2. Execute pending action DIRECTLY (bypass dirty checks since we just saved)
-        if (pendingAction) {
-          if (pendingAction.type === "node") {
-            const targetNodeId = pendingAction.value;
-            expandNodePath(targetNodeId);
-            const currentLayouts = get().layouts;
+          const updatedLayouts = activeSceneNodeId
+            ? {
+              ...layouts,
+              [activeSceneNodeId]: { racks, importedModels },
+            }
+            : layouts;
 
-            const targetNode = get().nodes.find((n) => n.nodeId === targetNodeId);
-            const isRoom = !targetNode || targetNode.type === "room" || targetNode.type === "root";
-
-            const newNodeLayout = isRoom
-              ? (targetNodeId ? currentLayouts[targetNodeId] || { racks: [], importedModels: [] } : { racks: [], importedModels: [] })
-              : { racks: get().racks, importedModels: get().importedModels };
-
-            // Phase 3-A: 단일 structuredClone으로 새 노드 baseline 스냅샷
-            const newSnap = structuredClone({
-              racks: newNodeLayout.racks,
-              importedModels: newNodeLayout.importedModels,
-              nodes: get().nodes,
+          try {
+            const snapshot = structuredClone({
+              racks,
+              importedModels,
+              nodes: currentNodes,
               registeredDevices: get().registeredDevices,
+              nodeEnvironments: get().nodeEnvironments,
+              layouts: updatedLayouts,
             });
-
-            const nodeEnv = (targetNodeId && get().nodeEnvironments[targetNodeId]) || {};
-            const cyberSpaceConfig = resolveNodeCyberSpaceConfig(get().csIsLightMode, nodeEnv);
 
             set({
-              ...cyberSpaceConfig,
-              activeNodeId: targetNodeId,
-              activeSceneNodeId: isRoom ? targetNodeId : get().activeSceneNodeId,
-              racks: newNodeLayout.racks,
-              importedModels: newNodeLayout.importedModels,
-              baselineRacks: newSnap.racks,
-              baselineModels: newSnap.importedModels,
-              baselineNodes: newSnap.nodes,
-              baselineRegisteredDevices: newSnap.registeredDevices,
-              baselineActiveNodeId: targetNodeId,
-              baselineActiveSceneNodeId: isRoom ? targetNodeId : get().activeSceneNodeId,
+              layouts: updatedLayouts,
+              baselineRacks: snapshot.racks,
+              baselineModels: snapshot.importedModels,
+              baselineNodes: snapshot.nodes,
+              baselineRegisteredDevices: snapshot.registeredDevices,
+              baselineNodeEnvironments: snapshot.nodeEnvironments,
+              baselineLayouts: snapshot.layouts,
+              baselineActiveNodeId: get().activeNodeId,
+              baselineActiveSceneNodeId: get().activeSceneNodeId,
               undoStack: [],
               redoStack: [],
-              selectedRackId: null,
-              focusedRackId: null,
-              selectedDeviceId: null,
-              isDragging: false,
-              draggingRackId: null,
-              dragPosition: null,
-              dragOffset: null,
-              draggingModelId: null,
-              modelDragPosition: null,
-              modelDragOffset: null,
-              preFocusCameraState: null,
-              triggerFitToScene: get().triggerFitToScene + 1,
+              showUnsavedDialog: false,
+              pendingAction: null,
+              _importDirty: false,
             });
-          } else if (pendingAction.type === "editMode") {
-            get().setIsEditMode(pendingAction.value);
+          } catch (e) {
+            console.error("saveChanges error:", e);
           }
-        }
+
+          // Execute pending action DIRECTLY (bypass dirty checks since we just saved)
+          if (pendingAction) {
+            if (pendingAction.type === "node") {
+              const targetNodeId = pendingAction.value;
+              expandNodePath(targetNodeId);
+              const currentLayouts = get().layouts;
+
+              const targetNode = get().nodes.find((n) => n.nodeId === targetNodeId);
+              const isRoom = !targetNode || targetNode.type === "room" || targetNode.type === "root";
+
+              const newNodeLayout = isRoom
+                ? (targetNodeId ? currentLayouts[targetNodeId] || { racks: [], importedModels: [] } : { racks: [], importedModels: [] })
+                : { racks: get().racks, importedModels: get().importedModels };
+
+              const newSnap = structuredClone({
+                racks: newNodeLayout.racks,
+                importedModels: newNodeLayout.importedModels,
+                nodes: get().nodes,
+                registeredDevices: get().registeredDevices,
+              });
+
+              const nodeEnv = (targetNodeId && get().nodeEnvironments[targetNodeId]) || {};
+              const cyberSpaceConfig = resolveNodeCyberSpaceConfig(get().csIsLightMode, nodeEnv);
+
+              set({
+                ...cyberSpaceConfig,
+                activeNodeId: targetNodeId,
+                activeSceneNodeId: isRoom ? targetNodeId : get().activeSceneNodeId,
+                racks: newNodeLayout.racks,
+                importedModels: newNodeLayout.importedModels,
+                baselineRacks: newSnap.racks,
+                baselineModels: newSnap.importedModels,
+                baselineNodes: newSnap.nodes,
+                baselineRegisteredDevices: newSnap.registeredDevices,
+                baselineActiveNodeId: targetNodeId,
+                baselineActiveSceneNodeId: isRoom ? targetNodeId : get().activeSceneNodeId,
+                undoStack: [],
+                redoStack: [],
+                selectedRackId: null,
+                focusedRackId: null,
+                selectedDeviceId: null,
+                isDragging: false,
+                draggingRackId: null,
+                dragPosition: null,
+                dragOffset: null,
+                draggingModelId: null,
+                modelDragPosition: null,
+                modelDragOffset: null,
+                preFocusCameraState: null,
+                triggerFitToScene: get().triggerFitToScene + 1,
+              });
+            } else if (pendingAction.type === "editMode") {
+              get().setIsEditMode(pendingAction.value);
+            }
+          }
+
+          // 3. Smoothly close transition overlay & notify
+          setTimeout(() => {
+            set({ isDataTransitioning: false, dataTransitionMeta: null });
+            showToast("변경 사항이 성공적으로 저장되었습니다.", "success");
+          }, 450);
+        }, 80);
       },
 
       discardChanges: () => {
@@ -1137,60 +1204,97 @@ export const useStore = create<AppState>()(
         set({ _cameraRef: camera, _controlsRef: controls }),
       setHoveredRack: (id) => set({ hoveredRackId: id }),
       setActiveNode: (nodeId) => {
-        const { expandNodePath, layouts, nodes, racks, importedModels, activeSceneNodeId } = get();
-
-        // 1. Update the current node's layout in the central layouts object BEFORE switching
-        const updatedLayouts = { ...layouts };
-        if (activeSceneNodeId) {
-          updatedLayouts[activeSceneNodeId] = { racks, importedModels };
-        }
-
-        expandNodePath(nodeId);
+        const { expandNodePath, nodes, activeSceneNodeId, isDataTransitioning } = get();
 
         const targetNode = nodes.find((n) => n.nodeId === nodeId);
         const isRoom = !targetNode || targetNode.type === "room" || targetNode.type === "root";
+        const isSwitchingRoom = targetNode?.type === "room" && nodeId !== activeSceneNodeId;
 
-        // Switch Layout ONLY if it's a room/root
-        const newNodeLayout = isRoom
-          ? (nodeId ? updatedLayouts[nodeId] || { racks: [], importedModels: [] } : { racks: [], importedModels: [] })
-          : { racks, importedModels }; // Keep current layout for groups
+        const performNodeSwitch = () => {
+          const currentLayouts = { ...get().layouts };
+          const curActiveSceneNodeId = get().activeSceneNodeId;
+          if (curActiveSceneNodeId) {
+            const existingLayout = currentLayouts[curActiveSceneNodeId];
+            if (get().racks.length > 0 || get().isEditMode || !existingLayout || existingLayout.racks.length === 0) {
+              currentLayouts[curActiveSceneNodeId] = { racks: get().racks, importedModels: get().importedModels };
+            }
+          }
 
-        // Fetch Node-specific CyberSpace Environment or Default
-        const nodeEnv = (nodeId && get().nodeEnvironments[nodeId]) || {};
-        const cyberSpaceConfig = resolveNodeCyberSpaceConfig(get().csIsLightMode, nodeEnv);
+          expandNodePath(nodeId);
 
-        set({
-          ...cyberSpaceConfig,
-          layouts: updatedLayouts,
-          activeNodeId: nodeId,
-          activeSceneNodeId: isRoom ? nodeId : activeSceneNodeId,
-          racks: newNodeLayout.racks,
-          importedModels: newNodeLayout.importedModels,
-          // We NO LONGER update baselines here because editing is now project-wide.
-          // Baselines are only updated when the user explicitly clicks "Save".
+          let newNodeLayout = isRoom
+            ? (nodeId ? currentLayouts[nodeId] || { racks: [], importedModels: [] } : { racks: [], importedModels: [] })
+            : { racks: get().racks, importedModels: get().importedModels };
 
-          undoStack: [], // Clear undo stack on node switch to prevent mixing node states
-          redoStack: [], // Clear redo stack on node switch
-          selectedRackId: null,
-          focusedRackId: null,
-          obstructingRackIds: [],
-          obstructingModelIds: [],
-          hoveredRackId: null,
-          selectedDeviceId: null,
-          isDragging: false,
-          draggingRackId: null,
-          dragPosition: null,
-          dragOffset: null,
-          draggingModelId: null,
-          modelDragPosition: null,
-          modelDragOffset: null,
-          preFocusCameraState: null,
-          triggerFitToScene: get().triggerFitToScene + 1,
-        });
+          // Healing fallback: If room layout is empty but sample data exists, recover it
+          if (isRoom && nodeId && (!newNodeLayout.racks || newNodeLayout.racks.length === 0)) {
+            const matchedSample = sampleRacks.filter((r) => r.mapId === nodeId);
+            if (matchedSample.length > 0) {
+              newNodeLayout = {
+                racks: structuredClone(matchedSample),
+                importedModels: newNodeLayout.importedModels || [],
+              };
+              currentLayouts[nodeId] = newNodeLayout;
+            }
+          }
+
+          const nodeEnv = (nodeId && get().nodeEnvironments[nodeId]) || {};
+          const cyberSpaceConfig = resolveNodeCyberSpaceConfig(get().csIsLightMode, nodeEnv);
+
+          set({
+            ...cyberSpaceConfig,
+            layouts: currentLayouts,
+            activeNodeId: nodeId,
+            activeSceneNodeId: isRoom ? nodeId : curActiveSceneNodeId,
+            racks: newNodeLayout.racks,
+            importedModels: newNodeLayout.importedModels,
+            undoStack: [],
+            redoStack: [],
+            selectedRackId: null,
+            focusedRackId: null,
+            obstructingRackIds: [],
+            obstructingModelIds: [],
+            hoveredRackId: null,
+            selectedDeviceId: null,
+            isDragging: false,
+            draggingRackId: null,
+            dragPosition: null,
+            dragOffset: null,
+            draggingModelId: null,
+            modelDragPosition: null,
+            modelDragOffset: null,
+            preFocusCameraState: null,
+            triggerFitToScene: get().triggerFitToScene + 1,
+          });
+        };
+
+        if (isSwitchingRoom) {
+          if (isDataTransitioning) return;
+          const roomName = targetNode?.name || "전산실";
+          set({
+            isDataTransitioning: true,
+            dataTransitionMeta: {
+              type: "room",
+              badge: "ROOM SWITCH",
+              title: `「${roomName}」 이동 중...`,
+              desc: "3D 랙 구성 및 전산실 환경을 불러오고 있습니다",
+              icon: "fluent:building-24-regular",
+            },
+          });
+
+          setTimeout(() => {
+            performNodeSwitch();
+            setTimeout(() => {
+              set({ isDataTransitioning: false, dataTransitionMeta: null });
+            }, 450);
+          }, 60);
+        } else {
+          performNodeSwitch();
+        }
       },
       setImportExportModalRackId: (id) => set({ importExportModalRackId: id }),
       setPinnedNode: (nodeId) => {
-        set({ pinnedNodeId: nodeId });
+        set((state) => ({ pinnedNodeId: state.pinnedNodeId === nodeId ? null : nodeId }));
       },
       setDeviceRegistrationModalOpen: (open) =>
         set({ deviceRegistrationModalOpen: open }),
@@ -2500,15 +2604,19 @@ export const useStore = create<AppState>()(
         const collapsedNodeIds = new Set<string>();
 
         const firstRoomNode = finalNodes.find((n) => n.type === "room");
-        const activeNodeId = firstRoomNode
-          ? firstRoomNode.nodeId
+        const pinnedRoom = get().pinnedNodeId
+          ? finalNodes.find((n) => n.nodeId === get().pinnedNodeId && n.type === "room")
+          : null;
+        const targetRoom = pinnedRoom || firstRoomNode;
+        const activeNodeId = targetRoom
+          ? targetRoom.nodeId
           : rootNode
             ? rootNode.nodeId
             : finalNodes.length > 0
               ? finalNodes[0].nodeId
               : null;
 
-        const activeSceneNodeId = firstRoomNode ? firstRoomNode.nodeId : activeNodeId;
+        const activeSceneNodeId = targetRoom ? targetRoom.nodeId : activeNodeId;
 
         // Group racks and models by nodeId
         const layouts: Record<
@@ -2539,9 +2647,11 @@ export const useStore = create<AppState>()(
         // Fetch Node-specific CyberSpace Environment or Default
         const nodeEnv = (activeNodeId && get().nodeEnvironments[activeNodeId]) || {};
         const cyberSpaceConfig = resolveNodeCyberSpaceConfig(get().csIsLightMode, nodeEnv);
+        const currentLowSpec = get().csLowSpecMode;
 
         set((state) => ({
           ...cyberSpaceConfig,
+          csLowSpecMode: currentLowSpec,
           layouts,
           racks: activeLayout.racks,
           importedModels: activeLayout.importedModels,
@@ -2553,9 +2663,13 @@ export const useStore = create<AppState>()(
           selectedRackId: null,
           focusedRackId: null,
           selectedModelId: null,
-          // Set baselines to pre-load state so dirty detection works
-          // Phase 3-A: 단일 structuredClone으로 통합
-          ...(() => { const s = structuredClone({ r: state.racks, m: state.importedModels, n: state.nodes }); return { baselineRacks: s.r, baselineModels: s.m, baselineNodes: s.n }; })(),
+          baselineRacks: structuredClone(activeLayout.racks),
+          baselineModels: structuredClone(activeLayout.importedModels),
+          baselineNodes: structuredClone(finalNodes),
+          baselineRegisteredDevices: structuredClone(migratedRegDevices),
+          baselineLayouts: structuredClone(layouts),
+          baselineActiveNodeId: activeNodeId,
+          baselineActiveSceneNodeId: activeSceneNodeId,
           _importDirty: true,
           triggerFitToScene: state.triggerFitToScene + 1,
         }));
@@ -3239,6 +3353,7 @@ export const useStore = create<AppState>()(
         });
       },
 
+      setActiveThermoHygroDetailModelId: (id) => set({ activeThermoHygroDetailModelId: id }),
       setActiveThermoHygroMappingModelId: (id) => set({ activeThermoHygroMappingModelId: id }),
       linkThermoHygroToModel: (modelId, thermoHygroId) => {
         const { isEditMode, pushUndoState, activeNodeId } = get();
@@ -3356,6 +3471,7 @@ export const useStore = create<AppState>()(
           showDeviceLabels,
           activeCctvLiveModelId,
           activeCctvMappingModelId,
+          activeThermoHygroDetailModelId,
           activeThermoHygroMappingModelId,
           ...rest
         } = state;
@@ -3450,9 +3566,81 @@ export const useStore = create<AppState>()(
           };
         }
 
-        const firstRoom = (persistedState.nodes as any[])?.find((n) => n.type === "room");
-        const resolvedActiveRoomId = firstRoom ? firstRoom.nodeId : null;
-        const restoredNodeEnv = resolvedActiveRoomId ? persistedState.nodeEnvironments?.[resolvedActiveRoomId] : undefined;
+        const effectiveNodes = (persistedState.baselineNodes as any[]) || (persistedState.nodes as any[]) || [];
+        const effectiveLayouts = (persistedState.baselineLayouts as any) || (persistedState.layouts as any) || {};
+        const effectiveRegisteredDevices = (persistedState.baselineRegisteredDevices as any[]) || (persistedState.registeredDevices as any[]) || [];
+        const effectiveNodeEnvs = (persistedState.baselineNodeEnvironments as any) || (persistedState.nodeEnvironments as any) || {};
+
+        // 1. Resolve active room: check pinnedNodeId first, then hierarchy order
+        let pinnedRoomId: string | null = null;
+        if (
+          persistedState.pinnedNodeId &&
+          effectiveNodes.some((n: any) => n.nodeId === persistedState.pinnedNodeId && n.type === "room")
+        ) {
+          pinnedRoomId = persistedState.pinnedNodeId;
+        }
+
+        let firstRoomId: string | null = null;
+        const findFirstRoom = (nodesList: any[], parentId: string | null): boolean => {
+          const children = nodesList.filter((n: any) => n.parentId === parentId);
+          for (const n of children) {
+            if (n.type === "room") {
+              firstRoomId = n.nodeId;
+              return true;
+            }
+            if (findFirstRoom(nodesList, n.nodeId)) return true;
+          }
+          return false;
+        };
+        findFirstRoom(effectiveNodes, null);
+        if (!firstRoomId) {
+          const fallbackRoom = effectiveNodes.find((n: any) => n.type === "room");
+          firstRoomId = fallbackRoom ? fallbackRoom.nodeId : null;
+        }
+
+        const resolvedActiveRoomId = pinnedRoomId || firstRoomId;
+
+        // 2. Heal any empty/corrupted room layouts from sampleRacks
+        for (const node of effectiveNodes) {
+          if (node.type === "room") {
+            const layout = effectiveLayouts[node.nodeId];
+            if (!layout || !Array.isArray(layout.racks) || layout.racks.length === 0) {
+              const matchedSample = sampleRacks.filter((r) => r.mapId === node.nodeId);
+              if (matchedSample.length > 0) {
+                effectiveLayouts[node.nodeId] = {
+                  racks: structuredClone(matchedSample),
+                  importedModels: layout?.importedModels || [],
+                };
+              }
+            }
+          }
+        }
+
+        // 3. Resolve active layout and initial racks/models
+        const activeLayout = resolvedActiveRoomId && effectiveLayouts[resolvedActiveRoomId]
+          ? effectiveLayouts[resolvedActiveRoomId]
+          : null;
+
+        const initialRacks = activeLayout?.racks && activeLayout.racks.length > 0
+          ? structuredClone(activeLayout.racks)
+          : (persistedState.activeSceneNodeId === resolvedActiveRoomId && Array.isArray(persistedState.racks) && persistedState.racks.length > 0
+              ? structuredClone(persistedState.racks)
+              : (resolvedActiveRoomId ? sampleRacks.filter((r) => r.mapId === resolvedActiveRoomId) : []));
+
+        const initialModels = activeLayout?.importedModels
+          ? structuredClone(activeLayout.importedModels)
+          : (persistedState.activeSceneNodeId === resolvedActiveRoomId && Array.isArray(persistedState.importedModels)
+              ? structuredClone(persistedState.importedModels)
+              : []);
+
+        if (resolvedActiveRoomId) {
+          effectiveLayouts[resolvedActiveRoomId] = {
+            racks: structuredClone(initialRacks),
+            importedModels: structuredClone(initialModels),
+          };
+        }
+
+        const restoredNodeEnv = resolvedActiveRoomId ? effectiveNodeEnvs?.[resolvedActiveRoomId] : undefined;
         const restoredCyberSpaceConfig = resolveNodeCyberSpaceConfig(currentState.csIsLightMode, {
           ...sizeConfig,
           ...restoredNodeEnv,
@@ -3470,12 +3658,20 @@ export const useStore = create<AppState>()(
           activeNodeId: resolvedActiveRoomId,
           activeSceneNodeId: resolvedActiveRoomId,
           customModels: cleanedCustomModels,
-          racks: persistedState.baselineRacks ? structuredClone(persistedState.baselineRacks) : (persistedState.racks ? structuredClone(persistedState.racks) : []),
-          importedModels: persistedState.baselineModels ? structuredClone(persistedState.baselineModels) : (persistedState.importedModels ? structuredClone(persistedState.importedModels) : []),
-          nodes: persistedState.baselineNodes ? structuredClone(persistedState.baselineNodes) : (persistedState.nodes ? structuredClone(persistedState.nodes) : []),
-          registeredDevices: persistedState.baselineRegisteredDevices ? structuredClone(persistedState.baselineRegisteredDevices) : (persistedState.registeredDevices ? structuredClone(persistedState.registeredDevices) : []),
-          nodeEnvironments: persistedState.baselineNodeEnvironments ? structuredClone(persistedState.baselineNodeEnvironments) : (persistedState.nodeEnvironments ? structuredClone(persistedState.nodeEnvironments) : {}),
-          layouts: persistedState.baselineLayouts ? structuredClone(persistedState.baselineLayouts) : (persistedState.layouts ? structuredClone(persistedState.layouts) : {}),
+          racks: structuredClone(initialRacks),
+          importedModels: structuredClone(initialModels),
+          nodes: structuredClone(effectiveNodes),
+          registeredDevices: structuredClone(effectiveRegisteredDevices),
+          nodeEnvironments: structuredClone(effectiveNodeEnvs),
+          layouts: structuredClone(effectiveLayouts),
+          baselineRacks: structuredClone(initialRacks),
+          baselineModels: structuredClone(initialModels),
+          baselineNodes: structuredClone(effectiveNodes),
+          baselineRegisteredDevices: structuredClone(effectiveRegisteredDevices),
+          baselineNodeEnvironments: structuredClone(effectiveNodeEnvs),
+          baselineLayouts: structuredClone(effectiveLayouts),
+          baselineActiveNodeId: resolvedActiveRoomId,
+          baselineActiveSceneNodeId: resolvedActiveRoomId,
           _importDirty: false,
         };
       },

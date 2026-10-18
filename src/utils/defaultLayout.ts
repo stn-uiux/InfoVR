@@ -26,6 +26,7 @@ export interface DefaultLayoutData {
 export function getDefaultLayoutData(
   customModels?: CustomEquipmentModel[],
   isLightMode?: boolean,
+  lowSpecMode?: boolean,
 ): DefaultLayoutData {
   const models = customModels && customModels.length > 0
     ? customModels
@@ -90,7 +91,7 @@ export function getDefaultLayoutData(
     csRoomLengthCm: rawCsConfig.csRoomLengthCm ?? baseThemeConfig.csRoomLengthCm,
     csOffsetXCm: rawCsConfig.csOffsetXCm ?? baseThemeConfig.csOffsetXCm,
     csOffsetZCm: rawCsConfig.csOffsetZCm ?? baseThemeConfig.csOffsetZCm,
-    csLowSpecMode: rawCsConfig.csLowSpecMode ?? baseThemeConfig.csLowSpecMode,
+    csLowSpecMode: lowSpecMode !== undefined ? lowSpecMode : (rawCsConfig.csLowSpecMode ?? baseThemeConfig.csLowSpecMode),
     csIsLightMode: isLight,
   };
 
@@ -131,29 +132,37 @@ export function applyDefaultSTNLayout(set: (fn: (state: AppState) => Partial<App
   const state = get ? get() : undefined;
   const customModels = state?.customModels;
   const isLight = state?.csIsLightMode ?? (typeof localStorage !== "undefined" && localStorage.getItem("comm-theme") === "light");
-  const data = getDefaultLayoutData(customModels, isLight);
+  const currentLowSpec = state?.csLowSpecMode;
+  const data = getDefaultLayoutData(customModels, isLight, currentLowSpec);
 
-  set((prev) => ({
-    ...prev,
-    nodes: data.nodes,
-    racks: data.racks,
-    importedModels: data.importedModels,
-    registeredDevices: data.registeredDevices,
-    layouts: data.layouts,
-    nodeEnvironments: data.nodeEnvironments,
-    activeNodeId: data.roomId,
-    activeSceneNodeId: data.roomId,
-    cyberSpaceConfig: data.cyberSpaceConfig,
-    ...data.cyberSpaceConfig,
-    // Baseline synchronization to ensure clean (not dirty) initial state
-    baselineNodes: structuredClone(data.nodes),
-    baselineRacks: structuredClone(data.racks),
-    baselineModels: structuredClone(data.importedModels),
-    baselineRegisteredDevices: structuredClone(data.registeredDevices),
-    baselineLayouts: structuredClone(data.layouts),
-    baselineNodeEnvironments: structuredClone(data.nodeEnvironments),
-    baselineActiveNodeId: data.roomId,
-    baselineActiveSceneNodeId: data.roomId,
-    _importDirty: false,
-  }));
+  set((prev) => {
+    const preservedLowSpec = currentLowSpec !== undefined ? currentLowSpec : prev.csLowSpecMode;
+    return {
+      ...prev,
+      nodes: data.nodes,
+      racks: data.racks,
+      importedModels: data.importedModels,
+      registeredDevices: data.registeredDevices,
+      layouts: data.layouts,
+      nodeEnvironments: data.nodeEnvironments,
+      activeNodeId: data.roomId,
+      activeSceneNodeId: data.roomId,
+      cyberSpaceConfig: {
+        ...data.cyberSpaceConfig,
+        csLowSpecMode: preservedLowSpec,
+      },
+      ...data.cyberSpaceConfig,
+      csLowSpecMode: preservedLowSpec,
+      // Baseline synchronization to ensure clean (not dirty) initial state
+      baselineNodes: structuredClone(data.nodes),
+      baselineRacks: structuredClone(data.racks),
+      baselineModels: structuredClone(data.importedModels),
+      baselineRegisteredDevices: structuredClone(data.registeredDevices),
+      baselineLayouts: structuredClone(data.layouts),
+      baselineNodeEnvironments: structuredClone(data.nodeEnvironments),
+      baselineActiveNodeId: data.roomId,
+      baselineActiveSceneNodeId: data.roomId,
+      _importDirty: false,
+    };
+  });
 }

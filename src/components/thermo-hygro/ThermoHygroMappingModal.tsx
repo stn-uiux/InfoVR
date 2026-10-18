@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import { useStore } from "../../store/useStore";
 import { getThermoHygroList, getThermoHygroStatusMeta } from "../../utils/thermoHygroService";
@@ -9,7 +9,6 @@ export const ThermoHygroMappingModal: React.FC = () => {
   const setActiveThermoHygroMappingModelId = useStore((s) => s.setActiveThermoHygroMappingModelId);
   const importedModels = useStore((s) => s.importedModels);
   const linkThermoHygroToModel = useStore((s) => s.linkThermoHygroToModel);
-  const showToast = useStore((s) => s.showToast);
 
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -44,14 +43,27 @@ export const ThermoHygroMappingModal: React.FC = () => {
     );
   }, [allSensors, searchQuery]);
 
+  const handleClose = useCallback(() => {
+    setActiveThermoHygroMappingModelId(null);
+  }, [setActiveThermoHygroMappingModelId]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        handleClose();
+      }
+    };
+    if (activeModelId) {
+      window.addEventListener("keydown", handleKeyDown);
+    }
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeModelId, handleClose]);
+
   if (!activeModelId || !targetModel) return null;
 
   const currentLinkedSensorId = targetModel.thermoHygroId;
   const currentLinkedSensor = allSensors.find((s) => s.id === currentLinkedSensorId);
-
-  const handleClose = () => {
-    setActiveThermoHygroMappingModelId(null);
-  };
 
   const handleLink = (sensor: ThermoHygroDevice) => {
     linkThermoHygroToModel(targetModel.id, sensor.id);
@@ -72,10 +84,7 @@ export const ThermoHygroMappingModal: React.FC = () => {
         {/* Header */}
         <div className="mapping-modal-header">
           <div className="mapping-header-title-box">
-            <div
-              className="mapping-header-icon-wrap"
-              style={{ background: "rgba(56, 189, 248, 0.15)", color: "#38bdf8" }}
-            >
+            <div className="mapping-header-icon-wrap">
               <Icon icon="mdi:thermometer-water" width="22" height="22" className="mapping-header-icon" />
             </div>
             <div>
@@ -102,7 +111,7 @@ export const ThermoHygroMappingModal: React.FC = () => {
             {currentLinkedSensor ? (
               <span className="mapping-badge mapping-badge-linked">
                 <Icon icon="mdi:check" width="14" height="14" />
-                [{currentLinkedSensor.id}] {currentLinkedSensor.location || currentLinkedSensor.name} ({currentLinkedSensor.temperature}°C / {currentLinkedSensor.humidity}%)
+                [{currentLinkedSensor.id}] {currentLinkedSensor.name} ({currentLinkedSensor.temperature}°C / {currentLinkedSensor.humidity}%)
               </span>
             ) : (
               <span className="mapping-badge mapping-badge-unlinked">
@@ -168,32 +177,16 @@ export const ThermoHygroMappingModal: React.FC = () => {
                     handleLink(sensor);
                   }}
                 >
-                  <div
-                    className="mapping-item-avatar"
-                    style={{
-                      background: "rgba(56, 189, 248, 0.12)",
-                      color: "#38bdf8",
-                    }}
-                  >
+                  <div className="mapping-item-avatar">
                     <Icon icon="mdi:thermometer-water" width="24" height="24" />
-                    <span
-                      className="mapping-status-dot"
-                      style={{ background: statusMeta.color }}
-                    />
+                    <span className={`mapping-status-dot ${statusMeta.statusClass}`} />
                   </div>
 
                   <div className="mapping-item-content">
                     <div className="mapping-item-title-row">
                       <span className="mapping-item-id">{sensor.id}</span>
-                      <span className="mapping-item-name">{sensor.location || sensor.name}</span>
-                      <span
-                        className="mapping-pill"
-                        style={{
-                          background: statusMeta.bg,
-                          color: statusMeta.color,
-                          border: `1px solid ${statusMeta.borderColor}`,
-                        }}
-                      >
+                      <span className="mapping-item-name">{sensor.name}</span>
+                      <span className={`mapping-pill ${statusMeta.statusClass}`}>
                         {statusMeta.label}
                       </span>
                       {isLinkedToOther && (
@@ -205,12 +198,15 @@ export const ThermoHygroMappingModal: React.FC = () => {
 
                     <div className="mapping-item-meta-row">
                       <span className="mapping-meta-item">
+                        <strong>위치:</strong> {sensor.location}
+                      </span>
+                      <span className="mapping-meta-item">
                         <strong>현재 수치:</strong>{" "}
-                        <span style={{ color: "#38bdf8", fontWeight: 700 }}>
+                        <span className="mapping-metric-highlight">
                           {sensor.temperature.toFixed(1)}°C
                         </span>{" "}
                         /{" "}
-                        <span style={{ color: "#60a5fa", fontWeight: 700 }}>
+                        <span className="mapping-metric-highlight">
                           {sensor.humidity.toFixed(1)}%
                         </span>
                       </span>

@@ -638,7 +638,10 @@ function composeCards(
 
     const isSlotHorizontal = cardW > cardH;
 
-    if (card.widthType === "vfull" && equipModel.cardArea) {
+    if (card.widthType === "full" && equipModel.cardArea) {
+      cardW = equipModel.cardArea.width;
+      x = equipModel.cardArea.x;
+    } else if (card.widthType === "vfull" && equipModel.cardArea) {
       if (isSlotHorizontal) {
         cardW = equipModel.cardArea.width;
         x = equipModel.cardArea.x;

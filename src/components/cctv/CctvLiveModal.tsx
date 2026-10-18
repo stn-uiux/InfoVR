@@ -1,20 +1,18 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Icon } from "@iconify/react";
 import { useStore } from "../../store/useStore";
-import { getCctvById, getCctvList } from "../../utils/cctvService";
+import { getCctvById, getCctvList, getCctvStatusMeta, getCctvFaultInfo } from "../../utils/cctvService";
 import type { CctvDevice } from "../../types";
 
 export const CctvLiveModal: React.FC = () => {
   const activeModelId = useStore((s) => s.activeCctvLiveModelId);
   const setActiveCctvLiveModelId = useStore((s) => s.setActiveCctvLiveModelId);
   const setActiveCctvMappingModelId = useStore((s) => s.setActiveCctvMappingModelId);
-  const isEditMode = useStore((s) => s.isEditMode);
   const importedModels = useStore((s) => s.importedModels);
 
   const viewportRef = useRef<HTMLDivElement>(null);
   const [currentTime, setCurrentTime] = useState("");
   const [zoomLevel, setZoomLevel] = useState(1);
-  const [refreshKey, setRefreshKey] = useState(Date.now());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Real-time clock for CCTV timestamp overlay
@@ -52,16 +50,35 @@ export const CctvLiveModal: React.FC = () => {
   }, [targetModel]);
 
   const isActuallyLinked = !!(targetModel?.cctvId && getCctvById(targetModel.cctvId));
+  const statusMeta = useMemo(() => {
+    return getCctvStatusMeta(cctvDevice?.status, isActuallyLinked);
+  }, [cctvDevice?.status, isActuallyLinked]);
+
+  const faultInfo = useMemo(() => {
+    return getCctvFaultInfo(cctvDevice, isActuallyLinked);
+  }, [cctvDevice, isActuallyLinked]);
+
+  const handleClose = useCallback(() => {
+    setActiveCctvLiveModelId(null);
+  }, [setActiveCctvLiveModelId]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // If mapping modal is open on top, don't close live modal on Escape
+      if (e.key === "Escape" && !useStore.getState().activeCctvMappingModelId) {
+        handleClose();
+      }
+    };
+    if (activeModelId) {
+      window.addEventListener("keydown", handleKeyDown);
+    }
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeModelId, handleClose]);
 
   if (!activeModelId || !targetModel || !cctvDevice) return null;
 
-  const handleClose = () => {
-    setActiveCctvLiveModelId(null);
-  };
-
   const handleRefresh = () => {
     setIsRefreshing(true);
-    setRefreshKey(Date.now());
     setTimeout(() => setIsRefreshing(false), 300);
   };
 
@@ -83,9 +100,9 @@ export const CctvLiveModal: React.FC = () => {
   };
 
   const handleOpenEditMapping = () => {
-    const modelId = targetModel.id;
-    handleClose();
-    useStore.getState().setActiveCctvMappingModelId(modelId);
+    if (!targetModel) return;
+    // Keep CctvLiveModal open in the background so closing mapping returns to it
+    setActiveCctvMappingModelId(targetModel.id);
   };
 
   const sampleImageSrc =
@@ -102,7 +119,7 @@ export const CctvLiveModal: React.FC = () => {
         {/* Header */}
         <div className="cctv-modal-header">
           <div className="cctv-header-title-box">
-            <div className="cctv-header-icon-wrap cctv-header-icon-live">
+            <div className="cctv-header-icon-wrap">
               <Icon icon="mdi:cctv" width="24" height="24" />
             </div>
             <div>
@@ -112,14 +129,19 @@ export const CctvLiveModal: React.FC = () => {
                   <span className="cctv-pulse-dot" />
                   LIVE
                 </span>
-                {!isActuallyLinked && (
+                {isActuallyLinked ? (
+                  <span className={`cctv-pill ${statusMeta.statusClass}`}>
+                    <span className={`device-nametag-dot ${statusMeta.statusClass}`} />
+                    {statusMeta.label}
+                  </span>
+                ) : (
                   <span className="cctv-pill cctv-pill-amber">
                     샘플 화면 미리보기 (미연동)
                   </span>
                 )}
               </div>
               <p className="cctv-modal-subtitle">
-                {cctvDevice.location} &bull; IP: {cctvDevice.ip} &bull; {cctvDevice.resolution}
+                위치: {cctvDevice.location} &bull; IP: {cctvDevice.ip} &bull; {cctvDevice.resolution}
               </p>
             </div>
           </div>
@@ -259,7 +281,32 @@ export const CctvLiveModal: React.FC = () => {
 
           {/* Details & Specifications Section */}
           <div className="cctv-details-section">
-            <h3 className="cctv-section-title">
+            {/* Fault & Alarm Status Card */}
+            <div className={`device-fault-card ${faultInfo.severity}`}>
+              <div className="device-fault-header">
+                <div className="device-fault-badge-wrap">
+                  <span className={`device-fault-pill ${faultInfo.severity}`}>
+                    <span className="device-fault-dot" />
+                    {faultInfo.severity.toUpperCase()}
+                  </span>
+                  <span className="device-fault-title">{faultInfo.title}</span>
+                </div>
+                {faultInfo.occurredAt !== "-" && (
+                  <span className="device-fault-time">
+                    {faultInfo.occurredAt}
+                  </span>
+                )}
+              </div>
+              <p className="device-fault-desc">{faultInfo.description}</p>
+              {faultInfo.recommendation && (
+                <div className="device-fault-action">
+                  <span className="device-fault-action-label">권고 조치:</span>
+                  <span className="device-fault-action-text">{faultInfo.recommendation}</span>
+                </div>
+              )}
+            </div>
+
+            <h3 className="cctv-section-title comm-mt-16">
               <Icon icon="mdi:information" width="18" height="18" />
               장비 상세 제원
             </h3>
@@ -270,9 +317,9 @@ export const CctvLiveModal: React.FC = () => {
                 <span className="cctv-spec-value cctv-highlight">{cctvDevice.id}</span>
               </div>
               <div className="cctv-spec-card">
-                <span className="cctv-spec-label">통신 상태</span>
-                <span className="cctv-spec-value cctv-text-green">
-                  ● 정상 (온라인)
+                <span className="cctv-spec-label">통신 / 장애 상태</span>
+                <span className={`cctv-spec-value ${statusMeta.statusClass === "status-normal" ? "cctv-text-green" : statusMeta.statusClass}`}>
+                  ● {statusMeta.label}
                 </span>
               </div>
 
@@ -363,7 +410,7 @@ export const CctvLiveModal: React.FC = () => {
               onClick={handleOpenEditMapping}
             >
               <Icon icon="mdi:link" width="16" height="16" />
-              CCTV 연동 장비 변경
+              {isActuallyLinked ? "CCTV 연동 장비 변경" : "CCTV 연동 장비 선택"}
             </button>
           </div>
           <button

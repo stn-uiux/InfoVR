@@ -25,8 +25,7 @@ import {
 import { DigitalClock } from "../layout/DigitalClock";
 import { ThermoHygrometer } from "./ThermoHygrometer";
 import { getThermoHygroById, getThermoHygroStatusMeta } from "../../utils/thermoHygroService";
-import { getCctvById } from "../../utils/cctvService";
-import { useTheme } from "../../contexts/ThemeContext";
+import { getCctvById, getCctvStatusMeta } from "../../utils/cctvService";
 import { getNodeSensorData } from "../layout/DashboardWidgets";
 import { GltfErrorBoundary } from "./GltfErrorBoundary";
 import { findThermoHygroRackSnap, type ThermoHygroSnapTarget } from "../../utils/rackGeometry";
@@ -683,9 +682,6 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
     return model.thermoHygroId ? getThermoHygroById(model.thermoHygroId) : undefined;
   }, [model.thermoHygroId]);
 
-  // Theme for 3D overlay tags
-  const { theme } = useTheme();
-  const isDarkMode = theme === "dark";
 
   // Linked CCTV device from store / mock database
   const linkedCctv = useMemo(() => {
@@ -696,6 +692,9 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
     cctvId ||
     model.name?.match(/(?:CCTV[-\s]?\d+|\d+)/i)?.[0] ||
     "CCTV";
+  const isCctvLinked = !!linkedCctv;
+  const cctvStatus = linkedCctv ? linkedCctv.status : (model.cctvId ? "normal" : "offline");
+  const cctvStatusMeta = getCctvStatusMeta(cctvStatus, isCctvLinked);
 
   const displaySensorId =
     linkedSensor?.id ||
@@ -704,14 +703,15 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
     model.name ||
     "TH-01";
 
+  const isSensorLinked = !!linkedSensor;
   const effectiveTemp = linkedSensor
     ? linkedSensor.temperature
     : (sensorData?.temperature ?? 23.4);
   const effectiveHum = linkedSensor
     ? linkedSensor.humidity
     : (sensorData?.humidity ?? 45.2);
-  const effectiveStatus = linkedSensor ? linkedSensor.status : "normal";
-  const statusMeta = getThermoHygroStatusMeta(effectiveStatus);
+  const effectiveStatus = linkedSensor ? linkedSensor.status : (model.thermoHygroId ? "normal" : "offline");
+  const statusMeta = getThermoHygroStatusMeta(effectiveStatus, isSensorLinked);
 
   const updateModel = useStore((s) => s.updateModel);
   const setModelDragging = useStore((s) => s.setModelDragging);
@@ -778,7 +778,7 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
       }
       if (isThermoHygro) {
         e.stopPropagation();
-        useStore.getState().setActiveThermoHygroMappingModelId(model.id);
+        useStore.getState().setActiveThermoHygroDetailModelId(model.id);
         return;
       }
 
@@ -864,7 +864,7 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
         } else if (isCctv || isThermoHygro) {
           e.stopPropagation();
           document.body.style.cursor = "pointer";
-          setIsHovered(true);
+          setIsHovered((prev) => (prev ? prev : true));
         } else {
           // 뷰 모드 일반 모델(유리문, 가벽 등): 뒤쪽에 있는 랙으로 호버 이벤트가 전달되도록
           // e.stopPropagation()을 호출하지 않습니다.
@@ -911,7 +911,7 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
             }
           }
         }
-        setIsHovered(false);
+        setIsHovered((prev) => (!prev ? prev : false));
       }}
     >
       {/* Render appropriate mesh */}
@@ -958,8 +958,8 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
         </GltfErrorBoundary>
       )}
 
-      {/* 뷰모드 전용: CCTV 깜빡이는 작고 빨간 녹화(REC) LED 불빛 */}
-      {!isEditMode && isCctv && (
+      {/* 뷰모드 전용: 연동된 CCTV만 깜빡이는 작고 빨간 녹화(REC) LED 불빛 */}
+      {!isEditMode && isCctv && isCctvLinked && (
         <CctvBlinkingLed model={model} />
       )}
 
@@ -1191,102 +1191,39 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
               ref={thermoNametagRef}
               onClick={(e) => {
                 e.stopPropagation();
-                useStore.getState().setActiveThermoHygroMappingModelId(model.id);
+                useStore.getState().setActiveThermoHygroDetailModelId(model.id);
               }}
-              className="device-nametag-wrapper thermo"
-              title="클릭하여 온습도계 상세 정보 보기"
-              style={{
-                pointerEvents: showDeviceLabels ? "auto" : "none",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                userSelect: "none",
-                cursor: "pointer",
-                transition: "transform 0.15s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "scale(1.08)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "scale(1)";
-              }}
+              className={`device-nametag-wrapper thermo ${statusMeta.statusClass} ${showDeviceLabels ? "interactive" : ""}`}
+              title="클릭하여 온습도계 실시간 모니터링 보기"
             >
               {/* 메인 뱃지 */}
-              <div
-                className="device-nametag-badge thermo"
-                style={{
-                  background: isDarkMode
-                    ? "rgba(15, 23, 42, 0.94)"
-                    : "rgba(255, 255, 255, 0.96)",
-                  color: isDarkMode ? "#ebedef" : "#202226",
-                  padding: "4px 9px",
-                  borderRadius: "10px",
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  border: `1.5px solid ${statusMeta.color || "#06b6d4"}`,
-                  boxShadow: isDarkMode
-                    ? `0 0 14px ${statusMeta.color || "#06b6d4"}60, 0 4px 12px rgba(0, 0, 0, 0.5)`
-                    : `0 0 10px ${statusMeta.color || "#06b6d4"}40, 0 4px 10px rgba(0, 0, 0, 0.12)`,
-                  whiteSpace: "nowrap",
-                  backdropFilter: "blur(8px)",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: "2px",
-                  fontFamily: "Inter, system-ui, sans-serif",
-                }}
-              >
+              <div className="device-nametag-badge thermo">
                 {/* 1행: 온습도계 번호 (오프라인 지원 mdi:thermometer-water 아이콘 포함) */}
-                <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                  <span
-                    style={{
-                      width: "6px",
-                      height: "6px",
-                      borderRadius: "50%",
-                      background: statusMeta.color || "#10b981",
-                      display: "inline-block",
-                      boxShadow: `0 0 6px ${statusMeta.color || "#10b981"}`,
-                    }}
-                  />
+                <div className="device-nametag-header">
+                  <span className="device-nametag-dot" />
                   <Icon
                     icon="mdi:thermometer-water"
-                    style={{
-                      width: "14px",
-                      height: "14px",
-                      color: statusMeta.color || "#06b6d4",
-                      flexShrink: 0,
-                    }}
+                    className="device-nametag-icon"
                   />
-                  <span style={{ color: statusMeta.color || "#06b6d4", fontWeight: 800, fontSize: "11px", letterSpacing: "0.2px" }}>
+                  <span className="device-nametag-id">
                     {displaySensorId}
                   </span>
                 </div>
                 {/* 2행: 줄바꿈 후 온습도 정보 */}
-                <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "10.5px", fontWeight: 700 }}>
-                  <span style={{ color: "#38bdf8" }}>{effectiveTemp.toFixed(1)}°C</span>
-                  <span style={{ opacity: 0.35, fontSize: "9px" }}>/</span>
-                  <span style={{ color: "#60a5fa" }}>{effectiveHum.toFixed(1)}%</span>
+                <div className={`device-nametag-values ${!isSensorLinked ? "unlinked" : ""}`}>
+                  <span>
+                    {!isSensorLinked ? "--.-°C" : `${effectiveTemp.toFixed(1)}°C`}
+                  </span>
+                  <span className="device-nametag-sep">/</span>
+                  <span>
+                    {!isSensorLinked ? "--.-%" : `${effectiveHum.toFixed(1)}%`}
+                  </span>
                 </div>
               </div>
 
               {/* 기기 방향을 가리키는 얇은 어노테이션 핀 스템 */}
-              <div
-                style={{
-                  width: "1.5px",
-                  height: "10px",
-                  background: `linear-gradient(to bottom, ${statusMeta.color || "#06b6d4"}, rgba(6, 182, 212, 0.05))`,
-                }}
-              />
-              <div
-                style={{
-                  width: "4px",
-                  height: "4px",
-                  borderRadius: "50%",
-                  background: statusMeta.color || "#06b6d4",
-                  boxShadow: `0 0 6px ${statusMeta.color || "#06b6d4"}`,
-                  marginTop: "-2px",
-                }}
-              />
+              <div className="device-nametag-stem" />
+              <div className="device-nametag-pin" />
             </div>
           </Html>
         </group>
@@ -1308,88 +1245,24 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
                 e.stopPropagation();
                 useStore.getState().setActiveCctvLiveModelId(model.id);
               }}
-              className="device-nametag-wrapper cctv"
+              className={`device-nametag-wrapper cctv ${cctvStatusMeta.statusClass} ${showDeviceLabels ? "interactive" : ""}`}
               title="클릭하여 CCTV 라이브 보기"
-              style={{
-                pointerEvents: showDeviceLabels ? "auto" : "none",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                userSelect: "none",
-                cursor: "pointer",
-                transition: "transform 0.15s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "scale(1.08)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "scale(1)";
-              }}
             >
               {/* 메인 뱃지 */}
-              <div
-                className="device-nametag-badge cctv"
-                style={{
-                  background: isDarkMode
-                    ? "rgba(15, 23, 42, 0.94)"
-                    : "rgba(255, 255, 255, 0.96)",
-                  color: isDarkMode ? "#ebedef" : "#202226",
-                  padding: "4px 10px",
-                  borderRadius: "14px",
-                  fontSize: "11.5px",
-                  fontWeight: 700,
-                  border: showDeviceLabels
-                    ? "1.5px solid #3b82f6"
-                    : isDarkMode
-                      ? "1px solid rgba(255, 255, 255, 0.2)"
-                      : "1px solid rgba(0, 0, 0, 0.12)",
-                  boxShadow: showDeviceLabels
-                    ? "0 0 14px rgba(59, 130, 246, 0.6), 0 4px 12px rgba(0, 0, 0, 0.45)"
-                    : isDarkMode
-                      ? "0 4px 15px rgba(0, 0, 0, 0.45)"
-                      : "0 4px 12px rgba(0, 0, 0, 0.1)",
-                  whiteSpace: "nowrap",
-                  backdropFilter: "blur(8px)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "5px",
-                  fontFamily: "Inter, system-ui, sans-serif",
-                }}
-              >
-                <span
-                  style={{
-                    width: "6px",
-                    height: "6px",
-                    borderRadius: "50%",
-                    background: linkedCctv?.status === "offline" ? "#ef4444" : "#10b981",
-                    display: "inline-block",
-                    boxShadow: linkedCctv?.status === "offline" ? "0 0 6px #ef4444" : "0 0 6px #10b981",
-                  }}
+              <div className="device-nametag-badge cctv">
+                <span className="device-nametag-dot" />
+                <Icon
+                  icon="mdi:cctv"
+                  className="device-nametag-icon"
                 />
-                <Icon icon="mdi:cctv" style={{ width: "14px", height: "14px", color: "#3b82f6" }} />
-                <span style={{ color: "#60a5fa", fontFamily: "monospace", fontWeight: 800, fontSize: "11px" }}>
+                <span className="device-nametag-id">
                   {displayCctvNo}
                 </span>
               </div>
 
               {/* 기기 방향을 가리키는 얇은 어노테이션 핀 스템 */}
-              <div
-                style={{
-                  width: "1.5px",
-                  height: "7px",
-                  background: "linear-gradient(to bottom, #3b82f6, rgba(59, 130, 246, 0.05))",
-                }}
-              />
-              <div
-                style={{
-                  width: "4px",
-                  height: "4px",
-                  borderRadius: "50%",
-                  background: "#3b82f6",
-                  boxShadow: "0 0 6px #3b82f6",
-                  marginTop: "-2px",
-                }}
-              />
+              <div className="device-nametag-stem" />
+              <div className="device-nametag-pin" />
             </div>
           </Html>
         </group>

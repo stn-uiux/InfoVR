@@ -16,6 +16,7 @@ import { DeviceTooltip } from "./components/device/DeviceTooltip";
 import { InitialLoader } from "./components/layout/InitialLoader";
 import { ModeTransitionOverlay } from "./components/layout/ModeTransitionOverlay";
 import { ThemeTransitionOverlay } from "./components/layout/ThemeTransitionOverlay";
+import { DataTransitionOverlay } from "./components/layout/DataTransitionOverlay";
 import { SettingsDropdown } from "./components/layout/SettingsDropdown";
 const ImportExportModal = React.lazy(() =>
   import("./components/system/ImportExportModal").then((m) => ({
@@ -42,6 +43,7 @@ import { AccountPermissionsModal } from "./components/account/AccountPermissions
 import { CctvMappingModal } from "./components/cctv/CctvMappingModal";
 import { CctvLiveModal } from "./components/cctv/CctvLiveModal";
 import { ThermoHygroMappingModal } from "./components/thermo-hygro/ThermoHygroMappingModal";
+import { ThermoHygroDetailModal } from "./components/thermo-hygro/ThermoHygroDetailModal";
 import "./css/cctv.css";
 import { useTheme } from "./contexts/ThemeContext";
 import { useStore } from "./store/useStore";
@@ -442,11 +444,11 @@ function App() {
   // 3D 렌더링 및 썸네일 합성 등의 작업이 진행 중인지 여부
   const is3DLoading = !isCanvasReady || active || pendingComposerTasks > 0;
 
-  // 최초 진입 시 room 노드가 없으면 layout_STN.json 자동 로드
+  // 최초 진입 시 room 노드가 없으면 layout_STN.json 자동 로드 (InitialLoader 사용하므로 중복 오버레이 방지)
   useEffect(() => {
     const state = useStore.getState();
     if (!state.nodes.some((n) => n.type === "room")) {
-      state.loadDefaultLayout();
+      state.loadDefaultLayout(false);
     }
   }, []);
 
@@ -473,8 +475,21 @@ function App() {
   }, []);
 
   const loadSample = () => {
-    // 3D 리렌더링 트리거
-    loadState(sampleRacks, undefined, sampleRegisteredDevices, sampleNodes);
+    if (useStore.getState().isDataTransitioning) return;
+    useStore.getState().setDataTransition(true, {
+      type: "sample",
+      badge: "SAMPLE DATA",
+      title: "샘플 데이터 불러오는 중...",
+      desc: "기본 랙 및 장비 배치 데이터를 구성하고 있습니다",
+      icon: "fluent:sparkle-28-filled",
+    });
+
+    setTimeout(() => {
+      loadState(sampleRacks, undefined, sampleRegisteredDevices, sampleNodes);
+      setTimeout(() => {
+        useStore.getState().setDataTransition(false, null);
+      }, 500);
+    }, 60);
   };
 
 
@@ -690,7 +705,7 @@ function App() {
               <button
                 className="comm-btn comm-btn-md comm-btn-secondary"
                 onClick={() => {
-                  useStore.getState().loadDefaultLayout();
+                  useStore.getState().loadDefaultLayout(true);
                 }}
                 title="STN테스트베드 전산실 만들기"
               >
@@ -801,10 +816,11 @@ function App() {
       <UnsavedChangesDialog />
 
       {/* CCTV Modals */}
-      <CctvMappingModal />
       <CctvLiveModal />
+      <CctvMappingModal />
 
-      {/* ThermoHygrometer Modal */}
+      {/* ThermoHygrometer Modals */}
+      <ThermoHygroDetailModal />
       <ThermoHygroMappingModal />
 
       {/* 2D UI Overlay - Fit to Models (Fixed next to Gizmo) */}
@@ -830,6 +846,9 @@ function App() {
 
       {/* Theme Transition Dimmed Loading Overlay */}
       <ThemeTransitionOverlay />
+
+      {/* Room Change / Sample Data / STN Testbed Dimmed Loading Overlay */}
+      <DataTransitionOverlay />
     </div>
   );
 }

@@ -40,7 +40,7 @@ interface ThermoHygrometerProps {
   sensorName?: string;
   temperature?: number;
   humidity?: number;
-  status?: "normal" | "warning" | "danger" | "offline";
+  status?: "normal" | "critical" | "major" | "minor" | "warning" | "offline" | "danger" | string;
   color?: string;
   dimensions?: [number, number, number];
   emissiveIntensity?: number;
@@ -65,10 +65,13 @@ export const ThermoHygrometer = forwardRef<Mesh, ThermoHygrometerProps>(
     const glowPlaneRef = useRef<Mesh>(null);
 
     const statusLineColor = useMemo(() => {
-      if (status === "danger") return "#ef4444";
-      if (status === "warning") return "#f59e0b";
-      if (status === "offline") return "#475569";
-      return "#00f0ff"; // 고휘도 사이언 네온
+      const s = status?.toLowerCase();
+      if (s === "critical" || s === "danger") return "#ef4444";
+      if (s === "major") return "#f97316";
+      if (s === "minor") return "#eab308";
+      if (s === "warning") return "#3b82f6";
+      if (s === "offline" || s === "unlinked") return "#64748b";
+      return "#10b981"; // 정상: 초록색
     }, [status]);
 
     // 기기 고유 ID 기반 시작 딜레이 오프셋
@@ -139,23 +142,32 @@ export const ThermoHygrometer = forwardRef<Mesh, ThermoHygrometerProps>(
       if (!ctx) return;
 
       // Status color definition
+      const s = status?.toLowerCase();
       const statusColor =
-        status === "danger"
+        s === "critical" || s === "danger"
           ? "#ef4444"
-          : status === "warning"
-            ? "#f59e0b"
-            : status === "offline"
-              ? "#94a3b8"
-              : "#10b981";
+          : s === "major"
+            ? "#f97316"
+            : s === "minor"
+              ? "#eab308"
+              : s === "warning"
+                ? "#3b82f6"
+                : s === "offline" || s === "unlinked"
+                  ? "#94a3b8"
+                  : "#10b981";
 
       const statusBg =
-        status === "danger"
+        s === "critical" || s === "danger"
           ? "rgba(239, 68, 68, 0.22)"
-          : status === "warning"
-            ? "rgba(245, 158, 11, 0.22)"
-            : status === "offline"
-              ? "rgba(148, 163, 184, 0.18)"
-              : "rgba(16, 185, 129, 0.22)";
+          : s === "major"
+            ? "rgba(249, 115, 22, 0.22)"
+            : s === "minor"
+              ? "rgba(234, 179, 8, 0.22)"
+              : s === "warning"
+                ? "rgba(59, 130, 246, 0.22)"
+                : s === "offline" || s === "unlinked"
+                  ? "rgba(148, 163, 184, 0.18)"
+                  : "rgba(16, 185, 129, 0.22)";
 
       // Clear Canvas with deep OLED dark background
       ctx.fillStyle = "#090d16";
@@ -266,11 +278,17 @@ export const ThermoHygrometer = forwardRef<Mesh, ThermoHygrometerProps>(
       const tempStr =
         temperature !== undefined ? temperature.toFixed(1) : "--.-";
       const tempColor =
-        status === "danger"
+        s === "critical" || s === "danger"
           ? "#ef4444"
-          : status === "warning"
-            ? "#f59e0b"
-            : "#ffffff";
+          : s === "major"
+            ? "#f97316"
+            : s === "minor"
+              ? "#eab308"
+              : s === "warning"
+                ? "#3b82f6"
+                : s === "offline" || s === "unlinked"
+                  ? "#94a3b8"
+                  : "#ffffff";
 
       ctx.font = 'italic bold 112px "D7MBI", "D7MI", monospace';
       ctx.fillStyle = tempColor;

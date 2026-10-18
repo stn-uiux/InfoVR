@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import { useStore } from "../../store/useStore";
-import { getCctvList } from "../../utils/cctvService";
+import { getCctvList, getCctvStatusMeta } from "../../utils/cctvService";
 import type { CctvDevice } from "../../types";
 
 export const CctvMappingModal: React.FC = () => {
@@ -44,14 +44,27 @@ export const CctvMappingModal: React.FC = () => {
     );
   }, [allCctvDevices, searchQuery]);
 
+  const handleClose = useCallback(() => {
+    setActiveCctvMappingModelId(null);
+  }, [setActiveCctvMappingModelId]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        handleClose();
+      }
+    };
+    if (activeModelId) {
+      window.addEventListener("keydown", handleKeyDown);
+    }
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeModelId, handleClose]);
+
   if (!activeModelId || !targetModel) return null;
 
   const currentLinkedCctvId = targetModel.cctvId;
   const currentLinkedDevice = allCctvDevices.find((d) => d.id === currentLinkedCctvId);
-
-  const handleClose = () => {
-    setActiveCctvMappingModelId(null);
-  };
 
   const handleLink = (device: CctvDevice) => {
     linkCctvToModel(targetModel.id, device.id);
@@ -152,6 +165,7 @@ export const CctvMappingModal: React.FC = () => {
               const isCurrentLinked = device.id === currentLinkedCctvId;
               const linkedOtherModelId = linkedCctvMap.get(device.id);
               const isLinkedToOther = !!linkedOtherModelId && linkedOtherModelId !== targetModel.id;
+              const statusMeta = getCctvStatusMeta(device.status);
 
               return (
                 <div
@@ -166,27 +180,16 @@ export const CctvMappingModal: React.FC = () => {
                 >
                   <div className="mapping-item-avatar">
                     <Icon icon="mdi:cctv" width="24" height="24" />
-                    <span
-                      className={`mapping-status-dot ${
-                        device.status === "online"
-                          ? "online"
-                          : device.status === "warning"
-                            ? "warning"
-                            : "offline"
-                      }`}
-                    />
+                    <span className={`mapping-status-dot ${statusMeta.statusClass}`} />
                   </div>
 
                   <div className="mapping-item-content">
                     <div className="mapping-item-title-row">
                       <span className="mapping-item-id">{device.id}</span>
                       <span className="mapping-item-name">{device.name}</span>
-                      {device.status === "online" && (
-                        <span className="mapping-pill mapping-pill-green">정상 작동</span>
-                      )}
-                      {device.status === "warning" && (
-                        <span className="mapping-pill mapping-pill-amber">주의</span>
-                      )}
+                      <span className={`mapping-pill ${statusMeta.statusClass}`}>
+                        {statusMeta.label}
+                      </span>
                       {isLinkedToOther && (
                         <span className="mapping-pill mapping-pill-muted">
                           (다른 3D 객체와 연동됨)

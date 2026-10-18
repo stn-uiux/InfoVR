@@ -27,6 +27,8 @@ import {
 } from "../../utils/modelStorage";
 import { HierarchyTree } from "../layout/HierarchyTree";
 import { calculateDynamicRoomSize, findThermoHygroRackSnap } from "../../utils/rackGeometry";
+import { getCctvById } from "../../utils/cctvService";
+import { getThermoHygroById } from "../../utils/thermoHygroService";
 /** Read a File as a base64 data URL */
 const fileToDataUrl = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -1814,176 +1816,88 @@ const ModelProperties = ({
       {/* CCTV Specific Mapping Control */}
       {(model.builtinType === "CCTV" ||
         model.fileName?.toLowerCase().includes("cctv") ||
-        model.name?.toLowerCase().includes("cctv")) && (
-        <div
-          className="comm-mb-16"
-          style={{
-            padding: "12px",
-            background: "rgba(59, 130, 246, 0.08)",
-            border: "1px solid rgba(59, 130, 246, 0.25)",
-            borderRadius: "8px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: "8px",
-            }}
-          >
-            <span
-              style={{
-                fontSize: "12px",
-                fontWeight: 700,
-                color: "#60a5fa",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-              }}
-            >
-              <Icon icon="mdi:cctv" width="16" height="16" />
-              CCTV 연동 장비
-            </span>
-            {model.cctvId ? (
-              <span
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  color: "#4ade80",
-                  background: "rgba(34, 197, 94, 0.15)",
-                  padding: "2px 6px",
-                  borderRadius: "4px",
-                }}
-              >
-                {model.cctvId}
+        model.name?.toLowerCase().includes("cctv")) && (() => {
+        const linkedCctv = model.cctvId
+          ? (getCctvById(model.cctvId) ?? { id: model.cctvId, name: model.cctvId })
+          : null;
+        return (
+          <div className="inspector-mapping-card cctv">
+            <div className="inspector-mapping-header">
+              <span className="inspector-mapping-title">
+                <Icon icon="mdi:cctv" width="16" height="16" />
+                CCTV 연동 장비
               </span>
-            ) : (
-              <span
-                style={{
-                  fontSize: "11px",
-                  color: "rgba(255, 255, 255, 0.4)",
-                }}
-              >
-                미연동
-              </span>
+              {!linkedCctv && (
+                <span className="inspector-mapping-badge-unlinked">미연동</span>
+              )}
+            </div>
+
+            {linkedCctv && (
+              <div className="inspector-mapping-device-row">
+                <span className="inspector-mapping-id-badge">{linkedCctv.id}</span>
+                <span className="inspector-mapping-device-name" title={linkedCctv.name}>
+                  {linkedCctv.name}
+                </span>
+              </div>
             )}
+
+            <button
+              type="button"
+              className="comm-btn inspector-mapping-btn cctv"
+              onClick={() =>
+                useStore.getState().setActiveCctvMappingModelId(model.id)
+              }
+            >
+              <Icon icon="mdi:link" width="14" height="14" />
+              {linkedCctv ? "CCTV 연동 장비 변경" : "CCTV 연동 장비 선택"}
+            </button>
           </div>
-          <button
-            type="button"
-            className="comm-btn"
-            style={{
-              width: "100%",
-              height: "32px",
-              fontSize: "12px",
-              fontWeight: 600,
-              background: "#2563eb",
-              color: "#ffffff",
-              border: "none",
-              borderRadius: "6px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "6px",
-              cursor: "pointer",
-            }}
-            onClick={() =>
-              useStore.getState().setActiveCctvMappingModelId(model.id)
-            }
-          >
-            <Icon icon="mdi:link" width="14" height="14" />
-            {model.cctvId ? "CCTV 연동 장비 변경" : "CCTV 연동 장비 선택"}
-          </button>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ThermoHygrometer Mapping Section (온습도계 전용) */}
       {(model.builtinType === "ThermoHygro" ||
         model.name?.toLowerCase().includes("온습도") ||
-        model.name?.toLowerCase().includes("thermo")) && (
-        <div
-          style={{
-            marginTop: "16px",
-            padding: "12px",
-            background: "rgba(56, 189, 248, 0.08)",
-            border: "1px solid rgba(56, 189, 248, 0.25)",
-            borderRadius: "8px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: "8px",
-            }}
-          >
-            <span
-              style={{
-                fontSize: "12px",
-                fontWeight: 600,
-                color: "#38bdf8",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-              }}
-            >
-              <Icon icon="mdi:thermometer-water" width="16" height="16" />
-              온습도계 연동 장비
-            </span>
-            {model.thermoHygroId ? (
-              <span
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  color: "#38bdf8",
-                  background: "rgba(56, 189, 248, 0.15)",
-                  padding: "2px 6px",
-                  borderRadius: "4px",
-                }}
-              >
-                {model.thermoHygroId}
+        model.name?.toLowerCase().includes("thermo")) && (() => {
+        const linkedThermo = model.thermoHygroId
+          ? (getThermoHygroById(model.thermoHygroId) ?? { id: model.thermoHygroId, name: model.thermoHygroId })
+          : null;
+        return (
+          <div className="inspector-mapping-card thermo">
+            <div className="inspector-mapping-header">
+              <span className="inspector-mapping-title">
+                <Icon icon="mdi:thermometer-water" width="16" height="16" />
+                온습도계 연동 장비
               </span>
-            ) : (
-              <span
-                style={{
-                  fontSize: "11px",
-                  color: "rgba(255, 255, 255, 0.4)",
-                }}
-              >
-                미연동
-              </span>
+              {!linkedThermo && (
+                <span className="inspector-mapping-badge-unlinked">미연동</span>
+              )}
+            </div>
+
+            {linkedThermo && (
+              <div className="inspector-mapping-device-row">
+                <span className="inspector-mapping-id-badge">{linkedThermo.id}</span>
+                <span className="inspector-mapping-device-name" title={linkedThermo.name}>
+                  {linkedThermo.name}
+                </span>
+              </div>
             )}
+
+            <button
+              type="button"
+              className="comm-btn inspector-mapping-btn thermo"
+              onClick={() =>
+                useStore.getState().setActiveThermoHygroMappingModelId(model.id)
+              }
+            >
+              <Icon icon="mdi:link" width="14" height="14" />
+              {linkedThermo
+                ? "온습도계 연동 장비 변경"
+                : "온습도계 연동 장비 선택"}
+            </button>
           </div>
-          <button
-            type="button"
-            className="comm-btn"
-            style={{
-              width: "100%",
-              height: "32px",
-              fontSize: "12px",
-              fontWeight: 600,
-              background: "#0284c7",
-              color: "#ffffff",
-              border: "none",
-              borderRadius: "6px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "6px",
-              cursor: "pointer",
-            }}
-            onClick={() =>
-              useStore.getState().setActiveThermoHygroMappingModelId(model.id)
-            }
-          >
-            <Icon icon="mdi:link" width="14" height="14" />
-            {model.thermoHygroId
-              ? "온습도계 연동 장비 변경"
-              : "온습도계 연동 장비 선택"}
-          </button>
-        </div>
-      )}
+        );
+      })()}
 
       <div
         className="comm-mt-24 comm-flex-col-10"

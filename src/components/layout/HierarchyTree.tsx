@@ -385,6 +385,12 @@ export const HierarchyTree = React.memo(() => {
       return;
     }
 
+    if (pinnedNodeId && activeNodeId !== pinnedNodeId) {
+      setActiveNode(pinnedNodeId);
+      hasAppliedPinnedDefault.current = true;
+      return;
+    }
+
     const isDefaultRootSelection = rootNodes.some(
       (root) => root.nodeId === activeNodeId,
     );
