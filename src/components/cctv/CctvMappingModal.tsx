@@ -91,7 +91,7 @@ export const CctvMappingModal: React.FC = () => {
             <div>
               <h2 className="mapping-modal-title">CCTV 장비 연동 설정</h2>
               <p className="mapping-modal-subtitle">
-                3D CCTV 객체 (<span className="mapping-highlight">{targetModel.name || "CCTV"}</span>)에 실제 관제 CCTV 장비를 매핑합니다.
+                3D CCTV 객체에 실제 관제 CCTV 장비를 매핑합니다.
               </p>
             </div>
           </div>
@@ -170,9 +170,8 @@ export const CctvMappingModal: React.FC = () => {
               return (
                 <div
                   key={device.id}
-                  className={`mapping-list-item ${
-                    isCurrentLinked ? "mapping-item-active" : ""
-                  } ${isLinkedToOther ? "mapping-item-disabled" : ""}`}
+                  className={`mapping-list-item ${isCurrentLinked ? "mapping-item-active" : ""
+                    } ${isLinkedToOther ? "mapping-item-disabled" : ""}`}
                   onClick={() => {
                     if (isLinkedToOther) return;
                     handleLink(device);

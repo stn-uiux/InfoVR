@@ -1200,7 +1200,6 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
               <div className="device-nametag-badge thermo">
                 {/* 1행: 온습도계 번호 (오프라인 지원 mdi:thermometer-water 아이콘 포함) */}
                 <div className="device-nametag-header">
-                  <span className="device-nametag-dot" />
                   <Icon
                     icon="mdi:thermometer-water"
                     className="device-nametag-icon"
@@ -1250,7 +1249,6 @@ export const ImportedModelMesh = ({ model }: ImportedModelMeshProps) => {
             >
               {/* 메인 뱃지 */}
               <div className="device-nametag-badge cctv">
-                <span className="device-nametag-dot" />
                 <Icon
                   icon="mdi:cctv"
                   className="device-nametag-icon"

@@ -90,7 +90,7 @@ export const ThermoHygroMappingModal: React.FC = () => {
             <div>
               <h2 className="mapping-modal-title">온습도계 장비 연동 설정</h2>
               <p className="mapping-modal-subtitle">
-                3D 온습도계 (<span className="mapping-highlight">{targetModel.name || "온습도계"}</span>)에 실제 관제 온습도 센서를 매핑합니다.
+                3D 온습도계 객체에 실제 관제 온습도 센서를 매핑합니다.
               </p>
             </div>
           </div>
@@ -169,9 +169,8 @@ export const ThermoHygroMappingModal: React.FC = () => {
               return (
                 <div
                   key={sensor.id}
-                  className={`mapping-list-item ${
-                    isCurrentLinked ? "mapping-item-active" : ""
-                  } ${isLinkedToOther ? "mapping-item-disabled" : ""}`}
+                  className={`mapping-list-item ${isCurrentLinked ? "mapping-item-active" : ""
+                    } ${isLinkedToOther ? "mapping-item-disabled" : ""}`}
                   onClick={() => {
                     if (isLinkedToOther) return;
                     handleLink(sensor);

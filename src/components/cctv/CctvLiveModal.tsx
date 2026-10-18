@@ -54,6 +54,8 @@ export const CctvLiveModal: React.FC = () => {
     return getCctvStatusMeta(cctvDevice?.status, isActuallyLinked);
   }, [cctvDevice?.status, isActuallyLinked]);
 
+  const isDisconnected = !isActuallyLinked || statusMeta.statusClass === "status-offline" || cctvDevice?.status?.toLowerCase() === "offline";
+
   const faultInfo = useMemo(() => {
     return getCctvFaultInfo(cctvDevice, isActuallyLinked);
   }, [cctvDevice, isActuallyLinked]);
@@ -125,8 +127,8 @@ export const CctvLiveModal: React.FC = () => {
             <div>
               <div className="cctv-live-title-row">
                 <h2 className="cctv-modal-title">{cctvDevice.name}</h2>
-                <span className="cctv-live-pulse-badge">
-                  <span className="cctv-pulse-dot" />
+                <span className={`cctv-live-pulse-badge ${isDisconnected ? "offline" : ""}`}>
+                  <span className={`cctv-pulse-dot ${isDisconnected ? "offline" : ""}`} />
                   LIVE
                 </span>
                 {isActuallyLinked ? (
@@ -195,7 +197,7 @@ export const CctvLiveModal: React.FC = () => {
 
               {/* Video/Image On-Screen Display (OSD) Overlays */}
               <div className="cctv-osd cctv-osd-top-left">
-                <span className="cctv-osd-rec">● LIVE</span>
+                <span className={`cctv-osd-rec ${isDisconnected ? "offline" : ""}`}>● LIVE</span>
                 <span className="cctv-osd-text">{cctvDevice.id} [CAM 01]</span>
               </div>
 
@@ -229,10 +231,6 @@ export const CctvLiveModal: React.FC = () => {
                   <Icon icon="mdi:refresh" width="18" height="18" />
                   <span>실시간 갱신</span>
                 </button>
-                <div className="cctv-pill cctv-pill-green" style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                  <span className="cctv-pulse-dot" />
-                  <span>스트리밍 정상</span>
-                </div>
               </div>
 
               <div className="cctv-controls-right">
@@ -277,11 +275,8 @@ export const CctvLiveModal: React.FC = () => {
                 </button>
               </div>
             </div>
-          </div>
 
-          {/* Details & Specifications Section */}
-          <div className="cctv-details-section">
-            {/* Fault & Alarm Status Card */}
+            {/* Fault & Alarm Status Card (좌측 영상 컨트롤 하단으로 이동) */}
             <div className={`device-fault-card ${faultInfo.severity}`}>
               <div className="device-fault-header">
                 <div className="device-fault-badge-wrap">
@@ -305,8 +300,11 @@ export const CctvLiveModal: React.FC = () => {
                 </div>
               )}
             </div>
+          </div>
 
-            <h3 className="cctv-section-title comm-mt-16">
+          {/* Details & Specifications Section */}
+          <div className="cctv-details-section">
+            <h3 className="cctv-section-title">
               <Icon icon="mdi:information" width="18" height="18" />
               장비 상세 제원
             </h3>

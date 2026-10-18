@@ -779,12 +779,25 @@
   letter-spacing: 0.05em;
 }
 
+.cctv-live-pulse-badge.offline {
+  background: rgba(148, 163, 184, 0.15);
+  border-color: rgba(148, 163, 184, 0.35);
+  color: #94a3b8;
+}
+
 .cctv-pulse-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: #ef4444;
   animation: cctvBlink 1.4s infinite ease-in-out;
+}
+
+.cctv-live-pulse-badge.offline .cctv-pulse-dot,
+.cctv-pulse-dot.offline {
+  background: #94a3b8;
+  animation: none;
+  box-shadow: none;
 }
 
 @keyframes cctvBlink {
@@ -868,6 +881,10 @@
   gap: 12px;
 }
 
+.cctv-video-section .device-fault-card {
+  margin: 0;
+}
+
 .cctv-video-viewport {
   position: relative;
   width: 100%;
@@ -928,6 +945,12 @@
   color: #ff3333;
   text-shadow: 0 0 6px rgba(255, 51, 51, 0.8);
   animation: cctvBlink 1.2s infinite ease-in-out;
+}
+
+.cctv-osd-rec.offline {
+  color: #94a3b8;
+  text-shadow: none;
+  animation: none;
 }
 
 .cctv-osd-top-right {
@@ -1235,17 +1258,21 @@
   align-items: stretch;
   justify-content: space-between;
   gap: 16px;
-  padding: 22px 24px;
+  padding: 22px 24px 14px 24px;
 }
 
 .thermo-detail-info-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 24px 16px 24px;
+  padding: 4px 24px 14px 24px;
   font-size: 0.85rem;
   color: #94a3b8;
   font-weight: 500;
+}
+
+.thermo-detail-modal-card .device-fault-card {
+  margin: 0 20px 16px 20px;
 }
 
 .thermo-detail-location,
@@ -1605,50 +1632,28 @@
 }
 
 .device-fault-card.normal {
-  background: rgba(16, 185, 129, 0.08);
-  border-color: rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.35);
 }
 .device-fault-card.warning {
-  background: rgba(59, 130, 246, 0.08);
-  border-color: rgba(59, 130, 246, 0.3);
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.35);
 }
 .device-fault-card.minor {
-  background: rgba(234, 179, 8, 0.08);
-  border-color: rgba(234, 179, 8, 0.35);
+  background: rgba(234, 179, 8, 0.12);
+  border-color: rgba(234, 179, 8, 0.38);
 }
 .device-fault-card.major {
-  background: rgba(249, 115, 22, 0.09);
-  border-color: rgba(249, 115, 22, 0.35);
+  background: rgba(249, 115, 22, 0.12);
+  border-color: rgba(249, 115, 22, 0.38);
 }
 .device-fault-card.critical {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.45);
 }
 .device-fault-card.offline {
-  background: rgba(148, 163, 184, 0.08);
+  background: rgba(148, 163, 184, 0.1);
   border-color: rgba(148, 163, 184, 0.3);
-}
-
-[data-theme="light"] .device-fault-card {
-  background: #f8fafc;
-}
-[data-theme="light"] .device-fault-card.normal {
-  background: rgba(16, 185, 129, 0.08);
-}
-[data-theme="light"] .device-fault-card.warning {
-  background: rgba(59, 130, 246, 0.08);
-}
-[data-theme="light"] .device-fault-card.minor {
-  background: rgba(234, 179, 8, 0.08);
-}
-[data-theme="light"] .device-fault-card.major {
-  background: rgba(249, 115, 22, 0.08);
-}
-[data-theme="light"] .device-fault-card.critical {
-  background: rgba(239, 68, 68, 0.08);
-}
-[data-theme="light"] .device-fault-card.offline {
-  background: rgba(148, 163, 184, 0.08);
 }
 
 .device-fault-header {
@@ -1686,24 +1691,24 @@
 }
 
 .device-fault-pill.normal {
-  background: rgba(16, 185, 129, 0.2);
+  background: rgba(16, 185, 129, 0.22);
   color: #10b981;
 }
 .device-fault-pill.warning {
-  background: rgba(59, 130, 246, 0.2);
-  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.25);
+  color: #60a5fa;
 }
 .device-fault-pill.minor {
-  background: rgba(234, 179, 8, 0.2);
-  color: #eab308;
+  background: rgba(234, 179, 8, 0.25);
+  color: #facc15;
 }
 .device-fault-pill.major {
-  background: rgba(249, 115, 22, 0.2);
-  color: #f97316;
+  background: rgba(249, 115, 22, 0.25);
+  color: #fb923c;
 }
 .device-fault-pill.critical {
-  background: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
+  background: rgba(239, 68, 68, 0.25);
+  color: #f87171;
 }
 .device-fault-pill.offline {
   background: rgba(148, 163, 184, 0.2);
@@ -1713,29 +1718,20 @@
 .device-fault-title {
   font-size: 12.5px;
   font-weight: 700;
-  color: var(--text-primary, #ffffff);
-}
-[data-theme="light"] .device-fault-title {
-  color: #1e293b;
+  color: #ffffff !important;
 }
 
 .device-fault-time {
   font-size: 11px;
-  color: #94a3b8;
+  color: #94a3b8 !important;
   font-family: monospace;
-}
-[data-theme="light"] .device-fault-time {
-  color: #64748b;
 }
 
 .device-fault-desc {
   font-size: 12px;
-  line-height: 1.5;
-  color: #cbd5e1;
+  line-height: 1.55;
+  color: #e2e8f0 !important;
   margin: 2px 0 4px 0;
-}
-[data-theme="light"] .device-fault-desc {
-  color: #334155;
 }
 
 .device-fault-action {
@@ -1744,26 +1740,18 @@
   gap: 6px;
   padding: 6px 10px;
   border-radius: 6px;
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   font-size: 11.5px;
-  line-height: 1.4;
-}
-[data-theme="light"] .device-fault-action {
-  background: rgba(0, 0, 0, 0.05);
+  line-height: 1.45;
 }
 
 .device-fault-action-label {
   font-weight: 700;
-  color: #93c5fd;
+  color: #93c5fd !important;
   white-space: nowrap;
-}
-[data-theme="light"] .device-fault-action-label {
-  color: #2563eb;
 }
 
 .device-fault-action-text {
-  color: #e2e8f0;
-}
-[data-theme="light"] .device-fault-action-text {
-  color: #1e293b;
+  color: #f1f5f9 !important;
 }

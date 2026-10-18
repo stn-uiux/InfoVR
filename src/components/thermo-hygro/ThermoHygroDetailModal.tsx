@@ -260,7 +260,17 @@ export const ThermoHygroDetailModal: React.FC = () => {
           </div>
         </div>
 
-        {/* Fault & Alarm Status Card */}
+        {/* Location & Battery Footer Row */}
+        <div className="thermo-detail-info-row">
+          <div className="thermo-detail-location">
+            <span>📍 위치: {linkedSensor.location || targetModel.name || "전산실 내부"}</span>
+          </div>
+          <div className="thermo-detail-battery">
+            <span>🔋 {linkedSensor.battery !== undefined ? `${linkedSensor.battery}%` : "100%"}</span>
+          </div>
+        </div>
+
+        {/* Fault & Alarm Status Card (하단으로 위치 이동) */}
         <div className={`device-fault-card ${faultInfo.severity}`}>
           <div className="device-fault-header">
             <div className="device-fault-badge-wrap">
@@ -283,16 +293,6 @@ export const ThermoHygroDetailModal: React.FC = () => {
               <span className="device-fault-action-text">{faultInfo.recommendation}</span>
             </div>
           )}
-        </div>
-
-        {/* Location & Battery Footer Row */}
-        <div className="thermo-detail-info-row">
-          <div className="thermo-detail-location">
-            <span>📍 위치: {linkedSensor.location || targetModel.name || "전산실 내부"}</span>
-          </div>
-          <div className="thermo-detail-battery">
-            <span>🔋 {linkedSensor.battery !== undefined ? `${linkedSensor.battery}%` : "100%"}</span>
-          </div>
         </div>
 
         {/* Bottom Actions Footer (CCTV Modal Style) */}
