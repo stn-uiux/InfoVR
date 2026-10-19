@@ -317,11 +317,13 @@ function SpinningFan({ position, radius = 0.35, label = "Fan", rpm = 4200, isOk 
     }), [label, rpm, isOk])
   );
 
-  // RPM에 비례한 3D 회전 속도 계산 (예: 4200 RPM -> 대략 6.3 rad/s), 이상 상태일 때는 0 RPM으로 정지
-  const rotationSpeed = isOk ? (rpm * 0.0015) : 0;
+  // 멈춤 없는 무한 연속 등속도 회전
+  const rotationSpeed = isOk ? 16.0 : 0;
 
   useFrame((_, delta) => {
-    if (ref.current) ref.current.rotation.z += delta * rotationSpeed;
+    if (ref.current && isOk) {
+      ref.current.rotation.z += delta * rotationSpeed;
+    }
   });
 
   return (
@@ -348,6 +350,35 @@ function SpinningFan({ position, radius = 0.35, label = "Fan", rpm = 4200, isOk 
         <ringGeometry args={[radius * 0.85, radius, 32]} />
         <meshStandardMaterial color="#1a1a1a" />
       </mesh>
+
+      {/* 고속 회전 시 생기는 은은한 반투명 모션 블러 잔상 링 (블레이드 뒤 z=0.082에 배치) */}
+      {isOk && (
+        <group position={[0, 0, 0.082]}>
+          <mesh>
+            <ringGeometry args={[radius * 0.34, radius * 0.95, 32]} />
+            <meshStandardMaterial
+              color="#64748b"
+              transparent
+              opacity={0.18}
+              depthWrite={false}
+              roughness={0.5}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+          <mesh position={[0, 0, 0.001]}>
+            <ringGeometry args={[radius * 0.58, radius * 0.93, 32]} />
+            <meshStandardMaterial
+              color="#94a3b8"
+              transparent
+              opacity={0.12}
+              depthWrite={false}
+              roughness={0.4}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+        </group>
+      )}
+
       {/* Spinning 6-blade fan */}
       <group ref={ref} position={[0, 0, 0.09]}>
         {/* Central motor hub */}
@@ -361,14 +392,21 @@ function SpinningFan({ position, radius = 0.35, label = "Fan", rpm = 4200, isOk 
           <meshStandardMaterial color="#64748b" metalness={0.8} roughness={0.2} />
         </mesh>
 
-        {/* 6 aerodynamic fan blades */}
+        {/* 6 aerodynamic fan blades (선명하고 매끄러운 6개 블레이드) */}
         {[0, 1, 2, 3, 4, 5].map((i) => {
           const angle = (i * Math.PI * 2) / 6;
           return (
             <group key={i} rotation={[0, 0, angle]}>
               <mesh position={[radius * 0.62, 0, 0]} rotation={[0.35, 0, 0]}>
                 <boxGeometry args={[radius * 0.58, 0.075, 0.012]} />
-                <meshStandardMaterial color="#334155" metalness={0.5} roughness={0.4} />
+                <meshStandardMaterial
+                  color="#64748b"
+                  metalness={0.5}
+                  roughness={0.3}
+                  transparent={isOk}
+                  opacity={isOk ? 0.85 : 1.0}
+                  side={THREE.DoubleSide}
+                />
               </mesh>
             </group>
           );
@@ -760,10 +798,10 @@ function SystemMemory() {
             {/* RAM PCB (Vertical-aligned, Z-long) */}
             <mesh castShadow receiveShadow>
               <boxGeometry args={[0.02, 0.22, 0.65]} />
-              <meshStandardMaterial 
+              <meshStandardMaterial
                 color={hovered ? "#2563eb" : "#1e40af"}
-                roughness={0.7} 
-                metalness={0.2} 
+                roughness={0.7}
+                metalness={0.2}
               />
             </mesh>
             {/* Gold fingers contact strip */}
@@ -787,13 +825,13 @@ function SystemMemory() {
             {/* Small LED on top of RAM */}
             <mesh position={[0.012, 0.115, 0.28]}>
               <sphereGeometry args={[0.008, 8, 8]} />
-              <meshStandardMaterial 
-                color={isHighUsage ? "#ef4444" : "#10b981"} 
-                emissive={isHighUsage ? "#ef4444" : "#10b981"} 
-                emissiveIntensity={1.5} 
+              <meshStandardMaterial
+                color={isHighUsage ? "#ef4444" : "#10b981"}
+                emissive={isHighUsage ? "#ef4444" : "#10b981"}
+                emissiveIntensity={1.5}
               />
             </mesh>
-            
+
             {/* DIMM Slot socket base */}
             <mesh position={[0, -0.13, 0]}>
               <boxGeometry args={[0.035, 0.02, 0.69]} />
@@ -1074,9 +1112,16 @@ function ServerDetailScene({ isExploded = false }: { isExploded?: boolean }) {
 
       {/* Top cover - transparent/open (shows internal) */}
       <group ref={topCoverRef}>
-        <mesh position={[0, 0.8, -0.3]}>
+        <mesh position={[0, 0.8, -0.3]} renderOrder={999}>
           <boxGeometry args={[3.76, 0.03, 4.4]} />
-          <meshStandardMaterial color="#64748b" metalness={0.9} roughness={0.2} transparent opacity={0.15} />
+          <meshStandardMaterial
+            color="#64748b"
+            metalness={0.9}
+            roughness={0.2}
+            transparent
+            opacity={0.15}
+            depthWrite={false}
+          />
         </mesh>
 
         {/* Top cover frame rails */}
@@ -1674,9 +1719,8 @@ export function EquipmentDetail3D({ className }: { className?: string }) {
 
         return (
           <div
-            className={`equipment-detail-tooltip ${isPinned ? 'is-pinned' : ''} ${
-              activeTooltip.chipsGrid ? 'has-chips' : ''
-            } ${activeTooltip.ramGrid ? 'has-ram' : ''}`}
+            className={`equipment-detail-tooltip ${isPinned ? 'is-pinned' : ''} ${activeTooltip.chipsGrid ? 'has-chips' : ''
+              } ${activeTooltip.ramGrid ? 'has-ram' : ''}`}
             style={{
               left: Math.max(12, Math.min(winW - 12, anchorX)),
               top: Math.max(12, Math.min(winH - 12, anchorY)),

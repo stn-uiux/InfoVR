@@ -7441,8 +7441,17 @@ input:checked+.slider:before {
 }
 
 [data-theme='light'] .equipment-3d-btn-explode.active {
-  background: rgba(14, 165, 233, 0.15);
-  box-shadow: 0 0 16px rgba(14, 165, 233, 0.25), 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(2, 132, 199, 0.75);
+  background: rgba(224, 242, 254, 0.95);
+  color: #0284c7;
+  font-weight: 600;
+  box-shadow: 0 0 12px rgba(14, 165, 233, 0.2), 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='light'] .equipment-3d-btn-explode.active:hover {
+  background: rgba(186, 230, 253, 0.95);
+  border-color: #0284c7;
+  color: #0369a1;
 }
 
 .equipment-3d-btn-explode .equipment-3d-btn-icon {
@@ -7461,6 +7470,11 @@ input:checked+.slider:before {
   box-shadow: 0 0 8px #38bdf8;
   display: inline-block;
   margin-left: 2px;
+}
+
+[data-theme='light'] .equipment-3d-btn-dot {
+  background: #0284c7;
+  box-shadow: 0 0 6px rgba(2, 132, 199, 0.5);
 }
 
 /* Refresh / Reset Camera Button */
