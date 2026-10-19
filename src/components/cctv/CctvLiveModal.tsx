@@ -126,6 +126,7 @@ export const CctvLiveModal: React.FC = () => {
             </div>
             <div>
               <div className="cctv-live-title-row">
+                <span className="cctv-detail-id-badge">{cctvDevice.id}</span>
                 <h2 className="cctv-modal-title">{cctvDevice.name}</h2>
                 <span className={`cctv-live-pulse-badge ${isDisconnected ? "offline" : ""}`}>
                   <span className={`cctv-pulse-dot ${isDisconnected ? "offline" : ""}`} />
@@ -310,17 +311,6 @@ export const CctvLiveModal: React.FC = () => {
             </h3>
 
             <div className="cctv-spec-grid">
-              <div className="cctv-spec-card">
-                <span className="cctv-spec-label">장비 식별 번호</span>
-                <span className="cctv-spec-value cctv-highlight">{cctvDevice.id}</span>
-              </div>
-              <div className="cctv-spec-card">
-                <span className="cctv-spec-label">통신 / 장애 상태</span>
-                <span className={`cctv-spec-value ${statusMeta.statusClass === "status-normal" ? "cctv-text-green" : statusMeta.statusClass}`}>
-                  ● {statusMeta.label}
-                </span>
-              </div>
-
               <div className="cctv-spec-card">
                 <span className="cctv-spec-label">IP 주소 / 포트</span>
                 <span className="cctv-spec-value">

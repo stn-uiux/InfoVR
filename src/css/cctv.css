@@ -1231,7 +1231,8 @@
   text-overflow: ellipsis;
 }
 
-.thermo-detail-id-badge {
+.thermo-detail-id-badge,
+.cctv-detail-id-badge {
   font-size: 0.76rem;
   font-family: monospace;
   font-weight: 800;
