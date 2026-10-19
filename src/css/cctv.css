@@ -1756,3 +1756,640 @@
 .device-fault-action-text {
   color: #f1f5f9 !important;
 }
+
+/* ==========================================================================
+   Animations & Droplet Styles
+   ========================================================================== */
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.thermo-droplet-bg {
+  fill: rgba(15, 23, 42, 0.85);
+  transition: fill 0.2s ease;
+}
+
+/* Modal Smooth Theme Transitions */
+.mapping-modal-card,
+.cctv-modal-card,
+.thermo-detail-modal-card,
+.mapping-modal-header,
+.cctv-modal-header,
+.thermo-detail-header,
+.mapping-modal-footer,
+.cctv-modal-footer,
+.cctv-spec-card,
+.cctv-telemetry-box,
+.cctv-video-controls,
+.mapping-list-item,
+.cctv-list-item,
+.device-fault-card {
+  transition: background 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* ==========================================================================
+   Light Mode Theme Styles for CCTV & Thermo-Hygrometer Modals
+   ========================================================================== */
+
+/* Overlays */
+[data-theme="light"] .cctv-modal-overlay,
+[data-theme="light"] .mapping-modal-overlay {
+  background: rgba(15, 23, 42, 0.45);
+}
+
+/* Modal Cards */
+[data-theme="light"] .mapping-modal-card,
+[data-theme="light"] .cctv-modal-card {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  color: #0f172a;
+}
+
+[data-theme="light"] .thermo-detail-modal-card {
+  background: #ffffff;
+  border-color: #bae6fd;
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.2), 0 0 24px rgba(56, 189, 248, 0.15);
+  color: #0f172a;
+}
+
+/* Headers */
+[data-theme="light"] .mapping-modal-header,
+[data-theme="light"] .cctv-modal-header,
+[data-theme="light"] .thermo-detail-header {
+  border-bottom-color: #e2e8f0;
+  background: #f8fafc;
+}
+
+[data-theme="light"] .mapping-header-icon-wrap,
+[data-theme="light"] .cctv-header-icon-wrap {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #2563eb;
+}
+
+[data-theme="light"] .thermo-detail-icon-wrap {
+  background: #f0f9ff;
+  border-color: #bae6fd;
+  color: #0284c7;
+}
+
+[data-theme="light"] .mapping-header-icon-wrap svg,
+[data-theme="light"] .cctv-header-icon-wrap svg {
+  color: #2563eb;
+}
+
+[data-theme="light"] .thermo-detail-icon-wrap svg {
+  color: #0284c7;
+}
+
+[data-theme="light"] .mapping-modal-title,
+[data-theme="light"] .cctv-modal-title,
+[data-theme="light"] .thermo-detail-title {
+  color: #0f172a;
+}
+
+[data-theme="light"] .mapping-modal-subtitle,
+[data-theme="light"] .cctv-modal-subtitle,
+[data-theme="light"] .thermo-detail-subtitle {
+  color: #64748b;
+}
+
+[data-theme="light"] .mapping-highlight,
+[data-theme="light"] .cctv-highlight {
+  color: #2563eb;
+}
+
+/* Header Close Button */
+[data-theme="light"] .mapping-btn-icon-close,
+[data-theme="light"] .cctv-btn-icon-close {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #64748b;
+}
+
+[data-theme="light"] .mapping-btn-icon-close:hover,
+[data-theme="light"] .cctv-btn-icon-close:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #dc2626;
+}
+
+/* Header ID Badges */
+[data-theme="light"] .thermo-detail-id-badge,
+[data-theme="light"] .cctv-detail-id-badge {
+  background: #0f172a;
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+/* Status Bar & Search (Mapping Modals) */
+[data-theme="light"] .mapping-status-bar,
+[data-theme="light"] .cctv-status-bar {
+  background: #f8fafc;
+  border-bottom-color: #e2e8f0;
+}
+
+[data-theme="light"] .mapping-status-label,
+[data-theme="light"] .cctv-status-label {
+  color: #64748b;
+}
+
+[data-theme="light"] .mapping-search-input,
+[data-theme="light"] .cctv-search-input {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+[data-theme="light"] .mapping-search-input::placeholder,
+[data-theme="light"] .cctv-search-input::placeholder {
+  color: #94a3b8;
+}
+
+[data-theme="light"] .mapping-search-input:focus,
+[data-theme="light"] .cctv-search-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+[data-theme="light"] .mapping-search-icon,
+[data-theme="light"] .cctv-search-icon {
+  color: #94a3b8;
+}
+
+[data-theme="light"] .mapping-search-clear,
+[data-theme="light"] .cctv-search-clear {
+  color: #94a3b8;
+}
+
+[data-theme="light"] .mapping-search-clear:hover,
+[data-theme="light"] .cctv-search-clear:hover {
+  color: #334155;
+}
+
+/* List Items (Mapping Modals) */
+[data-theme="light"] .mapping-list-item,
+[data-theme="light"] .cctv-list-item {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="light"] .mapping-list-item:hover,
+[data-theme="light"] .cctv-list-item:hover {
+  background: #f8fafc;
+  border-color: #93c5fd;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
+}
+
+[data-theme="light"] .mapping-list-item.mapping-item-active,
+[data-theme="light"] .cctv-list-item.cctv-item-active {
+  background: #f0fdf4;
+  border-color: #86efac;
+  box-shadow: 0 0 0 1px #86efac, 0 4px 12px rgba(34, 197, 94, 0.1);
+}
+
+[data-theme="light"] .mapping-list-item.mapping-item-disabled,
+[data-theme="light"] .cctv-list-item.cctv-item-disabled {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  opacity: 0.6;
+}
+
+[data-theme="light"] .mapping-item-avatar,
+[data-theme="light"] .cctv-item-avatar {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #334155;
+}
+
+[data-theme="light"] .mapping-item-avatar svg,
+[data-theme="light"] .cctv-item-avatar svg {
+  color: #334155;
+}
+
+[data-theme="light"] .mapping-item-active .mapping-item-avatar,
+[data-theme="light"] .cctv-item-active .cctv-item-avatar {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #15803d;
+}
+
+[data-theme="light"] .mapping-item-active .mapping-item-avatar svg,
+[data-theme="light"] .cctv-item-active .cctv-item-avatar svg {
+  color: #15803d;
+}
+
+[data-theme="light"] .mapping-item-id,
+[data-theme="light"] .cctv-item-id {
+  background: #0f172a;
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .mapping-item-name,
+[data-theme="light"] .cctv-item-name {
+  color: #0f172a;
+}
+
+[data-theme="light"] .mapping-item-meta-row,
+[data-theme="light"] .cctv-item-meta-row {
+  color: #64748b;
+}
+
+[data-theme="light"] .mapping-meta-item strong,
+[data-theme="light"] .cctv-meta-item strong {
+  color: #334155;
+}
+
+[data-theme="light"] .mapping-metric-highlight {
+  color: #0284c7;
+}
+
+[data-theme="light"] .mapping-badge-current,
+[data-theme="light"] .cctv-badge-current {
+  color: #15803d;
+}
+
+[data-theme="light"] .mapping-empty-list,
+[data-theme="light"] .cctv-empty-list {
+  color: #64748b;
+}
+
+[data-theme="light"] .mapping-empty-icon,
+[data-theme="light"] .cctv-empty-icon {
+  color: #cbd5e1;
+}
+
+/* Badges & Status Pills in Light Mode */
+[data-theme="light"] .mapping-badge-linked,
+[data-theme="light"] .cctv-badge-linked {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #15803d;
+}
+
+[data-theme="light"] .mapping-badge-unlinked,
+[data-theme="light"] .cctv-badge-unlinked {
+  background: #fef3c7;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+[data-theme="light"] .mapping-pill.status-normal,
+[data-theme="light"] .cctv-pill.status-normal,
+[data-theme="light"] .status-pill.status-normal {
+  background: #dcfce7;
+  color: #15803d;
+  border-color: #86efac;
+}
+
+[data-theme="light"] .mapping-pill.status-warning,
+[data-theme="light"] .cctv-pill.status-warning,
+[data-theme="light"] .status-pill.status-warning {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: #93c5fd;
+}
+
+[data-theme="light"] .mapping-pill.status-minor,
+[data-theme="light"] .cctv-pill.status-minor,
+[data-theme="light"] .status-pill.status-minor {
+  background: #fefce8;
+  color: #a16207;
+  border-color: #fde047;
+}
+
+[data-theme="light"] .mapping-pill.status-major,
+[data-theme="light"] .cctv-pill.status-major,
+[data-theme="light"] .status-pill.status-major {
+  background: #fff7ed;
+  color: #c2410c;
+  border-color: #fdba74;
+}
+
+[data-theme="light"] .mapping-pill.status-critical,
+[data-theme="light"] .cctv-pill.status-critical,
+[data-theme="light"] .status-pill.status-critical {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fca5a5;
+}
+
+[data-theme="light"] .mapping-pill.status-offline,
+[data-theme="light"] .cctv-pill.status-offline,
+[data-theme="light"] .status-pill.status-offline {
+  background: #f1f5f9;
+  color: #64748b;
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .cctv-live-pulse-badge {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #dc2626;
+}
+
+[data-theme="light"] .cctv-live-pulse-badge.offline {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #64748b;
+}
+
+[data-theme="light"] .mapping-pill-amber,
+[data-theme="light"] .cctv-pill-amber {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+[data-theme="light"] .mapping-status-dot {
+  border-color: #ffffff;
+}
+
+/* CCTV Unlinked Banner */
+[data-theme="light"] .cctv-unlinked-banner {
+  background: #fffbeb;
+  border-bottom-color: #fde68a;
+  color: #92400e;
+}
+
+[data-theme="light"] .cctv-btn-banner-link {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #92400e;
+}
+
+[data-theme="light"] .cctv-btn-banner-link:hover {
+  background: #fde68a;
+}
+
+/* CCTV Video Section */
+[data-theme="light"] .cctv-video-viewport {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="light"] .cctv-video-controls {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .cctv-ctrl-btn {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
+[data-theme="light"] .cctv-ctrl-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+[data-theme="light"] .cctv-ctrl-btn:disabled {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+}
+
+[data-theme="light"] .cctv-zoom-group {
+  background: #ffffff;
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .cctv-zoom-indicator {
+  color: #0284c7;
+}
+
+/* CCTV Specs & Telemetry */
+[data-theme="light"] .cctv-section-title {
+  color: #334155;
+}
+
+[data-theme="light"] .cctv-spec-card {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .cctv-spec-label {
+  color: #64748b;
+}
+
+[data-theme="light"] .cctv-spec-value {
+  color: #0f172a;
+}
+
+[data-theme="light"] .cctv-spec-code {
+  color: #0284c7;
+  background: #e0f2fe;
+  border: 1px solid #bae6fd;
+}
+
+[data-theme="light"] .cctv-text-green {
+  color: #16a34a !important;
+}
+
+[data-theme="light"] .cctv-telemetry-box {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .cctv-telemetry-label {
+  color: #64748b;
+}
+
+[data-theme="light"] .cctv-telemetry-val {
+  color: #0f172a;
+}
+
+/* Fault & Alarm Cards */
+[data-theme="light"] .device-fault-card {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .device-fault-card.normal {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+[data-theme="light"] .device-fault-card.warning {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+[data-theme="light"] .device-fault-card.minor {
+  background: #fefce8;
+  border-color: #fef08a;
+}
+
+[data-theme="light"] .device-fault-card.major {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+[data-theme="light"] .device-fault-card.critical {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+[data-theme="light"] .device-fault-card.offline {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .device-fault-title {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .device-fault-time {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .device-fault-desc {
+  color: #334155 !important;
+}
+
+[data-theme="light"] .device-fault-action {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .device-fault-action-label {
+  color: #1d4ed8 !important;
+}
+
+[data-theme="light"] .device-fault-action-text {
+  color: #1e293b !important;
+}
+
+/* Thermo Metrics Area */
+[data-theme="light"] .thermo-droplet-bg {
+  fill: #e2e8f0;
+}
+
+[data-theme="light"] .thermo-metric-lbl {
+  color: #64748b;
+}
+
+[data-theme="light"] .thermo-metric-col.temp .thermo-metric-val {
+  color: #0f172a;
+  text-shadow: none;
+}
+
+[data-theme="light"] .thermo-metric-col.hum .thermo-metric-val {
+  color: #0284c7;
+  text-shadow: none;
+}
+
+[data-theme="light"] .thermo-metric-unit {
+  color: #64748b;
+}
+
+[data-theme="light"] .thermo-target-lbl {
+  color: #64748b;
+}
+
+[data-theme="light"] .thermo-target-val {
+  color: #334155;
+}
+
+[data-theme="light"] .thermo-target-bar-track {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .thermo-target-bar-dot {
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+[data-theme="light"] .thermo-popover-vdiv {
+  background: #e2e8f0;
+}
+
+[data-theme="light"] .thermo-detail-info-row {
+  color: #64748b;
+}
+
+/* Footers & Buttons */
+[data-theme="light"] .mapping-modal-footer,
+[data-theme="light"] .cctv-modal-footer {
+  border-top-color: #e2e8f0;
+  background: #f8fafc;
+}
+
+[data-theme="light"] .mapping-footer-hint,
+[data-theme="light"] .cctv-footer-hint {
+  color: #64748b;
+}
+
+[data-theme="light"] .cctv-btn-change-mapping {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #2563eb;
+}
+
+[data-theme="light"] .cctv-btn-change-mapping:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+[data-theme="light"] .mapping-btn-link,
+[data-theme="light"] .cctv-btn-link {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #2563eb;
+}
+
+[data-theme="light"] .mapping-btn-link:hover,
+[data-theme="light"] .cctv-btn-link:hover {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+[data-theme="light"] .mapping-btn-disabled,
+[data-theme="light"] .mapping-btn-disabled:disabled,
+[data-theme="light"] .cctv-btn-disabled,
+[data-theme="light"] .cctv-btn-disabled:disabled {
+  background: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+  color: #94a3b8 !important;
+}
+
+[data-theme="light"] .mapping-btn-unlink,
+[data-theme="light"] .cctv-btn-unlink {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+[data-theme="light"] .mapping-btn-unlink:hover,
+[data-theme="light"] .cctv-btn-unlink:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+/* Scrollbars in Light Mode */
+[data-theme="light"] .mapping-list-scroll::-webkit-scrollbar-thumb,
+[data-theme="light"] .cctv-list-scroll::-webkit-scrollbar-thumb,
+[data-theme="light"] .cctv-live-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+[data-theme="light"] .mapping-list-scroll::-webkit-scrollbar-thumb:hover,
+[data-theme="light"] .cctv-list-scroll::-webkit-scrollbar-thumb:hover,
+[data-theme="light"] .cctv-live-body::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

@@ -40,7 +40,7 @@ const DropletGaugeSvg: React.FC<{ humidity: number; id: string }> = ({ humidity,
       {/* Background */}
       <path
         d="M 12 1 C 15.5 8, 23 14, 23 20 A 11 11 0 0 1 1 20 C 1 14, 8.5 8, 12 1 Z"
-        fill="rgba(15, 23, 42, 0.85)"
+        className="thermo-droplet-bg"
       />
       {/* Liquid Fill */}
       <g clipPath={`url(#${clipId})`}>
