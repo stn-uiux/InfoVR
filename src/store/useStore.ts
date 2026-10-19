@@ -3500,9 +3500,12 @@ export const useStore = create<AppState>()(
             const cleanModelSvg = (found.modelSvgRaw && found.modelSvgRaw.includes("/src/"))
               ? base.modelSvgRaw
               : (found.modelSvgRaw || base.modelSvgRaw);
+            // base 모델의 최신 표준 장비 종류(type)가 오래된 캐시로 덮어씌워지지 않도록 보장
+            const effectiveType = base.type || found.type;
             return {
               ...base,
               ...found,
+              type: effectiveType,
               baseEquipmentViewSvgRaw: cleanBaseRaw,
               modelSvgRaw: cleanModelSvg,
             };
