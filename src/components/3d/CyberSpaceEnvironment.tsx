@@ -332,7 +332,7 @@ export function CyberSpaceEnvironment() {
           <Suspense fallback={null}>
             <FogRemover />
             <Environment
-              preset="city"
+              files="/hdri/potsdamer_platz_1k.hdr"
               environmentIntensity={csIsLightMode ? 0.6 : 0.6}
               blur={0.8}
             />

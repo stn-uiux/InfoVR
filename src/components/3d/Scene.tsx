@@ -119,27 +119,12 @@ class EnvironmentErrorBoundary extends React.Component<
   render() { return this.state.hasError ? null : this.props.children; }
 }
 
-/** Wraps <Environment> so a failed HDR fetch doesn't crash the scene */
-const EnvironmentSafe = (props: { preset: string }) => {
-  const [isOffline, setIsOffline] = React.useState(!navigator.onLine);
-
-  React.useEffect(() => {
-    const handleOnline = () => setIsOffline(false);
-    const handleOffline = () => setIsOffline(true);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  if (isOffline) return null;
-
+/** Wraps <Environment> using local offline HDR asset */
+const EnvironmentSafe = (_props: { preset?: string }) => {
   return (
     <EnvironmentErrorBoundary>
       <Suspense fallback={null}>
-        <Environment preset={props.preset as any} />
+        <Environment files="/hdri/potsdamer_platz_1k.hdr" />
       </Suspense>
     </EnvironmentErrorBoundary>
   );

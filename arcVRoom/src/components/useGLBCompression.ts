@@ -120,10 +120,10 @@ export const useGLBCompression = () => {
       try {
         const [decoderModule, encoderModule] = await Promise.all([
           draco3d.createDecoderModule({
-            locateFile: (file: string) => `https://unpkg.com/draco3d@1.5.7/${file}`
+            locateFile: (file: string) => `/wasm/${file}`
           }),
           draco3d.createEncoderModule({
-            locateFile: (file: string) => `https://unpkg.com/draco3d@1.5.7/${file}`
+            locateFile: (file: string) => `/wasm/${file}`
           })
         ]);
         io.registerDependencies({

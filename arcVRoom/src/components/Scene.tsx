@@ -1189,7 +1189,7 @@ export const Scene = forwardRef<any, SceneProps>(({
         ))}
         <Suspense fallback={null}>
           <Environment
-            preset={currentPreset as any}
+            files="/hdri/potsdamer_platz_1k.hdr"
             background={!state.showBackgroundColor}
             far={1000}
             resolution={1024}

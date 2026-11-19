@@ -16,8 +16,8 @@ import { Evaluator, Brush, SUBTRACTION } from 'three-bvh-csg';
 // @ts-ignore
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry';
 
-// Set global DRACO decoder path for useGLTF
-useGLTF.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+// Set global DRACO decoder path for useGLTF (offline local path)
+useGLTF.setDecoderPath('/wasm/');
 
 const sanitizeMaterial = (mat: any, environment: THREE.Texture | null = null): any => {
   if (!mat.isMeshStandardMaterial && !mat.isMeshPhysicalMaterial) return mat;

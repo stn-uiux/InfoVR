@@ -23,6 +23,9 @@ import {
   DEFAULT_LIGHT_PARAMS,
 } from "../../utils/builtinModels";
 import { DigitalClock } from "../layout/DigitalClock";
+
+// Configure offline local Draco decoder path
+useGLTF.setDecoderPath("/wasm/");
 import { ThermoHygrometer } from "./ThermoHygrometer";
 import { getThermoHygroById, getThermoHygroStatusMeta } from "../../utils/thermoHygroService";
 import { getCctvById, getCctvStatusMeta } from "../../utils/cctvService";

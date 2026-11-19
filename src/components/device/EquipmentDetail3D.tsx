@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Text } from '@react-three/drei';
+import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { Icon } from '@iconify/react';
 import { useTheme } from "../../contexts/ThemeContext";
@@ -585,6 +585,29 @@ const totalRam = 24 * 16;
 const usedRam = parseFloat(ramData.reduce((acc, curr) => acc + curr.used, 0).toFixed(1));
 const freeRam = parseFloat((totalRam - usedRam).toFixed(1));
 
+// ─── NPU 상단 라벨 텍스처 (오프라인 Web Worker/폰트 로딩 의존성 완전 제거) ───
+let npuLabelTexture: THREE.CanvasTexture | null = null;
+function getNpuLabelTexture(): THREE.CanvasTexture {
+  if (!npuLabelTexture) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#c8d6e5';
+      ctx.font = '600 64px "Pretendard", "Malgun Gothic", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('rebellions_', canvas.width / 2, canvas.height / 2);
+    }
+    npuLabelTexture = new THREE.CanvasTexture(canvas);
+    npuLabelTexture.anisotropy = 4;
+    npuLabelTexture.needsUpdate = true;
+  }
+  return npuLabelTexture;
+}
+
 // ─── NPU 카드 (Rebellions) ───
 function NPUCard({ position, index }: { position: [number, number, number]; index: number }) {
   const data = npuData[index] || npuData[0];
@@ -627,9 +650,10 @@ function NPUCard({ position, index }: { position: [number, number, number]; inde
 
       {/* Top label */}
       <group position={[0, 0.326, 0]} rotation={[-Math.PI / 2, 0, -Math.PI / 2]}>
-        <Text fontSize={0.1} color="#c8d6e5" anchorX="center" anchorY="middle" letterSpacing={0.05}>
-          rebellions_
-        </Text>
+        <mesh>
+          <planeGeometry args={[0.72, 0.18]} />
+          <meshBasicMaterial map={getNpuLabelTexture()} transparent depthWrite={false} />
+        </mesh>
       </group>
 
       {/* Heatsink fins on top */}

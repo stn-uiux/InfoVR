@@ -1,5 +1,4 @@
-/* Import Pretendard font for typography */
-@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
+/* Offline-safe system & Pretendard typography (falls back to Malgun Gothic / Apple SD Gothic Neo when offline) */
 
 
 html,
